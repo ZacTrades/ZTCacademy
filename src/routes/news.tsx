@@ -662,20 +662,21 @@ function NewsComingSoonCard() {
         Coming soon
       </h2>
       <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-muted-foreground md:text-base md:leading-7">
-        The ZacTrades live news desk is being prepared. The page background and structure stay ready,
-        but the live feed and calendar will open when the news section launches.
+        The ZacTrades live news desk is being prepared. The page background and structure stay
+        ready, but the live feed and calendar will open when the news section launches.
       </p>
       <div className="mt-8 grid gap-3 text-left sm:grid-cols-3">
-        {[
-          "Live market headlines",
-          "Economic calendar",
-          "Clean trader-focused layout",
-        ].map((item) => (
-          <div key={item} className="rounded-2xl border border-border/60 bg-background/45 p-4 text-sm text-muted-foreground">
-            <div className="mb-3 h-1.5 w-10 rounded-full bg-electric/70" />
-            {item}
-          </div>
-        ))}
+        {["Live market headlines", "Economic calendar", "Clean trader-focused layout"].map(
+          (item) => (
+            <div
+              key={item}
+              className="rounded-2xl border border-border/60 bg-background/45 p-4 text-sm text-muted-foreground"
+            >
+              <div className="mb-3 h-1.5 w-10 rounded-full bg-electric/70" />
+              {item}
+            </div>
+          ),
+        )}
       </div>
     </motion.div>
   );
@@ -1096,9 +1097,7 @@ function NewsCard({ item, index }: { item: NewsItem; index: number }) {
               : "border-primary/35 bg-primary/10 text-electric"
           }`}
         >
-          <span
-            className={`h-2 w-2 rounded-full ${isHighImpact ? "bg-bear" : "bg-electric"}`}
-          />
+          <span className={`h-2 w-2 rounded-full ${isHighImpact ? "bg-bear" : "bg-electric"}`} />
           {isHighImpact ? "Urgent" : "News"}
         </div>
         {item.publishedAt && (
@@ -1145,7 +1144,11 @@ function NewsMeta({
         <Badge
           key={label}
           variant="outline"
-          className={impact === "high" ? "border-bear/40 bg-bear/10 text-bear" : "border-primary/35 bg-primary/10 text-electric"}
+          className={
+            impact === "high"
+              ? "border-bear/40 bg-bear/10 text-bear"
+              : "border-primary/35 bg-primary/10 text-electric"
+          }
         >
           {label}
         </Badge>

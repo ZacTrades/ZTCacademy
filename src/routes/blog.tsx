@@ -224,7 +224,9 @@ function BlogPage() {
 }
 
 function getVisibleBlogPosts(items: BlogPostRow[]) {
-  const visibleItems = items.filter((post) => post.slug && post.title && post.is_published !== false);
+  const visibleItems = items.filter(
+    (post) => post.slug && post.title && post.is_published !== false,
+  );
   return visibleItems.length ? visibleItems : defaultBlogPosts;
 }
 

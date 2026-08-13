@@ -126,7 +126,10 @@ function BlogPostPage() {
                 />
               </motion.article>
             ) : loadingPosts ? (
-              <motion.div {...fadeUp} className="rounded-2xl border border-border/60 bg-card/35 p-8">
+              <motion.div
+                {...fadeUp}
+                className="rounded-2xl border border-border/60 bg-card/35 p-8"
+              >
                 <Badge variant="outline" className="glass mb-4 border-primary/40 text-xs">
                   Blog
                 </Badge>
@@ -136,7 +139,10 @@ function BlogPostPage() {
                 </p>
               </motion.div>
             ) : (
-              <motion.div {...fadeUp} className="rounded-2xl border border-border/60 bg-card/35 p-8">
+              <motion.div
+                {...fadeUp}
+                className="rounded-2xl border border-border/60 bg-card/35 p-8"
+              >
                 <Badge variant="outline" className="glass mb-4 border-primary/40 text-xs">
                   Blog
                 </Badge>
@@ -271,7 +277,9 @@ function BlogPdfReader({
 }
 
 function getVisibleBlogPosts(items: BlogPostRow[]) {
-  const visibleItems = items.filter((post) => post.slug && post.title && post.is_published !== false);
+  const visibleItems = items.filter(
+    (post) => post.slug && post.title && post.is_published !== false,
+  );
   return visibleItems.length ? visibleItems : defaultBlogPosts;
 }
 
@@ -281,7 +289,9 @@ function formatBlogContent(content: string) {
     .map((paragraph) => paragraph.trim())
     .filter(Boolean);
 
-  return paragraphs.length ? paragraphs : ["This article is being prepared and will be expanded soon."];
+  return paragraphs.length
+    ? paragraphs
+    : ["This article is being prepared and will be expanded soon."];
 }
 
 function PostIcon({ post, className }: { post: BlogPostRow; className: string }) {

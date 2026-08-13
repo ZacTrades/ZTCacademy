@@ -24,10 +24,66 @@ async function getServerEntry(): Promise<ServerEntry> {
   return serverEntryPromise;
 }
 
-function brandedErrorResponse(): Response {
-  return new Response(renderErrorPage(), {
-    status: 500,
-    headers: { "content-type": "text/html; charset=utf-8" },
+function brandedErrorResponse(request?: Request): Response {
+  return withSecurityHeaders(
+    new Response(renderErrorPage(), {
+      status: 500,
+      headers: { "content-type": "text/html; charset=utf-8" },
+    }),
+    request,
+  );
+}
+
+function isLocalDevelopmentRequest(request?: Request): boolean {
+  if (!request) return false;
+
+  const hostname = new URL(request.url).hostname;
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}
+
+function withSecurityHeaders(response: Response, request?: Request): Response {
+  const headers = new Headers(response.headers);
+  const isLocalDevelopment = isLocalDevelopmentRequest(request);
+  headers.set("x-content-type-options", "nosniff");
+  headers.set("referrer-policy", "strict-origin-when-cross-origin");
+  headers.set("permissions-policy", "camera=(), microphone=(), geolocation=(), payment=()");
+  if (!isLocalDevelopment) {
+    headers.set("strict-transport-security", "max-age=31536000; includeSubDomains; preload");
+  }
+  headers.set(
+    "content-security-policy",
+    isLocalDevelopment
+      ? [
+          "default-src 'self'",
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* http://127.0.0.1:* https://s3.tradingview.com https://www.tradingview.com",
+          "style-src 'self' 'unsafe-inline'",
+          "img-src 'self' data: blob: http://localhost:* http://127.0.0.1:* https://*.supabase.co https://cdn.discordapp.com https://*.tradingview.com https://www.tradingview.com",
+          "connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* https://*.supabase.co wss://*.supabase.co https://api.nowpayments.io https://discord.com https://*.tradingview.com wss://*.tradingview.com",
+          "frame-src 'self' http://localhost:* http://127.0.0.1:* https://*.tradingview.com https://www.tradingview.com https://*.supabase.co blob:",
+          "object-src 'none'",
+          "base-uri 'self'",
+          "form-action 'self'",
+          "frame-ancestors 'self'",
+        ].join("; ")
+      : [
+          "default-src 'self'",
+          "script-src 'self' 'unsafe-inline' https://s3.tradingview.com https://*.tradingview.com https://*.tradingview-widget.com",
+          "style-src 'self' 'unsafe-inline'",
+          "img-src 'self' data: blob: https://*.supabase.co https://cdn.discordapp.com https://*.tradingview.com https://*.tradingview-widget.com",
+          "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.nowpayments.io https://discord.com https://*.tradingview.com https://*.tradingview-widget.com wss://*.tradingview.com",
+          "frame-src 'self' https://*.tradingview.com https://*.tradingview-widget.com https://*.supabase.co blob:",
+          "object-src 'none'",
+          "base-uri 'self'",
+          "form-action 'self'",
+          "frame-ancestors 'self'",
+          "upgrade-insecure-requests",
+        ].join("; "),
+  );
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
   });
 }
 
@@ -88,12 +144,20 @@ export default {
         );
       }
 
+      if (url.pathname === "/api/nowpayments/ipn") {
+        const { handleNowPaymentsIpnRequest } = await import("./lib/payment-server");
+        return handleNowPaymentsIpnRequest(
+          request,
+          env && typeof env === "object" ? (env as Record<string, string | undefined>) : {},
+        );
+      }
+
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      return withSecurityHeaders(await normalizeCatastrophicSsrResponse(response), request);
     } catch (error) {
       console.error(error);
-      return brandedErrorResponse();
+      return brandedErrorResponse(request);
     }
   },
 };

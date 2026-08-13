@@ -94,6 +94,7 @@ const fadeUp = {
 };
 
 const BLOG_PDF_BUCKET = "blog-pdfs";
+const MAX_BLOG_PDF_BYTES = 10 * 1024 * 1024;
 
 type EditablePlan = CoachingPlanRow & {
   featuresText: string;
@@ -230,6 +231,9 @@ function AdminPage() {
   const [profiles, setProfiles] = useState<UserProfileRow[]>([]);
   const [activePanel, setActivePanel] = useState<AdminPanelKey>("staff");
   const [blogCreateOpen, setBlogCreateOpen] = useState(false);
+  const [indicatorDeleteTarget, setIndicatorDeleteTarget] = useState<IndicatorRow | null>(null);
+  const [communitySocialDeleteTarget, setCommunitySocialDeleteTarget] =
+    useState<EditableCommunitySocial | null>(null);
   const [propFirmDeleteTarget, setPropFirmDeleteTarget] = useState<EditablePropFirm | null>(null);
   const [fetching, setFetching] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -468,6 +472,41 @@ function AdminPage() {
     setErrorMessage("");
   };
 
+  const addCommunitySocial = () => {
+    setCommunitySocials((current) => {
+      const existingSlugs = new Set(current.map((item) => item.slug));
+      const baseSlug = slugify("social-link");
+      let slug = baseSlug;
+      let suffix = 2;
+
+      while (existingSlugs.has(slug)) {
+        slug = `${baseSlug}-${suffix}`;
+        suffix += 1;
+      }
+
+      const nextOrder = current.length
+        ? Math.max(...current.map((item) => item.display_order)) + 1
+        : 1;
+
+      const newSocial: EditableCommunitySocial = {
+        slug,
+        name: "New social link",
+        handle: "@yourhandle",
+        description: "Add a short description for this social channel.",
+        icon_key: "message",
+        url: "https://",
+        tone_key: "primary",
+        is_active: true,
+        display_order: nextOrder,
+      };
+
+      return [newSocial, ...current];
+    });
+    setActivePanel("community");
+    setMessage("New social link added. Fill the details, then save it.");
+    setErrorMessage("");
+  };
+
   const updateProfile = (id: string, patch: Partial<UserProfileRow>) => {
     setProfiles((current) =>
       current.map((profile) => (profile.id === id ? { ...profile, ...patch } : profile)),
@@ -703,6 +742,27 @@ function AdminPage() {
     setSavingKey(null);
   };
 
+  const deleteIndicator = async (item: IndicatorRow) => {
+    if (!supabase) return;
+
+    setSavingKey(`indicator:delete:${item.slug}`);
+    setMessage("");
+    setErrorMessage("");
+
+    const { error } = await supabase.from("premium_indicators").delete().eq("slug", item.slug);
+
+    if (error) {
+      console.error(error);
+      setErrorMessage(error.message);
+    } else {
+      setIndicators((current) => current.filter((currentItem) => currentItem.slug !== item.slug));
+      setMessage(`${item.name} deleted.`);
+    }
+
+    setIndicatorDeleteTarget(null);
+    setSavingKey(null);
+  };
+
   const saveTool = async (event: FormEvent<HTMLFormElement>, item: EditableTool) => {
     event.preventDefault();
     if (!supabase) return;
@@ -927,6 +987,29 @@ function AdminPage() {
       setMessage(`${payload.name} community card updated.`);
     }
 
+    setSavingKey(null);
+  };
+
+  const deleteCommunitySocial = async (item: EditableCommunitySocial) => {
+    if (!supabase) return;
+
+    setSavingKey(`community:delete:${item.slug}`);
+    setMessage("");
+    setErrorMessage("");
+
+    const { error } = await supabase.from("community_socials").delete().eq("slug", item.slug);
+
+    if (error) {
+      console.error(error);
+      setErrorMessage(error.message);
+    } else {
+      setCommunitySocials((current) =>
+        current.filter((currentItem) => currentItem.slug !== item.slug),
+      );
+      setMessage(`${item.name} community card deleted.`);
+    }
+
+    setCommunitySocialDeleteTarget(null);
     setSavingKey(null);
   };
 
@@ -1285,15 +1368,28 @@ function AdminPage() {
                     {visibleActivePanel === "community" && (
                       <AdminSection
                         title="ZacTrades Community"
-                        description="Edit the social cards shown in the homepage community section."
+                        description="Add and edit the social cards shown in the homepage community section."
+                        action={
+                          <Button
+                            type="button"
+                            onClick={addCommunitySocial}
+                            className="text-primary-foreground glow-primary hover:opacity-90"
+                            style={{ background: "var(--gradient-primary)" }}
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add Social Link
+                          </Button>
+                        }
                       >
                         {communitySocials.map((item) => (
                           <CommunitySocialEditor
                             key={item.slug}
                             item={item}
                             saving={savingKey === `community:${item.slug}`}
+                            deleting={savingKey === `community:delete:${item.slug}`}
                             onChange={updateCommunitySocial}
                             onSubmit={saveCommunitySocial}
+                            onDelete={(social) => setCommunitySocialDeleteTarget(social)}
                           />
                         ))}
                       </AdminSection>
@@ -1345,8 +1441,10 @@ function AdminPage() {
                             key={item.slug}
                             item={item}
                             saving={savingKey === `indicator:${item.slug}`}
+                            deleting={savingKey === `indicator:delete:${item.slug}`}
                             onChange={updateIndicator}
                             onSubmit={saveIndicator}
+                            onDelete={(indicator) => setIndicatorDeleteTarget(indicator)}
                           />
                         ))}
                       </AdminSection>
@@ -1388,6 +1486,116 @@ function AdminPage() {
         onOpenChange={setBlogCreateOpen}
         onSubmit={createBlogPost}
       />
+      <AlertDialog
+        open={Boolean(communitySocialDeleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setCommunitySocialDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent className="glass-strong max-w-md border-border/60 p-0 shadow-2xl">
+          <div className="relative overflow-hidden rounded-2xl">
+            <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-bear/20 blur-3xl" />
+            <div className="relative p-6">
+              <AlertDialogHeader>
+                <div className="mb-2 grid h-12 w-12 place-items-center rounded-xl bg-bear/10 text-bear ring-1 ring-bear/30">
+                  <AlertCircle className="h-5 w-5" />
+                </div>
+                <AlertDialogTitle className="font-display text-2xl">
+                  Delete community card?
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-sm leading-6 text-muted-foreground">
+                  This will remove{" "}
+                  <span className="font-semibold text-foreground">
+                    {communitySocialDeleteTarget?.name ?? "this community card"}
+                  </span>{" "}
+                  from the homepage ZacTrades Community section. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+
+              <AlertDialogFooter className="mt-6 gap-3 sm:space-x-0">
+                <AlertDialogCancel
+                  disabled={savingKey?.startsWith("community:delete")}
+                  className="mt-0 border-border/60 bg-background/45"
+                >
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={
+                    !communitySocialDeleteTarget || savingKey?.startsWith("community:delete")
+                  }
+                  onClick={(event) => {
+                    event.preventDefault();
+                    if (communitySocialDeleteTarget) {
+                      void deleteCommunitySocial(communitySocialDeleteTarget);
+                    }
+                  }}
+                  className="bg-bear text-white hover:bg-bear/90"
+                >
+                  {savingKey?.startsWith("community:delete") ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  Delete community card
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </div>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={Boolean(indicatorDeleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setIndicatorDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent className="glass-strong max-w-md border-border/60 p-0 shadow-2xl">
+          <div className="relative overflow-hidden rounded-2xl">
+            <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-bear/20 blur-3xl" />
+            <div className="relative p-6">
+              <AlertDialogHeader>
+                <div className="mb-2 grid h-12 w-12 place-items-center rounded-xl bg-bear/10 text-bear ring-1 ring-bear/30">
+                  <AlertCircle className="h-5 w-5" />
+                </div>
+                <AlertDialogTitle className="font-display text-2xl">
+                  Delete indicator?
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-sm leading-6 text-muted-foreground">
+                  This will remove{" "}
+                  <span className="font-semibold text-foreground">
+                    {indicatorDeleteTarget?.name ?? "this indicator"}
+                  </span>{" "}
+                  from the Premium Indicators page. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+
+              <AlertDialogFooter className="mt-6 gap-3 sm:space-x-0">
+                <AlertDialogCancel
+                  disabled={savingKey?.startsWith("indicator:delete")}
+                  className="mt-0 border-border/60 bg-background/45"
+                >
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={!indicatorDeleteTarget || savingKey?.startsWith("indicator:delete")}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    if (indicatorDeleteTarget) void deleteIndicator(indicatorDeleteTarget);
+                  }}
+                  className="bg-bear text-white hover:bg-bear/90"
+                >
+                  {savingKey?.startsWith("indicator:delete") ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  Delete indicator
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </div>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog
         open={Boolean(propFirmDeleteTarget)}
         onOpenChange={(open) => {
@@ -2127,13 +2335,17 @@ function LivePackageEditor({
 function IndicatorEditor({
   item,
   saving,
+  deleting,
   onChange,
   onSubmit,
+  onDelete,
 }: {
   item: IndicatorRow;
   saving: boolean;
+  deleting: boolean;
   onChange: (slug: string, patch: Partial<IndicatorRow>) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>, item: IndicatorRow) => void;
+  onDelete: (item: IndicatorRow) => void;
 }) {
   return (
     <form
@@ -2194,16 +2406,33 @@ function IndicatorEditor({
           </div>
         </div>
 
-        <Button
-          type="submit"
-          size="lg"
-          disabled={saving}
-          className="mt-5 w-full text-primary-foreground glow-primary hover:opacity-90"
-          style={{ background: "var(--gradient-primary)" }}
-        >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Save indicator
-        </Button>
+        <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto]">
+          <Button
+            type="submit"
+            size="lg"
+            disabled={saving || deleting}
+            className="w-full text-primary-foreground glow-primary hover:opacity-90"
+            style={{ background: "var(--gradient-primary)" }}
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Save indicator
+          </Button>
+          <Button
+            type="button"
+            size="lg"
+            variant="outline"
+            disabled={saving || deleting}
+            onClick={() => onDelete(item)}
+            className="border-bear/45 bg-bear/10 text-bear hover:bg-bear/15"
+          >
+            {deleting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+            Delete
+          </Button>
+        </div>
       </div>
     </form>
   );
@@ -2491,13 +2720,17 @@ function PropFirmEditor({
 function CommunitySocialEditor({
   item,
   saving,
+  deleting,
   onChange,
   onSubmit,
+  onDelete,
 }: {
   item: EditableCommunitySocial;
   saving: boolean;
+  deleting: boolean;
   onChange: (slug: string, patch: Partial<EditableCommunitySocial>) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>, item: EditableCommunitySocial) => void;
+  onDelete: (item: EditableCommunitySocial) => void;
 }) {
   return (
     <form
@@ -2514,6 +2747,10 @@ function CommunitySocialEditor({
             <h3 className="font-display text-2xl font-bold">{item.name}</h3>
             <p className="mt-2 text-sm text-muted-foreground">
               Controls the social card shown in the homepage community section.
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Icon keys: youtube, instagram, music, message. Color styles: bear, gold, primary,
+              bull.
             </p>
           </div>
           <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-primary/15 text-electric ring-1 ring-primary/30">
@@ -2580,16 +2817,33 @@ function CommunitySocialEditor({
           </div>
         </div>
 
-        <Button
-          type="submit"
-          size="lg"
-          disabled={saving}
-          className="mt-5 w-full text-primary-foreground glow-primary hover:opacity-90"
-          style={{ background: "var(--gradient-primary)" }}
-        >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Save community card
-        </Button>
+        <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto]">
+          <Button
+            type="submit"
+            size="lg"
+            disabled={saving || deleting}
+            className="w-full text-primary-foreground glow-primary hover:opacity-90"
+            style={{ background: "var(--gradient-primary)" }}
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Save community card
+          </Button>
+          <Button
+            type="button"
+            size="lg"
+            variant="outline"
+            disabled={saving || deleting}
+            onClick={() => onDelete(item)}
+            className="border-bear/45 bg-bear/10 text-bear hover:bg-bear/15"
+          >
+            {deleting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+            Delete
+          </Button>
+        </div>
       </div>
     </form>
   );
@@ -2798,11 +3052,7 @@ function StaffRoleCard({
   );
 }
 
-function CommunityMembersPanel({
-  memberProfiles,
-}: {
-  memberProfiles: UserProfileRow[];
-}) {
+function CommunityMembersPanel({ memberProfiles }: { memberProfiles: UserProfileRow[] }) {
   const [searchQuery, setSearchQuery] = useState("");
   const paidMemberProfiles = memberProfiles.filter(hasPaidMentorship);
   const paidNewsProfiles = memberProfiles.filter(hasPaidNewsSubscription);
@@ -2815,7 +3065,10 @@ function CommunityMembersPanel({
       <div className="grid gap-3 sm:grid-cols-4">
         <AdminStat label="All members" value={String(memberProfiles.length)} />
         <AdminStat label="Paid members" value={String(paidMemberProfiles.length)} />
-        <AdminStat label="Live trading" value={String(memberProfiles.filter(hasPaidLiveTradingAccess).length)} />
+        <AdminStat
+          label="Live trading"
+          value={String(memberProfiles.filter(hasPaidLiveTradingAccess).length)}
+        />
         <AdminStat label="News subscribers" value={String(paidNewsProfiles.length)} />
       </div>
 
@@ -2965,7 +3218,9 @@ function CommunityMembersTableRow({ profile }: { profile: UserProfileRow }) {
                 <Badge variant="outline" className={plan.className}>
                   {plan.label}
                 </Badge>
-                {plan.detail && <span className="text-xs text-muted-foreground">{plan.detail}</span>}
+                {plan.detail && (
+                  <span className="text-xs text-muted-foreground">{plan.detail}</span>
+                )}
               </div>
             ))}
           </div>
@@ -2983,7 +3238,9 @@ function CommunityMembersTableRow({ profile }: { profile: UserProfileRow }) {
             size="sm"
             variant="outline"
             className="border-gold/35 text-gold hover:bg-gold/10"
-            aria-label={"Print invoice for " + (profile.full_name || profile.email || "paid member")}
+            aria-label={
+              "Print invoice for " + (profile.full_name || profile.email || "paid member")
+            }
             onClick={() => printPaidMemberInvoice(profile, paidMemberships)}
           >
             <Printer className="h-3.5 w-3.5" />
@@ -3066,7 +3323,9 @@ function memberMatchesSearch(profile: UserProfileRow, query: string) {
     liveAccess.notes,
   ];
 
-  return fields.some((field) => normalizeMemberSearch(String(field ?? "")).includes(normalizedQuery));
+  return fields.some((field) =>
+    normalizeMemberSearch(String(field ?? "")).includes(normalizedQuery),
+  );
 }
 
 function normalizeMemberSearch(value: string) {
@@ -3083,7 +3342,11 @@ function paidPlanItems(profile: UserProfileRow) {
         key: slug,
         label: slug === "one_to_one" ? "Coaching" : "Mentorship",
         className: "w-fit border-bull/40 bg-bull/10 text-bull",
-        detail: [label, membership.amount_label, membership.paid_at ? formatAdminDate(membership.paid_at) : null]
+        detail: [
+          label,
+          membership.amount_label,
+          membership.paid_at ? formatAdminDate(membership.paid_at) : null,
+        ]
           .filter(Boolean)
           .join(" - "),
       };
@@ -4442,19 +4705,21 @@ function slugify(value: string) {
 async function uploadBlogPdf(fileValue: FormDataEntryValue | null, slug: string) {
   if (!supabase || !(fileValue instanceof File) || fileValue.size === 0) return null;
 
+  if (fileValue.size > MAX_BLOG_PDF_BYTES) {
+    throw new Error("Please upload a PDF smaller than 10 MB.");
+  }
+
   if (fileValue.type !== "application/pdf" && !fileValue.name.toLowerCase().endsWith(".pdf")) {
     throw new Error("Please upload a PDF file.");
   }
 
   const safeFileName = slugify(fileValue.name.replace(/\.pdf$/i, "")) || "blog-file";
-  const storagePath = `${slug}/${Date.now()}-${safeFileName}.pdf`;
-  const { error } = await supabase.storage
-    .from(BLOG_PDF_BUCKET)
-    .upload(storagePath, fileValue, {
-      cacheControl: "3600",
-      contentType: "application/pdf",
-      upsert: true,
-    });
+  const storagePath = `${slug}/${crypto.randomUUID()}-${safeFileName}.pdf`;
+  const { error } = await supabase.storage.from(BLOG_PDF_BUCKET).upload(storagePath, fileValue, {
+    cacheControl: "3600",
+    contentType: "application/pdf",
+    upsert: true,
+  });
 
   if (error) {
     throw new Error(error.message);

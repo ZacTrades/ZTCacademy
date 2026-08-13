@@ -10,12 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { BrandLogo } from "@/components/site/BrandLogo";
 import { useLanguage } from "@/lib/language";
 import { useAuth } from "@/lib/use-auth";
@@ -51,7 +46,8 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
   const [selectedCountryId, setSelectedCountryId] = useState("us");
 
   const isJoin = mode === "join";
-  const selectedCountry = countryCodes.find((country) => country.id === selectedCountryId) ?? countryCodes[0];
+  const selectedCountry =
+    countryCodes.find((country) => country.id === selectedCountryId) ?? countryCodes[0];
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

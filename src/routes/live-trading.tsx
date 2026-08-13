@@ -254,9 +254,7 @@ function LiveTradingPage() {
                     <step.icon className="h-5 w-5" />
                   </div>
                   <h3 className="mt-5 font-display text-xl font-bold">{step.title}</h3>
-                  <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                    {step.description}
-                  </p>
+                  <p className="mt-3 text-sm leading-6 text-muted-foreground">{step.description}</p>
                 </motion.div>
               ))}
             </div>
@@ -334,10 +332,7 @@ function LiveTradingPage() {
 
         <section className="pb-20 md:pb-28">
           <div className="mx-auto max-w-7xl px-4 md:px-6">
-            <motion.div
-              {...fadeUp}
-              className="glass-strong overflow-hidden rounded-3xl p-6 md:p-8"
-            >
+            <motion.div {...fadeUp} className="glass-strong overflow-hidden rounded-3xl p-6 md:p-8">
               <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
                 <div>
                   <Badge variant="outline" className="glass border-bull/40 text-xs">
@@ -352,9 +347,21 @@ function LiveTradingPage() {
                   </p>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <TrustCard icon={Shield} title="Risk first" text="Stops, invalidation, and sizing are part of the discussion." />
-                  <TrustCard icon={MessageSquareText} title="Ask questions" text="Use the room chat to clarify setups and session logic." />
-                  <TrustCard icon={Users} title="Community" text="Stay connected with traders studying the same markets." />
+                  <TrustCard
+                    icon={Shield}
+                    title="Risk first"
+                    text="Stops, invalidation, and sizing are part of the discussion."
+                  />
+                  <TrustCard
+                    icon={MessageSquareText}
+                    title="Ask questions"
+                    text="Use the room chat to clarify setups and session logic."
+                  />
+                  <TrustCard
+                    icon={Users}
+                    title="Community"
+                    text="Stay connected with traders studying the same markets."
+                  />
                 </div>
               </div>
             </motion.div>
@@ -396,15 +403,7 @@ function RoomStat({
   );
 }
 
-function TrustCard({
-  icon: Icon,
-  title,
-  text,
-}: {
-  icon: LucideIcon;
-  title: string;
-  text: string;
-}) {
+function TrustCard({ icon: Icon, title, text }: { icon: LucideIcon; title: string; text: string }) {
   return (
     <div className="rounded-2xl border border-border/60 bg-background/45 p-5">
       <div className="grid h-10 w-10 place-items-center rounded-xl bg-bull/15 text-bull">
