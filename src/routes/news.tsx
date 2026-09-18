@@ -23,6 +23,7 @@ import { StaffCheckoutNotice } from "@/components/site/StaffCheckoutNotice";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useCurrency } from "@/lib/currency";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/use-auth";
 
@@ -470,7 +471,7 @@ function NewsPage() {
                 <Radio className="h-3.5 w-3.5 text-electric" />
                 Market News
               </Badge>
-              <h1 className="font-display text-5xl font-bold leading-tight tracking-tight md:text-7xl">
+              <h1 className="font-display text-4xl font-bold leading-tight tracking-tight sm:text-5xl md:text-7xl">
                 Market-moving <span className="text-gradient">news</span>
               </h1>
               <p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-muted-foreground md:text-lg">
@@ -658,7 +659,7 @@ function NewsComingSoonCard() {
       <Badge variant="outline" className="glass mt-6 border-primary/40 text-xs">
         News Desk
       </Badge>
-      <h2 className="mt-5 font-display text-4xl font-bold tracking-tight md:text-5xl">
+      <h2 className="mt-5 font-display text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
         Coming soon
       </h2>
       <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-muted-foreground md:text-base md:leading-7">
@@ -683,6 +684,9 @@ function NewsComingSoonCard() {
 }
 
 function NewsSubscriptionGate({ onCheckout }: { onCheckout: () => void }) {
+  const { formatPrice } = useCurrency();
+  const newsPrice = formatPrice(NEWS_SUBSCRIPTION_PACKAGES[0].price);
+
   return (
     <motion.div
       {...fadeUp}
@@ -695,7 +699,7 @@ function NewsSubscriptionGate({ onCheckout }: { onCheckout: () => void }) {
             Paid news desk
           </div>
           <h2 className="mt-5 font-display text-3xl font-bold tracking-tight md:text-4xl">
-            Unlock live market news for <span className="text-gradient-gold">$5/mo</span>.
+            Unlock live market news for <span className="text-gradient-gold">{newsPrice}/mo</span>.
           </h2>
           <p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground">
             Your account is registered, but the news desk is a paid subscription. Subscribe to view
@@ -718,7 +722,7 @@ function NewsSubscriptionGate({ onCheckout }: { onCheckout: () => void }) {
             className="mt-8 text-primary-foreground glow-primary hover:opacity-90"
             style={{ background: "var(--gradient-primary)" }}
           >
-            Pay $5 & Unlock News
+            Pay {newsPrice} & Unlock News
           </Button>
         </div>
 
@@ -732,7 +736,7 @@ function NewsSubscriptionGate({ onCheckout }: { onCheckout: () => void }) {
                 <div className="mt-2 font-display text-2xl font-bold">News Desk</div>
               </div>
               <div className="text-right">
-                <div className="font-mono text-4xl font-bold text-gradient-gold">$5</div>
+                <div className="font-mono text-4xl font-bold text-gradient-gold">{newsPrice}</div>
                 <div className="text-xs text-muted-foreground">per month</div>
               </div>
             </div>

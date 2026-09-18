@@ -20,41 +20,92 @@ function RefundPolicyPage() {
     <LegalPage
       eyebrow="Refunds"
       title="Refund Policy"
-      intro="This policy explains how refunds and cancellations are handled for ZacTrades subscriptions, mentorship, live rooms, indicators, and digital services."
+      intro="At ZacTrades, we want every customer to understand our refund policy before purchasing any product or service. By completing a purchase on ZacTrades.com, you acknowledge that you have read and accepted this Refund Policy."
+      lastUpdated="September 5, 2026"
       sections={[
         {
-          title: "General refund window",
+          title: "1. General Refund Policy",
           body: [
-            "Unless a specific offer states otherwise, eligible purchases may be requested for refund within 7 days of purchase.",
-            "Refund requests must be submitted with the email address used at checkout and enough detail for us to locate the transaction.",
+            `All purchases made through ZacTrades.com are generally non-refundable once access to the purchased service, membership, digital content, training, or other product has been provided, or once the service has started.`,
+            `This includes, but is not limited to:`,
+            `- Premium Memberships`,
+            `- Group Formation / Mentorship`,
+            `- 1-to-1 Coaching`,
+            `- Digital PDFs and educational materials`,
+            `- Trading tools, indicators, or other digital products`,
+            `- Other educational services offered through ZacTrades.com`,
+            `Simply changing your mind, deciding not to use the service, missing sessions, or not achieving the results you expected does not automatically create a right to a refund.`,
           ],
         },
         {
-          title: "Subscriptions and cancellations",
+          title: "2. Services That Have Started",
           body: [
-            "You may cancel a subscription according to the cancellation options available in your account or by contacting support.",
-            "Cancellation stops future billing. It does not automatically refund past payments unless the purchase qualifies under this policy or a written offer guarantee.",
+            `For services that begin immediately or shortly after purchase, including memberships, coaching, mentoring, live trading sessions, and digital access, you acknowledge that the service may begin before the expiry of any applicable withdrawal period when you expressly request or agree to immediate access or performance.`,
+            `Where applicable law allows the withdrawal right to be excluded after the service has started with your agreement, no refund will be provided once the service has begun.`,
           ],
         },
         {
-          title: "Digital products and access",
+          title: "3. Digital Products and Content",
           body: [
-            "Because ZacTrades provides digital education, indicators, recordings, community access, and live sessions, refunds may be denied when materials have been substantially accessed, downloaded, used, or shared.",
-            "Abuse of refund requests, chargebacks, account sharing, or violation of the Terms of Service may make a purchase ineligible for refund.",
+            `Digital products, PDFs, educational materials, recordings, indicators, tools, or other digital content may become available immediately after purchase.`,
+            `Once digital content has been supplied, accessed, downloaded, or otherwise made available to you, purchases are generally non-refundable, except where a refund is required by applicable law.`,
           ],
         },
         {
-          title: "Mentorship and live services",
+          title: "4. Memberships",
           body: [
-            "Scheduled mentorship, coaching calls, and live services may have limited refund eligibility once sessions are booked, delivered, or missed without proper notice.",
-            "If ZacTrades cancels a paid session and cannot provide a reasonable replacement, we may provide a credit, reschedule, or refund at our discretion.",
+            `Membership payments are generally non-refundable once membership access has been activated.`,
+            `Cancelling a membership does not create a right to a refund for the current billing period.`,
+            `Where applicable, cancellation will prevent future renewal rather than refunding previous payments.`,
           ],
         },
         {
-          title: "How to request a refund",
+          title: "5. Coaching and Formation Programs",
           body: [
-            "Contact ZacTrades support with your full name, purchase email, order details, and reason for the request.",
-            "Approved refunds are usually returned to the original payment method. Processing times depend on the payment provider and your bank.",
+            `Payments for coaching, mentoring, and formation programs are generally non-refundable once the program has started or access to the program has been provided.`,
+            `If you purchase a program and do not attend scheduled sessions or choose not to participate, this does not automatically create a right to a refund.`,
+          ],
+        },
+        {
+          title: "6. Exceptions Required by Law",
+          body: [
+            `Nothing in this Refund Policy is intended to remove or limit any consumer right that cannot legally be excluded.`,
+            `Where applicable Moroccan consumer protection laws provide a statutory right of withdrawal, cancellation, or refund, those rights will continue to apply.`,
+            `For certain distance contracts, Moroccan Law No. 31-08 provides a withdrawal period, subject to the exceptions and conditions established by the law. One important exception concerns services whose execution has already started with the consumer's agreement.`,
+          ],
+        },
+        {
+          title: "7. Service Unavailability",
+          body: [
+            `If ZacTrades is unable to provide a purchased service because the service becomes unavailable before it has been provided, we may provide an appropriate refund or other remedy in accordance with applicable law.`,
+          ],
+        },
+        {
+          title: "8. Duplicate or Incorrect Payments",
+          body: [
+            `If you believe you have been charged more than once for the same purchase or that a payment was processed incorrectly, please contact us as soon as possible.`,
+            `We will review the transaction and, where an error is confirmed, take appropriate corrective action.`,
+          ],
+        },
+        {
+          title: "9. How to Contact Us",
+          body: [
+            `If you believe you are entitled to a refund under this policy or applicable law, please contact our support team through the official contact information provided on ZacTrades.com.`,
+            `Please include:`,
+            `- Your full name`,
+            `- Email used for the purchase`,
+            `- Order or transaction reference`,
+            `- Product or service purchased`,
+            `- Reason for your request`,
+            `We will review each request based on the circumstances and applicable law.`,
+          ],
+        },
+        {
+          title: "10. Agreement to This Policy",
+          body: [
+            `By purchasing any product or service through ZacTrades.com, you confirm that you have had the opportunity to read and understand this Refund Policy and agree to its terms, subject to any rights that cannot legally be excluded.`,
+            `ZacTrades Operated by Zactrix Limited, SARL AU`,
+            `Website: ZacTrades.com`,
           ],
         },
       ]}

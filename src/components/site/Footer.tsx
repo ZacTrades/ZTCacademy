@@ -24,14 +24,13 @@ export function Footer() {
         { labelKey: "footer.liveRoom", href: "/#live" },
         { labelKey: "footer.mentorship", href: "/#mentorship" },
         { labelKey: "footer.indicators", href: "/#indicators" },
-        { labelKey: "footer.community", href: "/#connect" },
+        { labelKey: "footer.community", href: "/#testimonials" },
       ],
     },
     {
       titleKey: "footer.company",
       links: [
         { labelKey: "footer.about", href: "/about" },
-        { labelKey: "footer.blog", href: "/blog" },
       ],
     },
     {
@@ -48,9 +47,9 @@ export function Footer() {
   }>;
 
   const socials = [
-    { label: "YouTube", href: "https://www.youtube.com", icon: Youtube },
-    { label: "X", href: "https://x.com", icon: X },
-    { label: "Instagram", href: "https://www.instagram.com", icon: Instagram },
+    { label: "YouTube", href: "https://www.youtube.com/@itsZac_Trades", icon: Youtube },
+    { label: "X", href: "https://x.com/Zac_Trades", icon: X },
+    { label: "Instagram", href: "https://www.instagram.com/itszac_trades/", icon: Instagram },
     { label: "Discord", href: "https://discord.com", icon: DiscordIcon },
   ];
 
@@ -62,12 +61,14 @@ export function Footer() {
       viewport={{ once: true, margin: "-80px" }}
       variants={staggerContainer}
     >
-      <div className="mx-auto max-w-7xl px-4 md:px-6">
-        <div className="grid gap-10 md:grid-cols-4">
-          <motion.div className="md:col-span-1" variants={fadeUp}>
-            <BrandLogo className="h-16" showWordmark wordmarkClassName="text-2xl" />
-            <p className="mt-4 max-w-xs text-sm text-muted-foreground">{t("footer.tagline")}</p>
-            <div className="mt-5 flex items-center gap-3">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="grid gap-8 text-center sm:grid-cols-2 sm:text-left lg:grid-cols-4 lg:gap-10">
+          <motion.div className="sm:col-span-2 lg:col-span-1" variants={fadeUp}>
+            <div className="flex justify-center sm:justify-start">
+              <BrandLogo className="h-14 sm:h-16" showWordmark wordmarkClassName="text-xl sm:text-2xl" />
+            </div>
+            <p className="mx-auto mt-4 max-w-sm text-sm leading-6 text-muted-foreground sm:mx-0 sm:max-w-xs">{t("footer.tagline")}</p>
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-3 sm:justify-start">
               {socials.map((social) => (
                 <motion.a
                   key={social.label}
@@ -75,7 +76,7 @@ export function Footer() {
                   target="_blank"
                   rel="noreferrer"
                   aria-label={social.label}
-                  className="grid h-10 w-10 place-items-center rounded-lg border border-border/50 bg-background/35 text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/10 hover:text-foreground"
+                  className="grid h-11 w-11 place-items-center rounded-xl border border-border/50 bg-background/35 text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/10 hover:text-foreground sm:h-10 sm:w-10"
                   whileHover={{ y: -3, scale: 1.04 }}
                   whileTap={{ scale: 0.96 }}
                   transition={{ type: "spring", stiffness: 320, damping: 24 }}
@@ -88,15 +89,15 @@ export function Footer() {
 
           {columns.map((col) => (
             <motion.div key={col.titleKey} variants={fadeUp}>
-              <h4 className="font-display text-sm font-semibold text-foreground">
+              <h4 className="font-display text-sm font-semibold uppercase tracking-[0.18em] text-foreground/90">
                 {t(col.titleKey)}
               </h4>
-              <ul className="mt-4 space-y-2">
+              <ul className="mt-3 flex flex-col items-center gap-1 sm:items-start">
                 {col.links.map((link) => (
                   <li key={link.labelKey}>
                     <a
                       href={link.href}
-                      className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                      className="inline-flex min-h-9 items-center justify-center rounded-lg px-2 text-sm text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground sm:justify-start sm:px-0 sm:hover:bg-transparent"
                     >
                       {t(link.labelKey)}
                     </a>
@@ -108,11 +109,11 @@ export function Footer() {
         </div>
 
         <motion.div
-          className="mt-7 grid gap-4 border-t border-border/40 pt-6 md:mt-10 md:grid-cols-2"
+          className="mt-7 grid gap-4 border-t border-border/40 pt-6 text-left md:mt-10 md:grid-cols-2"
           variants={staggerContainer}
         >
           <motion.div
-            className="rounded-xl border border-border/50 bg-background/35 p-4"
+            className="rounded-2xl border border-border/50 bg-background/35 p-4 sm:p-5"
             variants={fadeUp}
           >
             <h4 className="font-display text-sm font-semibold text-foreground">
@@ -124,7 +125,7 @@ export function Footer() {
           </motion.div>
 
           <motion.div
-            className="rounded-xl border border-border/50 bg-background/35 p-4"
+            className="rounded-2xl border border-border/50 bg-background/35 p-4 sm:p-5"
             variants={fadeUp}
           >
             <h4 className="font-display text-sm font-semibold text-foreground">
@@ -136,8 +137,8 @@ export function Footer() {
           </motion.div>
         </motion.div>
 
-        <motion.div className="mt-7 border-t border-border/40 pt-6 md:mt-8" variants={fadeUp}>
-          <p className="text-xs text-muted-foreground">
+        <motion.div className="mt-7 border-t border-border/40 pt-6 text-center sm:text-left md:mt-8" variants={fadeUp}>
+          <p className="text-xs leading-6 text-muted-foreground">
             © {new Date().getFullYear()} ZacTrades. {t("footer.risk")}
           </p>
         </motion.div>

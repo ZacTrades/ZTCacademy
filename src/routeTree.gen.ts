@@ -18,12 +18,16 @@ import { Route as MentorshipRouteImport } from './routes/mentorship'
 import { Route as LiveTradingRouteImport } from './routes/live-trading'
 import { Route as IndicatorsRouteImport } from './routes/indicators'
 import { Route as EducationRouteImport } from './routes/education'
-import { Route as BlogRouteImport } from './routes/blog'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PaymentSuccessRouteImport } from './routes/payment.success'
+import { Route as PaymentFailureRouteImport } from './routes/payment.failure'
+import { Route as PaymentCancelRouteImport } from './routes/payment.cancel'
+import { Route as EducationSlugRouteImport } from './routes/education_.$slug'
 import { Route as DiscordCallbackRouteImport } from './routes/discord.callback'
-import { Route as BlogSlugRouteImport } from './routes/blog_.$slug'
+import { Route as AdminEducationNewRouteImport } from './routes/admin_.education.new'
+import { Route as AdminEducationEditSlugRouteImport } from './routes/admin_.education.edit.$slug'
 
 const TermsOfServiceRoute = TermsOfServiceRouteImport.update({
   id: '/terms-of-service',
@@ -70,11 +74,6 @@ const EducationRoute = EducationRouteImport.update({
   path: '/education',
   getParentRoute: () => rootRouteImport,
 } as any)
-const BlogRoute = BlogRouteImport.update({
-  id: '/blog',
-  path: '/blog',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -90,14 +89,39 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PaymentSuccessRoute = PaymentSuccessRouteImport.update({
+  id: '/payment/success',
+  path: '/payment/success',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaymentFailureRoute = PaymentFailureRouteImport.update({
+  id: '/payment/failure',
+  path: '/payment/failure',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaymentCancelRoute = PaymentCancelRouteImport.update({
+  id: '/payment/cancel',
+  path: '/payment/cancel',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EducationSlugRoute = EducationSlugRouteImport.update({
+  id: '/education_/$slug',
+  path: '/education/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DiscordCallbackRoute = DiscordCallbackRouteImport.update({
   id: '/discord/callback',
   path: '/discord/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
-const BlogSlugRoute = BlogSlugRouteImport.update({
-  id: '/blog_/$slug',
-  path: '/blog/$slug',
+const AdminEducationNewRoute = AdminEducationNewRouteImport.update({
+  id: '/admin_/education/new',
+  path: '/admin/education/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminEducationEditSlugRoute = AdminEducationEditSlugRouteImport.update({
+  id: '/admin_/education/edit/$slug',
+  path: '/admin/education/edit/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -105,7 +129,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/admin': typeof AdminRoute
-  '/blog': typeof BlogRoute
   '/education': typeof EducationRoute
   '/indicators': typeof IndicatorsRoute
   '/live-trading': typeof LiveTradingRoute
@@ -115,14 +138,18 @@ export interface FileRoutesByFullPath {
   '/propfirms': typeof PropfirmsRoute
   '/refund-policy': typeof RefundPolicyRoute
   '/terms-of-service': typeof TermsOfServiceRoute
-  '/blog/$slug': typeof BlogSlugRoute
   '/discord/callback': typeof DiscordCallbackRoute
+  '/education/$slug': typeof EducationSlugRoute
+  '/payment/cancel': typeof PaymentCancelRoute
+  '/payment/failure': typeof PaymentFailureRoute
+  '/payment/success': typeof PaymentSuccessRoute
+  '/admin/education/new': typeof AdminEducationNewRoute
+  '/admin/education/edit/$slug': typeof AdminEducationEditSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/admin': typeof AdminRoute
-  '/blog': typeof BlogRoute
   '/education': typeof EducationRoute
   '/indicators': typeof IndicatorsRoute
   '/live-trading': typeof LiveTradingRoute
@@ -132,15 +159,19 @@ export interface FileRoutesByTo {
   '/propfirms': typeof PropfirmsRoute
   '/refund-policy': typeof RefundPolicyRoute
   '/terms-of-service': typeof TermsOfServiceRoute
-  '/blog/$slug': typeof BlogSlugRoute
   '/discord/callback': typeof DiscordCallbackRoute
+  '/education/$slug': typeof EducationSlugRoute
+  '/payment/cancel': typeof PaymentCancelRoute
+  '/payment/failure': typeof PaymentFailureRoute
+  '/payment/success': typeof PaymentSuccessRoute
+  '/admin/education/new': typeof AdminEducationNewRoute
+  '/admin/education/edit/$slug': typeof AdminEducationEditSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/admin': typeof AdminRoute
-  '/blog': typeof BlogRoute
   '/education': typeof EducationRoute
   '/indicators': typeof IndicatorsRoute
   '/live-trading': typeof LiveTradingRoute
@@ -150,8 +181,13 @@ export interface FileRoutesById {
   '/propfirms': typeof PropfirmsRoute
   '/refund-policy': typeof RefundPolicyRoute
   '/terms-of-service': typeof TermsOfServiceRoute
-  '/blog_/$slug': typeof BlogSlugRoute
   '/discord/callback': typeof DiscordCallbackRoute
+  '/education_/$slug': typeof EducationSlugRoute
+  '/payment/cancel': typeof PaymentCancelRoute
+  '/payment/failure': typeof PaymentFailureRoute
+  '/payment/success': typeof PaymentSuccessRoute
+  '/admin_/education/new': typeof AdminEducationNewRoute
+  '/admin_/education/edit/$slug': typeof AdminEducationEditSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -159,7 +195,6 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/admin'
-    | '/blog'
     | '/education'
     | '/indicators'
     | '/live-trading'
@@ -169,14 +204,18 @@ export interface FileRouteTypes {
     | '/propfirms'
     | '/refund-policy'
     | '/terms-of-service'
-    | '/blog/$slug'
     | '/discord/callback'
+    | '/education/$slug'
+    | '/payment/cancel'
+    | '/payment/failure'
+    | '/payment/success'
+    | '/admin/education/new'
+    | '/admin/education/edit/$slug'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/about'
     | '/admin'
-    | '/blog'
     | '/education'
     | '/indicators'
     | '/live-trading'
@@ -186,14 +225,18 @@ export interface FileRouteTypes {
     | '/propfirms'
     | '/refund-policy'
     | '/terms-of-service'
-    | '/blog/$slug'
     | '/discord/callback'
+    | '/education/$slug'
+    | '/payment/cancel'
+    | '/payment/failure'
+    | '/payment/success'
+    | '/admin/education/new'
+    | '/admin/education/edit/$slug'
   id:
     | '__root__'
     | '/'
     | '/about'
     | '/admin'
-    | '/blog'
     | '/education'
     | '/indicators'
     | '/live-trading'
@@ -203,15 +246,19 @@ export interface FileRouteTypes {
     | '/propfirms'
     | '/refund-policy'
     | '/terms-of-service'
-    | '/blog_/$slug'
     | '/discord/callback'
+    | '/education_/$slug'
+    | '/payment/cancel'
+    | '/payment/failure'
+    | '/payment/success'
+    | '/admin_/education/new'
+    | '/admin_/education/edit/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
   AdminRoute: typeof AdminRoute
-  BlogRoute: typeof BlogRoute
   EducationRoute: typeof EducationRoute
   IndicatorsRoute: typeof IndicatorsRoute
   LiveTradingRoute: typeof LiveTradingRoute
@@ -221,8 +268,13 @@ export interface RootRouteChildren {
   PropfirmsRoute: typeof PropfirmsRoute
   RefundPolicyRoute: typeof RefundPolicyRoute
   TermsOfServiceRoute: typeof TermsOfServiceRoute
-  BlogSlugRoute: typeof BlogSlugRoute
   DiscordCallbackRoute: typeof DiscordCallbackRoute
+  EducationSlugRoute: typeof EducationSlugRoute
+  PaymentCancelRoute: typeof PaymentCancelRoute
+  PaymentFailureRoute: typeof PaymentFailureRoute
+  PaymentSuccessRoute: typeof PaymentSuccessRoute
+  AdminEducationNewRoute: typeof AdminEducationNewRoute
+  AdminEducationEditSlugRoute: typeof AdminEducationEditSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -290,13 +342,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EducationRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/blog': {
-      id: '/blog'
-      path: '/blog'
-      fullPath: '/blog'
-      preLoaderRoute: typeof BlogRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/admin': {
       id: '/admin'
       path: '/admin'
@@ -318,6 +363,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/payment/success': {
+      id: '/payment/success'
+      path: '/payment/success'
+      fullPath: '/payment/success'
+      preLoaderRoute: typeof PaymentSuccessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payment/failure': {
+      id: '/payment/failure'
+      path: '/payment/failure'
+      fullPath: '/payment/failure'
+      preLoaderRoute: typeof PaymentFailureRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payment/cancel': {
+      id: '/payment/cancel'
+      path: '/payment/cancel'
+      fullPath: '/payment/cancel'
+      preLoaderRoute: typeof PaymentCancelRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/education_/$slug': {
+      id: '/education_/$slug'
+      path: '/education/$slug'
+      fullPath: '/education/$slug'
+      preLoaderRoute: typeof EducationSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/discord/callback': {
       id: '/discord/callback'
       path: '/discord/callback'
@@ -325,11 +398,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DiscordCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/blog_/$slug': {
-      id: '/blog_/$slug'
-      path: '/blog/$slug'
-      fullPath: '/blog/$slug'
-      preLoaderRoute: typeof BlogSlugRouteImport
+    '/admin_/education/new': {
+      id: '/admin_/education/new'
+      path: '/admin/education/new'
+      fullPath: '/admin/education/new'
+      preLoaderRoute: typeof AdminEducationNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin_/education/edit/$slug': {
+      id: '/admin_/education/edit/$slug'
+      path: '/admin/education/edit/$slug'
+      fullPath: '/admin/education/edit/$slug'
+      preLoaderRoute: typeof AdminEducationEditSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -339,7 +419,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
   AdminRoute: AdminRoute,
-  BlogRoute: BlogRoute,
   EducationRoute: EducationRoute,
   IndicatorsRoute: IndicatorsRoute,
   LiveTradingRoute: LiveTradingRoute,
@@ -349,8 +428,13 @@ const rootRouteChildren: RootRouteChildren = {
   PropfirmsRoute: PropfirmsRoute,
   RefundPolicyRoute: RefundPolicyRoute,
   TermsOfServiceRoute: TermsOfServiceRoute,
-  BlogSlugRoute: BlogSlugRoute,
   DiscordCallbackRoute: DiscordCallbackRoute,
+  EducationSlugRoute: EducationSlugRoute,
+  PaymentCancelRoute: PaymentCancelRoute,
+  PaymentFailureRoute: PaymentFailureRoute,
+  PaymentSuccessRoute: PaymentSuccessRoute,
+  AdminEducationNewRoute: AdminEducationNewRoute,
+  AdminEducationEditSlugRoute: AdminEducationEditSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

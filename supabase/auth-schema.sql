@@ -182,6 +182,44 @@ alter table public.user_memberships add column if not exists access_starts_at ti
 alter table public.user_memberships add column if not exists access_expires_at timestamptz;
 alter table public.user_memberships add column if not exists notes text;
 
+with ranked_memberships as (
+  select
+    id,
+    row_number() over (
+      partition by user_id, plan_slug
+      order by
+        case status
+          when 'paid' then 1
+          when 'pending' then 2
+          when 'unpaid' then 3
+          when 'expired' then 4
+          when 'cancelled' then 5
+          else 6
+        end,
+        updated_at desc nulls last,
+        created_at desc nulls last
+    ) as keep_rank
+  from public.user_memberships
+)
+delete from public.user_memberships memberships
+using ranked_memberships ranked
+where memberships.id = ranked.id
+  and ranked.keep_rank > 1;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'user_memberships_user_id_plan_slug_key'
+      and conrelid = 'public.user_memberships'::regclass
+  ) then
+    alter table public.user_memberships
+    add constraint user_memberships_user_id_plan_slug_key unique (user_id, plan_slug);
+  end if;
+end;
+$$;
+
 do $$
 begin
   if not exists (
@@ -785,8 +823,8 @@ insert into public.live_trading_packages (
 values
   ('one_month', '1 month', '$39.99', '$39.99/mo', null, null, 1),
   ('three_months', '3 months', '$100', '$33.33/mo', '$120', 'Discount', 2),
-  ('six_months', '6 months', '$200', '$33.33/mo', '$240', 'Discount', 3),
-  ('twelve_months', '12 months', '$400', '$33.33/mo', '$480', 'Best value', 4)
+  ('six_months', '6 months', '$180', '$30/mo', '$240', 'Discount', 3),
+  ('twelve_months', '12 months', '$348', '$29/mo', '$480', 'Best value', 4)
 on conflict (slug) do update
 set
   duration = excluded.duration,
@@ -804,6 +842,7 @@ create table if not exists public.premium_indicators (
   tag text not null,
   stats_label text not null,
   tradingview_url text not null,
+  video_url text,
   is_active boolean not null default true,
   display_order integer not null default 0,
   created_at timestamptz not null default now(),
@@ -855,7 +894,7 @@ insert into public.premium_indicators (
 values
   (
     'zac_trend_pro',
-    'Zac Trend Pro',
+    'ZTC SESSION',
     'Multi-timeframe trend confirmation with smart filter.',
     'Most Popular',
     'Win 72% · 1.8R avg',
@@ -890,12 +929,15 @@ create table if not exists public.trading_tools (
   promo_code text not null,
   discount text not null,
   url text not null,
+  logo_url text,
   highlights text[] not null default '{}',
   is_active boolean not null default true,
   display_order integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.trading_tools add column if not exists logo_url text;
 
 alter table public.trading_tools enable row level security;
 
@@ -918,11 +960,25 @@ for update
 using (public.is_admin())
 with check (public.is_admin());
 
+drop policy if exists "Admins can delete trading tools" on public.trading_tools;
+create policy "Admins can delete trading tools"
+on public.trading_tools
+for delete
+using (public.is_admin());
+
 drop trigger if exists trading_tools_set_updated_at on public.trading_tools;
 create trigger trading_tools_set_updated_at
 before update on public.trading_tools
 for each row
 execute function public.set_updated_at();
+
+-- Keep the backend trading tools catalog limited to the approved ZacTrades tools.
+delete from public.trading_tools
+where slug not in (
+  'fxreplay',
+  'tradesyncer',
+  'tradingview'
+);
 
 insert into public.trading_tools (
   slug,
@@ -933,82 +989,64 @@ insert into public.trading_tools (
   discount,
   url,
   highlights,
+  is_active,
   display_order
 )
 values
   (
-    'tradingview',
-    'TradingView',
-    'Charting',
-    'My main charting workspace for multi-timeframe analysis, alerts, and watchlists.',
-    'ZACTV10',
-    '10% off',
-    'https://www.tradingview.com',
-    array['Advanced charts', 'Alerts', 'Watchlists'],
+    'fxreplay',
+    'FX Replay',
+    'Backtesting',
+    'Replay market sessions, test setups, and build confidence before trading live.',
+    'ZACTRADES',
+    'Partner link',
+    'https://fxreplay.com/?via=ZACTRADES',
+    array['Market replay', 'Backtesting', 'Strategy practice'],
+    true,
     1
   ),
   (
-    'notion',
-    'Notion',
+    'tradesyncer',
+    'TradeSyncer',
     'Trading Journal',
-    'A clean place to organize trade plans, journal notes, screenshots, and weekly reviews.',
-    'ZACNOTION',
-    'Free template',
-    'https://www.notion.so',
-    array['Trade journal', 'Review pages', 'Playbooks'],
+    'Sync trades, review performance, and understand your execution with clean analytics.',
+    'TS2537E28A',
+    'Referral access',
+    'https://app.tradesyncer.com/?ref=TS2537E28A',
+    array['Trade journal', 'Performance analytics', 'Execution review'],
+    true,
     2
   ),
   (
-    'forex_factory',
-    'Forex Factory',
-    'News Calendar',
-    'Useful for checking high-impact economic events before entering a trade.',
-    'ZACNEWS',
-    'Member setup',
-    'https://www.forexfactory.com/calendar',
-    array['Economic news', 'Impact filters', 'Session planning'],
+    'tradingview',
+    'TradingView',
+    'Charting',
+    'Professional charting, alerts, watchlists, and multi-timeframe market analysis.',
+    'Zac_Hr',
+    'Official pricing',
+    'https://www.tradingview.com/pricing/?share_your_love=Zac_Hr',
+    array['Advanced charts', 'Alerts', 'Watchlists'],
+    true,
     3
-  ),
-  (
-    'myfxbook',
-    'Myfxbook',
-    'Performance Tracking',
-    'Track account performance, drawdown, win rate, and trading statistics.',
-    'ZACTRACK',
-    'Tracker setup',
-    'https://www.myfxbook.com',
-    array['Analytics', 'Drawdown', 'Account stats'],
-    4
-  ),
-  (
-    'edgewonk',
-    'Edgewonk',
-    'Deep Journaling',
-    'A more advanced journal for tracking psychology, setups, mistakes, and improvement.',
-    'ZACEDGE',
-    '15% off',
-    'https://edgewonk.com',
-    array['Mistake tracking', 'Trade tags', 'Review dashboard'],
-    5
-  ),
-  (
-    'trendspider',
-    'TrendSpider',
-    'Market Scanning',
-    'Helpful for scanning markets, automated trendlines, and technical alerts.',
-    'ZACTREND',
-    'Trial bonus',
-    'https://trendspider.com',
-    array['Scanners', 'Alerts', 'Technical research'],
-    6
   )
-on conflict (slug) do nothing;
+on conflict (slug) do update set
+  name = excluded.name,
+  category = excluded.category,
+  description = excluded.description,
+  promo_code = excluded.promo_code,
+  discount = excluded.discount,
+  url = excluded.url,
+  highlights = excluded.highlights,
+  is_active = excluded.is_active,
+  display_order = excluded.display_order,
+  updated_at = now();
 
 create table if not exists public.prop_firms (
   slug text primary key,
   name text not null,
   description text not null,
   logo text not null,
+  logo_url text,
   discount text not null,
   promo_code text not null,
   color text not null,
@@ -1025,6 +1063,9 @@ create table if not exists public.prop_firms (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.prop_firms
+add column if not exists logo_url text;
 
 alter table public.prop_firms enable row level security;
 
@@ -1059,11 +1100,22 @@ before update on public.prop_firms
 for each row
 execute function public.set_updated_at();
 
+-- Keep the backend prop firm catalog limited to the approved ZacTrades partners.
+delete from public.prop_firms
+where slug not in (
+  'alpha-futures',
+  'earn2trade',
+  'fundednext',
+  'alpha-capital-group',
+  'funding-pips'
+);
+
 insert into public.prop_firms (
   slug,
   name,
   description,
   logo,
+  logo_url,
   discount,
   promo_code,
   color,
@@ -1075,154 +1127,129 @@ insert into public.prop_firms (
   features,
   url,
   is_featured,
+  is_active,
   display_order
 )
 values
   (
-    'ftmo',
-    'FTMO',
-    'The industry leader in prop trading. Two-step evaluation with up to $400K accounts.',
-    'FTMO',
-    '10% OFF',
-    'ZAC10',
-    '#00d084',
-    4.9,
-    12400,
-    '$400K',
+    'alpha-futures',
+    'Alpha Futures',
+    'Futures funding platform for traders who want structured evaluation access.',
+    'AF',
+    null,
+    'Max Discount',
+    'ZACTRADES',
+    '#22c55e',
+    4.4,
+    3200,
+    '$150K',
     '90%',
     'Bi-weekly',
-    array['Two-step evaluation', 'No time limit', 'Free retry', 'Mobile app'],
-    'https://ftmo.com',
+    array['TV', 'Web'],
+    'https://app.alpha-futures.com',
+    true,
     true,
     1
   ),
   (
-    'the5ers',
-    'The5ers',
-    'Instant funding available. Trade from day one with no evaluation period.',
-    '5ERS',
-    '20% OFF',
-    'ZAC20',
-    '#f59e0b',
-    4.8,
-    8900,
-    '$250K',
+    'earn2trade',
+    'Earn2Trade',
+    'Education-first futures evaluation platform with structured trader development.',
+    'E2T',
+    null,
+    'Max Discount',
+    'ZACTRADES',
+    '#38bdf8',
+    4.4,
+    4100,
+    '$200K',
     '80%',
-    'Instant',
-    array['Instant funding', 'Weekly payouts', 'Low spreads', 'News trading'],
-    'https://the5ers.com',
+    'Monthly',
+    array['TV', 'Web'],
+    'https://www.earn2trade.com',
+    true,
     true,
     2
   ),
   (
-    'myforexfunds',
-    'MyForexFunds',
-    'Flexible account sizes from $10K to $300K with rapid evaluation.',
-    'MFF',
-    '15% OFF',
-    'ZAC15',
-    '#6366f1',
-    4.7,
-    10200,
-    '$300K',
-    '85%',
-    'Weekly',
-    array['Rapid evaluation', 'Scaling plan', 'No minimum trading days', 'Crypto payouts'],
-    'https://myforexfunds.com',
-    false,
-    3
-  ),
-  (
     'fundednext',
     'FundedNext',
-    'Industry-first profit sharing from day one with the Stellar Challenge.',
+    'Multi-asset prop firm with flexible challenges and a modern trader dashboard.',
     'FN',
-    '10% OFF',
-    'ZACFN10',
+    null,
+    'Max Discount',
+    'ZACTRADES',
     '#ec4899',
-    4.6,
+    4.3,
     6700,
     '$200K',
     '95%',
     'Bi-weekly',
-    array['Profit from challenge', 'Stellar 1-step', 'Express model', 'Free trial'],
-    'https://fundednext.com',
+    array['MT5', 'App', 'Web'],
+    'https://app.fundednext.com',
+    true,
+    true,
+    3
+  ),
+  (
+    'alpha-capital-group',
+    'Alpha Capital Group',
+    'Professional prop trading firm with challenge accounts and scaling opportunities.',
+    'ACG',
+    null,
+    'Max Discount',
+    'ZACTRADES',
+    '#a855f7',
+    4.4,
+    2800,
+    '$200K',
+    '80%',
+    'Bi-weekly',
+    array['MT5', 'Web'],
+    'https://app.alphacapitalgroup.uk',
     false,
+    true,
     4
   ),
   (
-    'true-forex-funds',
-    'True Forex Funds',
-    'Transparent pricing with no hidden fees. Beginner-friendly platform.',
-    'TFF',
-    '12% OFF',
-    'ZACTFF',
-    '#10b981',
-    4.5,
-    5400,
-    '$200K',
+    'funding-pips',
+    'Funding Pips',
+    'Popular prop firm for forex traders with flexible rules and fast account access.',
+    'FP',
+    null,
+    'Max Discount',
+    'ZACTRADES',
+    '#f59e0b',
+    4.2,
+    5200,
+    '$100K',
     '80%',
-    'Weekly',
-    array['No activation fee', 'Raw spreads', 'MT5 platform', 'Fast support'],
-    'https://trueforexfunds.com',
-    false,
-    5
-  ),
-  (
-    'apex-trader-funding',
-    'Apex Trader Funding',
-    'The original futures prop firm. Trade NQ, ES, CL with generous rules.',
-    'ATF',
-    '50% OFF',
-    'ZAC50',
-    '#3b82f6',
-    4.7,
-    15600,
-    '$300K',
-    '100%',
-    'Monthly',
-    array['Futures only', 'No daily loss limit', 'Trailing threshold', 'Reset discount'],
-    'https://apextraderfunding.com',
-    true,
-    6
-  ),
-  (
-    'topstep',
-    'Topstep',
-    'The original prop firm since 2012. Futures and forex evaluations.',
-    'TS',
-    '20% OFF',
-    'ZACTS20',
-    '#ef4444',
-    4.6,
-    9200,
-    '$150K',
-    '90%',
-    'Monthly',
-    array['Founded 2012', 'Coaching included', 'Combine rules', 'Scaling to $2M'],
-    'https://topstep.com',
-    false,
-    7
-  ),
-  (
-    'surgetrader',
-    'SurgeTrader',
-    'One-step evaluation with no minimum trading days. Simple and fast.',
-    'ST',
-    '10% OFF',
-    'ZACST10',
-    '#f97316',
-    4.4,
-    4100,
-    '$250K',
-    '85%',
     'Bi-weekly',
-    array['One-step eval', 'No minimum days', 'Add-ons available', 'EA allowed'],
-    'https://surgetrader.com',
+    array['MT5', 'Web'],
+    'https://app.fundingpips.com',
     false,
-    8
+    true,
+    5
   )
-on conflict (slug) do nothing;
+on conflict (slug) do update set
+  name = excluded.name,
+  description = excluded.description,
+  logo = excluded.logo,
+  logo_url = excluded.logo_url,
+  discount = excluded.discount,
+  promo_code = excluded.promo_code,
+  color = excluded.color,
+  rating = excluded.rating,
+  reviews = excluded.reviews,
+  max_capital = excluded.max_capital,
+  profit_split = excluded.profit_split,
+  payout = excluded.payout,
+  features = excluded.features,
+  url = excluded.url,
+  is_featured = excluded.is_featured,
+  is_active = excluded.is_active,
+  display_order = excluded.display_order,
+  updated_at = now();
 
 create table if not exists public.community_socials (
   slug text primary key,
@@ -1318,144 +1345,78 @@ values
     'ZacTrades Community',
     'Join the private community for chat, questions, and trader support.',
     'message',
-    'https://discord.com',
+    'https://discord.gg/sJ8jC3n2H3',
     'bull',
     4
   )
-on conflict (slug) do nothing;
-
-create table if not exists public.blog_posts (
-  slug text primary key,
-  title text not null,
-  category text not null,
-  published_date text not null,
-  read_time text not null,
-  excerpt text not null,
-  content text not null,
-  pdf_url text,
-  is_featured boolean not null default false,
-  is_published boolean not null default true,
-  display_order integer not null default 0,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-alter table public.blog_posts
-add column if not exists pdf_url text;
-
-alter table public.blog_posts enable row level security;
-
-drop policy if exists "Anyone can read published blog posts" on public.blog_posts;
-create policy "Anyone can read published blog posts"
-on public.blog_posts
-for select
-using (is_published = true or public.is_admin());
-
-drop policy if exists "Admins can insert blog posts" on public.blog_posts;
-create policy "Admins can insert blog posts"
-on public.blog_posts
-for insert
-with check (public.is_admin());
-
-drop policy if exists "Admins can update blog posts" on public.blog_posts;
-create policy "Admins can update blog posts"
-on public.blog_posts
-for update
-using (public.is_admin())
-with check (public.is_admin());
+on conflict (slug) do update set
+  name = excluded.name,
+  handle = excluded.handle,
+  description = excluded.description,
+  icon_key = excluded.icon_key,
+  url = excluded.url,
+  tone_key = excluded.tone_key,
+  display_order = excluded.display_order,
+  updated_at = now();
 
 insert into storage.buckets (id, name, public)
-values ('blog-pdfs', 'blog-pdfs', true)
+values ('propfirm-logos', 'propfirm-logos', true)
 on conflict (id) do update set public = excluded.public;
 
-drop policy if exists "Anyone can read blog PDFs" on storage.objects;
-create policy "Anyone can read blog PDFs"
+drop policy if exists "Anyone can read prop firm logos" on storage.objects;
+create policy "Anyone can read prop firm logos"
 on storage.objects
 for select
-using (bucket_id = 'blog-pdfs');
+using (bucket_id = 'propfirm-logos');
 
-drop policy if exists "Admins can upload blog PDFs" on storage.objects;
-create policy "Admins can upload blog PDFs"
+drop policy if exists "Admins can upload prop firm logos" on storage.objects;
+create policy "Admins can upload prop firm logos"
 on storage.objects
 for insert
-with check (bucket_id = 'blog-pdfs' and public.is_admin());
+with check (bucket_id = 'propfirm-logos' and public.is_admin());
 
-drop policy if exists "Admins can update blog PDFs" on storage.objects;
-create policy "Admins can update blog PDFs"
+drop policy if exists "Admins can update prop firm logos" on storage.objects;
+create policy "Admins can update prop firm logos"
 on storage.objects
 for update
-using (bucket_id = 'blog-pdfs' and public.is_admin())
-with check (bucket_id = 'blog-pdfs' and public.is_admin());
+using (bucket_id = 'propfirm-logos' and public.is_admin())
+with check (bucket_id = 'propfirm-logos' and public.is_admin());
 
-drop policy if exists "Admins can delete blog PDFs" on storage.objects;
-create policy "Admins can delete blog PDFs"
+drop policy if exists "Admins can delete prop firm logos" on storage.objects;
+create policy "Admins can delete prop firm logos"
 on storage.objects
 for delete
-using (bucket_id = 'blog-pdfs' and public.is_admin());
+using (bucket_id = 'propfirm-logos' and public.is_admin());
 
-drop trigger if exists blog_posts_set_updated_at on public.blog_posts;
-create trigger blog_posts_set_updated_at
-before update on public.blog_posts
-for each row
-execute function public.set_updated_at();
 
-insert into public.blog_posts (
-  slug,
-  title,
-  category,
-  published_date,
-  read_time,
-  excerpt,
-  content,
-  is_featured,
-  display_order
-)
-values
-  (
-    'build-trading-plan-before-market-open',
-    'How to build a trading plan before the market opens',
-    'Trading Process',
-    'May 27, 2026',
-    '6 min read',
-    'A practical pre-market routine for defining bias, levels, invalidation, risk, and the one or two setups worth waiting for.',
-    'Start with higher-timeframe context, mark the key levels that would change your bias, define risk before entry, and write down exactly what would make you skip the session.',
-    true,
-    1
-  ),
-  (
-    'risk-rules-every-beginner-should-write-down',
-    'The risk rules every beginner should write down',
-    'Risk Management',
-    'May 20, 2026',
-    '5 min read',
-    'Simple limits for daily loss, position sizing, and max trades so one bad session does not become a damaged account.',
-    'Risk rules should be visible before the first trade. Define max daily loss, risk per trade, max trades, and the exact point where the session ends.',
-    false,
-    2
-  ),
-  (
-    'journaling-beats-hunting-for-another-indicator',
-    'Why journaling beats hunting for another indicator',
-    'Study',
-    'May 13, 2026',
-    '4 min read',
-    'The fastest way to identify recurring mistakes is to review screenshots, emotions, timing, and execution quality.',
-    'A journal turns vague frustration into evidence. Track setup quality, execution, emotion, and whether the trade matched your plan.',
-    false,
-    3
-  ),
-  (
-    'reading-market-structure-without-forcing-trades',
-    'Reading market structure without forcing trades',
-    'Market Notes',
-    'May 6, 2026',
-    '7 min read',
-    'A cleaner way to mark highs, lows, liquidity, and trend context before deciding whether a setup is actually present.',
-    'Market structure is useful only when it reduces decisions. Mark clear swing points, identify liquidity, then wait for confirmation instead of inventing a trade.',
-    false,
-    4
-  )
-on conflict (slug) do nothing;
+insert into storage.buckets (id, name, public)
+values ('trading-tool-logos', 'trading-tool-logos', true)
+on conflict (id) do update set public = excluded.public;
+
+drop policy if exists "Anyone can read trading tool logos" on storage.objects;
+create policy "Anyone can read trading tool logos"
+on storage.objects
+for select
+using (bucket_id = 'trading-tool-logos');
+
+drop policy if exists "Admins can upload trading tool logos" on storage.objects;
+create policy "Admins can upload trading tool logos"
+on storage.objects
+for insert
+with check (bucket_id = 'trading-tool-logos' and public.is_admin());
+
+drop policy if exists "Admins can update trading tool logos" on storage.objects;
+create policy "Admins can update trading tool logos"
+on storage.objects
+for update
+using (bucket_id = 'trading-tool-logos' and public.is_admin())
+with check (bucket_id = 'trading-tool-logos' and public.is_admin());
+
+drop policy if exists "Admins can delete trading tool logos" on storage.objects;
+create policy "Admins can delete trading tool logos"
+on storage.objects
+for delete
+using (bucket_id = 'trading-tool-logos' and public.is_admin());
 
 create or replace function public.handle_new_user()
 returns trigger
@@ -1545,3 +1506,822 @@ where provider_checkout_id is not null;
 revoke execute on function public.confirm_local_mentorship_payment(text, text, text) from public, anon, authenticated;
 revoke execute on function public.confirm_local_live_trading_payment(text, text, text, text) from public, anon, authenticated;
 revoke execute on function public.confirm_local_news_subscription(text, text) from public, anon, authenticated;
+create table if not exists public.discount_codes (
+  id uuid primary key default gen_random_uuid(),
+  code text not null,
+  description text,
+  discount_type text not null default 'percent',
+  discount_value numeric(10, 2) not null,
+  applies_to text not null default 'all',
+  is_active boolean not null default true,
+  max_redemptions integer,
+  redeemed_count integer not null default 0,
+  starts_at timestamptz,
+  expires_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.discount_codes add column if not exists description text;
+alter table public.discount_codes add column if not exists discount_type text not null default 'percent';
+alter table public.discount_codes add column if not exists discount_value numeric(10, 2) not null default 0;
+alter table public.discount_codes add column if not exists applies_to text not null default 'all';
+alter table public.discount_codes add column if not exists is_active boolean not null default true;
+alter table public.discount_codes add column if not exists max_redemptions integer;
+alter table public.discount_codes add column if not exists redeemed_count integer not null default 0;
+alter table public.discount_codes add column if not exists starts_at timestamptz;
+alter table public.discount_codes add column if not exists expires_at timestamptz;
+alter table public.discount_codes add column if not exists created_at timestamptz not null default now();
+alter table public.discount_codes add column if not exists updated_at timestamptz not null default now();
+
+create unique index if not exists discount_codes_code_unique on public.discount_codes (code);
+
+alter table public.discount_codes drop constraint if exists discount_codes_code_format_check;
+alter table public.discount_codes add constraint discount_codes_code_format_check
+check (code = upper(code) and code ~ '^[A-Z0-9_-]{2,50}$');
+
+alter table public.discount_codes drop constraint if exists discount_codes_discount_type_check;
+alter table public.discount_codes add constraint discount_codes_discount_type_check
+check (discount_type in ('percent', 'fixed'));
+
+alter table public.discount_codes drop constraint if exists discount_codes_discount_value_check;
+alter table public.discount_codes add constraint discount_codes_discount_value_check
+check (discount_value > 0 and (discount_type <> 'percent' or discount_value <= 100));
+
+alter table public.discount_codes drop constraint if exists discount_codes_applies_to_check;
+alter table public.discount_codes add constraint discount_codes_applies_to_check
+check (
+  applies_to = 'all'
+  or applies_to ~ '^(live|mentorship|mentorship_one_to_one|mentorship_group|news)(,(live|mentorship|mentorship_one_to_one|mentorship_group|news))*$'
+);
+
+alter table public.discount_codes drop constraint if exists discount_codes_redemptions_check;
+alter table public.discount_codes add constraint discount_codes_redemptions_check
+check ((max_redemptions is null or max_redemptions > 0) and redeemed_count >= 0);
+
+alter table public.discount_codes enable row level security;
+
+revoke all on public.discount_codes from anon, authenticated;
+grant select, insert, update, delete on public.discount_codes to authenticated;
+
+drop policy if exists "Staff can read discount codes" on public.discount_codes;
+create policy "Staff can read discount codes"
+on public.discount_codes
+for select
+using (public.is_staff());
+
+drop policy if exists "Admins can insert discount codes" on public.discount_codes;
+create policy "Admins can insert discount codes"
+on public.discount_codes
+for insert
+with check (public.is_admin());
+
+drop policy if exists "Admins can update discount codes" on public.discount_codes;
+create policy "Admins can update discount codes"
+on public.discount_codes
+for update
+using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "Admins can delete discount codes" on public.discount_codes;
+create policy "Admins can delete discount codes"
+on public.discount_codes
+for delete
+using (public.is_admin());
+
+drop trigger if exists discount_codes_set_updated_at on public.discount_codes;
+create trigger discount_codes_set_updated_at
+before update on public.discount_codes
+for each row
+execute function public.set_updated_at();
+
+create or replace function public.increment_discount_code_redemption(p_code text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.discount_codes
+  set redeemed_count = redeemed_count + 1
+  where code = upper(regexp_replace(trim(p_code), '\s+', '', 'g'));
+end;
+$$;
+
+revoke execute on function public.increment_discount_code_redemption(text) from public, anon, authenticated;
+grant execute on function public.increment_discount_code_redemption(text) to service_role;
+
+create unique index if not exists user_memberships_payzone_public_order_unique
+on public.user_memberships (payment_provider, provider_subscription_id)
+where payment_provider = 'payzone' and provider_subscription_id is not null;
+
+create unique index if not exists user_live_trading_access_payzone_public_order_unique
+on public.user_live_trading_access (payment_provider, provider_subscription_id)
+where payment_provider = 'payzone' and provider_subscription_id is not null;
+
+create unique index if not exists user_news_subscriptions_payzone_public_order_unique
+on public.user_news_subscriptions (payment_provider, provider_subscription_id)
+where payment_provider = 'payzone' and provider_subscription_id is not null;
+
+create table if not exists public.live_trading_access_adjustments (
+  id uuid primary key default gen_random_uuid(),
+  admin_user_id uuid references public.profiles (id) on delete set null,
+  extra_days integer not null check (extra_days between 1 and 365),
+  reason text,
+  affected_user_ids uuid[] not null default '{}',
+  affected_count integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+alter table public.live_trading_access_adjustments enable row level security;
+
+revoke all on public.live_trading_access_adjustments from anon, authenticated;
+grant select on public.live_trading_access_adjustments to authenticated;
+
+drop policy if exists "Staff can read live trading access adjustments" on public.live_trading_access_adjustments;
+create policy "Staff can read live trading access adjustments"
+on public.live_trading_access_adjustments
+for select
+using (public.is_staff());
+
+create or replace function public.extend_active_live_trading_access(
+  p_extra_days integer,
+  p_reason text default null
+)
+returns setof public.user_live_trading_access
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_admin_user_id uuid := auth.uid();
+  v_reason text := nullif(trim(coalesce(p_reason, '')), '');
+  v_user_ids uuid[];
+  v_affected_count integer;
+begin
+  if not public.is_admin() then
+    raise exception 'Admin access required';
+  end if;
+
+  if p_extra_days is null or p_extra_days < 1 or p_extra_days > 365 then
+    raise exception 'Extra days must be between 1 and 365';
+  end if;
+
+  select coalesce(array_agg(user_id order by access_expires_at), '{}'::uuid[])
+  into v_user_ids
+  from public.user_live_trading_access
+  where status = 'paid'
+    and access_expires_at is not null
+    and access_expires_at > now();
+
+  v_affected_count := coalesce(array_length(v_user_ids, 1), 0);
+
+  insert into public.live_trading_access_adjustments (
+    admin_user_id,
+    extra_days,
+    reason,
+    affected_user_ids,
+    affected_count
+  )
+  values (
+    v_admin_user_id,
+    p_extra_days,
+    v_reason,
+    v_user_ids,
+    v_affected_count
+  );
+
+  return query
+  update public.user_live_trading_access
+  set
+    access_expires_at = access_expires_at + make_interval(days => p_extra_days),
+    notes = concat_ws(
+      E'\n',
+      nullif(notes, ''),
+      'Admin Live Trading extension: +' || p_extra_days || ' day' ||
+        case when p_extra_days = 1 then '' else 's' end ||
+        ' on ' || to_char(now(), 'YYYY-MM-DD') ||
+        case when v_reason is null then '' else '. Reason: ' || v_reason end || '.'
+    )
+  where user_id = any(v_user_ids)
+  returning *;
+end;
+$$;
+
+revoke execute on function public.extend_active_live_trading_access(integer, text) from public, anon;
+grant execute on function public.extend_active_live_trading_access(integer, text) to authenticated;
+
+create table if not exists public.education_articles (
+  slug text primary key,
+  title text not null,
+  description text not null,
+  category text not null check (category in ('study', 'psychology', 'risk', 'premium')),
+  level text not null,
+  read_time text not null,
+  access text not null default 'Free' check (access in ('Free', 'Members')),
+  published_date text not null,
+  cover_title text not null,
+  cover_subtitle text not null,
+  cover_image_url text,
+  content text not null,
+  is_published boolean not null default true,
+  display_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.education_articles enable row level security;
+
+drop policy if exists "Anyone can read published education articles" on public.education_articles;
+create policy "Anyone can read published education articles"
+on public.education_articles
+for select
+using (is_published = true or public.is_admin());
+
+drop policy if exists "Admins can insert education articles" on public.education_articles;
+create policy "Admins can insert education articles"
+on public.education_articles
+for insert
+with check (public.is_admin());
+
+drop policy if exists "Admins can update education articles" on public.education_articles;
+create policy "Admins can update education articles"
+on public.education_articles
+for update
+using (public.is_admin())
+with check (public.is_admin());
+
+
+
+drop policy if exists "Admins can delete education articles" on public.education_articles;
+create policy "Admins can delete education articles"
+on public.education_articles
+for delete
+using (public.is_admin());
+
+drop trigger if exists education_articles_set_updated_at on public.education_articles;
+create trigger education_articles_set_updated_at
+before update on public.education_articles
+for each row
+execute function public.set_updated_at();
+
+insert into storage.buckets (id, name, public)
+values ('education-images', 'education-images', true)
+on conflict (id) do update set public = excluded.public;
+
+drop policy if exists "Anyone can read education images" on storage.objects;
+create policy "Anyone can read education images"
+on storage.objects
+for select
+using (bucket_id = 'education-images');
+
+drop policy if exists "Admins can upload education images" on storage.objects;
+create policy "Admins can upload education images"
+on storage.objects
+for insert
+with check (bucket_id = 'education-images' and public.is_admin());
+
+drop policy if exists "Admins can update education images" on storage.objects;
+create policy "Admins can update education images"
+on storage.objects
+for update
+using (bucket_id = 'education-images' and public.is_admin())
+with check (bucket_id = 'education-images' and public.is_admin());
+
+drop policy if exists "Admins can delete education images" on storage.objects;
+create policy "Admins can delete education images"
+on storage.objects
+for delete
+using (bucket_id = 'education-images' and public.is_admin());
+
+
+alter table public.education_articles
+add column if not exists cover_image_url text;
+
+create table if not exists public.member_reviews (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  display_name text not null,
+  email text,
+  message text not null,
+  rating integer not null default 5,
+  status text not null default 'pending',
+  reviewed_by uuid references public.profiles (id) on delete set null,
+  reviewed_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint member_reviews_rating_check check (rating between 1 and 5),
+  constraint member_reviews_status_check check (status in ('pending', 'approved', 'hidden')),
+  constraint member_reviews_message_length_check check (
+    char_length(trim(message)) between 10 and 2000
+  )
+);
+
+alter table public.member_reviews enable row level security;
+
+drop policy if exists "Anyone can read approved member reviews" on public.member_reviews;
+create policy "Anyone can read approved member reviews"
+on public.member_reviews
+for select
+using (status = 'approved' or auth.uid() = user_id or public.is_staff());
+
+drop policy if exists "Members can submit their own pending reviews" on public.member_reviews;
+create policy "Members can submit their own pending reviews"
+on public.member_reviews
+for insert
+with check (
+  auth.uid() = user_id
+  and status = 'pending'
+  and reviewed_by is null
+  and reviewed_at is null
+);
+
+drop policy if exists "Members can update their own pending reviews" on public.member_reviews;
+create policy "Members can update their own pending reviews"
+on public.member_reviews
+for update
+using (auth.uid() = user_id and status = 'pending')
+with check (
+  auth.uid() = user_id
+  and status = 'pending'
+  and reviewed_by is null
+  and reviewed_at is null
+);
+
+drop policy if exists "Admins can moderate member reviews" on public.member_reviews;
+create policy "Admins can moderate member reviews"
+on public.member_reviews
+for update
+using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "Admins can delete member reviews" on public.member_reviews;
+create policy "Admins can delete member reviews"
+on public.member_reviews
+for delete
+using (public.is_admin());
+
+drop trigger if exists member_reviews_set_updated_at on public.member_reviews;
+create trigger member_reviews_set_updated_at
+before update on public.member_reviews
+for each row
+execute function public.set_updated_at();
+create or replace function public.has_paid_access(p_user_id uuid default auth.uid())
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.user_memberships membership
+    where membership.user_id = p_user_id
+      and membership.status = 'paid'
+      and (
+        membership.access_expires_at is null
+        or membership.access_expires_at > now()
+      )
+  )
+  or exists (
+    select 1
+    from public.user_live_trading_access access
+    where access.user_id = p_user_id
+      and access.status = 'paid'
+      and (
+        access.access_expires_at is null
+        or access.access_expires_at > now()
+      )
+  )
+  or exists (
+    select 1
+    from public.user_news_subscriptions subscription
+    where subscription.user_id = p_user_id
+      and subscription.status = 'paid'
+      and (
+        subscription.access_expires_at is null
+        or subscription.access_expires_at > now()
+      )
+  );
+$$;
+
+grant execute on function public.has_paid_access(uuid) to authenticated;
+
+drop policy if exists "Members can submit their own pending reviews" on public.member_reviews;
+drop policy if exists "Paid members can submit their own pending reviews" on public.member_reviews;
+create policy "Paid members can submit their own pending reviews"
+on public.member_reviews
+for insert
+with check (
+  auth.uid() = user_id
+  and public.has_paid_access(auth.uid())
+  and status = 'pending'
+  and reviewed_by is null
+  and reviewed_at is null
+);
+
+drop policy if exists "Members can update their own pending reviews" on public.member_reviews;
+drop policy if exists "Paid members can update their own pending reviews" on public.member_reviews;
+create policy "Paid members can update their own pending reviews"
+on public.member_reviews
+for update
+using (
+  auth.uid() = user_id
+  and status = 'pending'
+  and public.has_paid_access(auth.uid())
+)
+with check (
+  auth.uid() = user_id
+  and public.has_paid_access(auth.uid())
+  and status = 'pending'
+  and reviewed_by is null
+  and reviewed_at is null
+);
+alter table public.member_reviews
+add column if not exists plan_label text;
+
+create or replace function public.paid_access_label(p_user_id uuid default auth.uid())
+returns text
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  labels text[] := array[]::text[];
+begin
+  if exists (
+    select 1
+    from public.user_memberships membership
+    where membership.user_id = p_user_id
+      and membership.plan_slug = 'one_to_one'
+      and membership.status = 'paid'
+      and (
+        membership.access_expires_at is null
+        or membership.access_expires_at > now()
+      )
+  ) then
+    labels := array_append(labels, '1-to-1 Coaching');
+  end if;
+
+  if exists (
+    select 1
+    from public.user_memberships membership
+    where membership.user_id = p_user_id
+      and membership.plan_slug = 'group'
+      and membership.status = 'paid'
+      and (
+        membership.access_expires_at is null
+        or membership.access_expires_at > now()
+      )
+  ) then
+    labels := array_append(labels, 'Training Group Coaching');
+  end if;
+
+  if exists (
+    select 1
+    from public.user_live_trading_access access
+    where access.user_id = p_user_id
+      and access.status = 'paid'
+      and (
+        access.access_expires_at is null
+        or access.access_expires_at > now()
+      )
+  ) then
+    labels := array_append(labels, 'Live Trading');
+  end if;
+
+  if exists (
+    select 1
+    from public.user_news_subscriptions subscription
+    where subscription.user_id = p_user_id
+      and subscription.status = 'paid'
+      and (
+        subscription.access_expires_at is null
+        or subscription.access_expires_at > now()
+      )
+  ) then
+    labels := array_append(labels, 'News Subscription');
+  end if;
+
+  if cardinality(labels) = 0 then
+    return 'Paid member';
+  end if;
+
+  return array_to_string(labels, ' + ');
+end;
+$$;
+
+grant execute on function public.paid_access_label(uuid) to authenticated;
+
+create or replace function public.set_member_review_plan_label()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  new.plan_label := public.paid_access_label(new.user_id);
+  return new;
+end;
+$$;
+
+drop trigger if exists member_reviews_set_plan_label on public.member_reviews;
+create trigger member_reviews_set_plan_label
+before insert on public.member_reviews
+for each row
+execute function public.set_member_review_plan_label();
+
+update public.member_reviews
+set plan_label = public.paid_access_label(user_id)
+where plan_label is null
+   or trim(plan_label) = '';
+
+create or replace function public.approve_member_review(p_review_id uuid)
+returns public.member_reviews
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_review public.member_reviews;
+  v_reviewed_at timestamptz := now();
+begin
+  if not public.is_staff() then
+    raise exception 'Only staff can approve member reviews.' using errcode = '42501';
+  end if;
+
+  select *
+  into v_review
+  from public.member_reviews
+  where id = p_review_id
+  for update;
+
+  if not found then
+    raise exception 'Member review not found.' using errcode = 'P0002';
+  end if;
+
+  delete from public.member_reviews
+  where user_id = v_review.user_id
+    and status = 'approved'
+    and id <> v_review.id;
+
+  update public.member_reviews
+  set
+    status = 'approved',
+    reviewed_by = auth.uid(),
+    reviewed_at = v_reviewed_at
+  where id = p_review_id
+  returning * into v_review;
+
+  return v_review;
+end;
+$$;
+
+grant execute on function public.approve_member_review(uuid) to authenticated;
+
+with ranked_reviews as (
+  select
+    id,
+    row_number() over (
+      partition by user_id
+      order by coalesce(reviewed_at, updated_at, created_at) desc, created_at desc, id desc
+    ) as review_rank
+  from public.member_reviews
+  where status = 'approved'
+)
+delete from public.member_reviews reviews
+using ranked_reviews
+where reviews.id = ranked_reviews.id
+  and ranked_reviews.review_rank > 1;
+
+create unique index if not exists member_reviews_one_approved_per_user
+on public.member_reviews (user_id)
+where status = 'approved';
+
+create or replace function public.current_user_has_paid_access()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.has_paid_access(auth.uid());
+$$;
+
+grant execute on function public.current_user_has_paid_access() to authenticated;
+
+-- Member review image uploads: up to 2 public images per approved/pending review.
+alter table public.member_reviews
+add column if not exists image_urls text[] not null default '{}'::text[];
+
+alter table public.member_reviews
+drop constraint if exists member_reviews_image_urls_max_two_check;
+
+alter table public.member_reviews
+add constraint member_reviews_image_urls_max_two_check
+check (coalesce(array_length(image_urls, 1), 0) <= 2);
+
+insert into storage.buckets (id, name, public)
+values ('member-review-images', 'member-review-images', true)
+on conflict (id) do update set public = excluded.public;
+
+drop policy if exists "Anyone can read member review images" on storage.objects;
+create policy "Anyone can read member review images"
+on storage.objects
+for select
+using (bucket_id = 'member-review-images');
+
+drop policy if exists "Paid members can upload own review images" on storage.objects;
+create policy "Paid members can upload own review images"
+on storage.objects
+for insert
+with check (
+  bucket_id = 'member-review-images'
+  and auth.role() = 'authenticated'
+  and public.has_paid_access(auth.uid())
+  and (storage.foldername(name))[1] = auth.uid()::text
+);
+
+drop policy if exists "Members can update own review images" on storage.objects;
+create policy "Members can update own review images"
+on storage.objects
+for update
+using (
+  bucket_id = 'member-review-images'
+  and auth.role() = 'authenticated'
+  and (storage.foldername(name))[1] = auth.uid()::text
+)
+with check (
+  bucket_id = 'member-review-images'
+  and auth.role() = 'authenticated'
+  and (storage.foldername(name))[1] = auth.uid()::text
+);
+
+drop policy if exists "Members can delete own review images" on storage.objects;
+create policy "Members can delete own review images"
+on storage.objects
+for delete
+using (
+  bucket_id = 'member-review-images'
+  and auth.role() = 'authenticated'
+  and (storage.foldername(name))[1] = auth.uid()::text
+);
+
+create or replace function public.storage_object_has_extension(
+  p_name text,
+  p_extensions text[]
+)
+returns boolean
+language sql
+immutable
+set search_path = public, storage
+as $$
+  select lower(coalesce(p_name, '')) ~ ('\.(' || array_to_string(p_extensions, '|') || ')$');
+$$;
+
+create or replace function public.storage_object_has_mime(
+  p_metadata jsonb,
+  p_mime_types text[]
+)
+returns boolean
+language sql
+immutable
+set search_path = public
+as $$
+  select lower(coalesce(p_metadata ->> 'mimetype', '')) = any(p_mime_types);
+$$;
+
+create or replace function public.storage_object_size_between(
+  p_metadata jsonb,
+  p_min_bytes bigint,
+  p_max_bytes bigint
+)
+returns boolean
+language sql
+immutable
+set search_path = public
+as $$
+  select
+    coalesce(p_metadata ->> 'size', '') ~ '^\d+$'
+    and (p_metadata ->> 'size')::bigint between p_min_bytes and p_max_bytes;
+$$;
+
+drop policy if exists "Admins can upload prop firm logos" on storage.objects;
+create policy "Admins can upload prop firm logos"
+on storage.objects
+for insert
+with check (
+  bucket_id = 'propfirm-logos'
+  and public.is_admin()
+  and public.storage_object_has_extension(name, array['png', 'jpg', 'jpeg', 'webp'])
+  and public.storage_object_has_mime(metadata, array['image/png', 'image/jpeg', 'image/webp'])
+  and public.storage_object_size_between(metadata, 1, 2097152)
+);
+
+drop policy if exists "Admins can update prop firm logos" on storage.objects;
+create policy "Admins can update prop firm logos"
+on storage.objects
+for update
+using (bucket_id = 'propfirm-logos' and public.is_admin())
+with check (
+  bucket_id = 'propfirm-logos'
+  and public.is_admin()
+  and public.storage_object_has_extension(name, array['png', 'jpg', 'jpeg', 'webp'])
+  and public.storage_object_has_mime(metadata, array['image/png', 'image/jpeg', 'image/webp'])
+  and public.storage_object_size_between(metadata, 1, 2097152)
+);
+
+drop policy if exists "Admins can upload trading tool logos" on storage.objects;
+create policy "Admins can upload trading tool logos"
+on storage.objects
+for insert
+with check (
+  bucket_id = 'trading-tool-logos'
+  and public.is_admin()
+  and public.storage_object_has_extension(name, array['png', 'jpg', 'jpeg', 'webp'])
+  and public.storage_object_has_mime(metadata, array['image/png', 'image/jpeg', 'image/webp'])
+  and public.storage_object_size_between(metadata, 1, 2097152)
+);
+
+drop policy if exists "Admins can update trading tool logos" on storage.objects;
+create policy "Admins can update trading tool logos"
+on storage.objects
+for update
+using (bucket_id = 'trading-tool-logos' and public.is_admin())
+with check (
+  bucket_id = 'trading-tool-logos'
+  and public.is_admin()
+  and public.storage_object_has_extension(name, array['png', 'jpg', 'jpeg', 'webp'])
+  and public.storage_object_has_mime(metadata, array['image/png', 'image/jpeg', 'image/webp'])
+  and public.storage_object_size_between(metadata, 1, 2097152)
+);
+
+drop policy if exists "Admins can upload education images" on storage.objects;
+create policy "Admins can upload education images"
+on storage.objects
+for insert
+with check (
+  bucket_id = 'education-images'
+  and public.is_admin()
+  and public.storage_object_has_extension(name, array['png', 'jpg', 'jpeg', 'webp', 'gif'])
+  and public.storage_object_has_mime(
+    metadata,
+    array['image/png', 'image/jpeg', 'image/webp', 'image/gif']
+  )
+  and public.storage_object_size_between(metadata, 1, 4194304)
+);
+
+drop policy if exists "Admins can update education images" on storage.objects;
+create policy "Admins can update education images"
+on storage.objects
+for update
+using (bucket_id = 'education-images' and public.is_admin())
+with check (
+  bucket_id = 'education-images'
+  and public.is_admin()
+  and public.storage_object_has_extension(name, array['png', 'jpg', 'jpeg', 'webp', 'gif'])
+  and public.storage_object_has_mime(
+    metadata,
+    array['image/png', 'image/jpeg', 'image/webp', 'image/gif']
+  )
+  and public.storage_object_size_between(metadata, 1, 4194304)
+);
+
+drop policy if exists "Paid members can upload own review images" on storage.objects;
+create policy "Paid members can upload own review images"
+on storage.objects
+for insert
+with check (
+  bucket_id = 'member-review-images'
+  and auth.role() = 'authenticated'
+  and public.has_paid_access(auth.uid())
+  and (storage.foldername(name))[1] = auth.uid()::text
+  and public.storage_object_has_extension(name, array['png', 'jpg', 'jpeg', 'webp', 'gif'])
+  and public.storage_object_has_mime(
+    metadata,
+    array['image/png', 'image/jpeg', 'image/webp', 'image/gif']
+  )
+  and public.storage_object_size_between(metadata, 1, 4194304)
+);
+
+drop policy if exists "Members can update own review images" on storage.objects;
+create policy "Members can update own review images"
+on storage.objects
+for update
+using (
+  bucket_id = 'member-review-images'
+  and auth.role() = 'authenticated'
+  and (storage.foldername(name))[1] = auth.uid()::text
+)
+with check (
+  bucket_id = 'member-review-images'
+  and auth.role() = 'authenticated'
+  and (storage.foldername(name))[1] = auth.uid()::text
+  and public.storage_object_has_extension(name, array['png', 'jpg', 'jpeg', 'webp', 'gif'])
+  and public.storage_object_has_mime(
+    metadata,
+    array['image/png', 'image/jpeg', 'image/webp', 'image/gif']
+  )
+  and public.storage_object_size_between(metadata, 1, 4194304)
+);

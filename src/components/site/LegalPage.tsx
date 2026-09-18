@@ -14,10 +14,17 @@ type LegalPageProps = {
   eyebrow: string;
   title: string;
   intro: string;
+  lastUpdated?: string;
   sections: LegalSection[];
 };
 
-export function LegalPage({ eyebrow, title, intro, sections }: LegalPageProps) {
+export function LegalPage({
+  eyebrow,
+  title,
+  intro,
+  lastUpdated = "May 27, 2026",
+  sections,
+}: LegalPageProps) {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
@@ -36,19 +43,19 @@ export function LegalPage({ eyebrow, title, intro, sections }: LegalPageProps) {
             <Badge variant="outline" className="glass mb-5 border-primary/40 text-xs">
               {eyebrow}
             </Badge>
-            <h1 className="font-display text-5xl font-bold leading-tight tracking-tight md:text-7xl">
+            <h1 className="font-display text-4xl font-bold leading-tight tracking-tight sm:text-5xl md:text-7xl">
               {title}
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground md:text-lg">
               {intro}
             </p>
-            <p className="mt-4 text-xs text-muted-foreground">Last updated: May 27, 2026</p>
+            <p className="mt-4 text-xs text-muted-foreground">Last updated: {lastUpdated}</p>
           </motion.div>
         </section>
 
         <section className="pb-20">
           <motion.div
-            className="mx-auto grid max-w-4xl gap-4 px-4 md:px-6"
+            className="mx-auto max-w-4xl space-y-10 px-4 md:px-6"
             initial="hidden"
             whileInView="show"
             viewport={{ once: true, margin: "-80px" }}
@@ -57,13 +64,13 @@ export function LegalPage({ eyebrow, title, intro, sections }: LegalPageProps) {
             {sections.map((section) => (
               <motion.article
                 key={section.title}
-                className="rounded-2xl border border-border/50 bg-card/35 p-5 md:p-6"
+                className="border-b border-border/35 pb-10 last:border-b-0"
                 variants={fadeUp}
               >
-                <h2 className="font-display text-xl font-semibold text-foreground">
+                <h2 className="font-display text-2xl font-semibold text-foreground">
                   {section.title}
                 </h2>
-                <div className="mt-3 space-y-3 text-sm leading-7 text-muted-foreground">
+                <div className="mt-4 space-y-4 text-sm leading-7 text-muted-foreground md:text-base md:leading-8">
                   {section.body.map((paragraph) => (
                     <p key={paragraph}>{paragraph}</p>
                   ))}

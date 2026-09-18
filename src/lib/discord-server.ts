@@ -13,6 +13,10 @@ const discordCallbackSchema = z.object({
   state: z.string().min(1),
 });
 
+const discordSyncSchema = z.object({
+  accessToken: z.string().min(1),
+});
+
 type DiscordTokenResponse = {
   access_token: string;
   refresh_token?: string;
@@ -33,7 +37,7 @@ type ProvisionDiscordOptions =
   | { kind: "news" };
 
 type ExistingPaidMembershipRow = {
-  plan_slug: "one_to_one" | "group";
+  plan_slug: string | null;
   status: string;
   access_expires_at: string | null;
 };
@@ -50,11 +54,21 @@ type ExistingLiveTradingAccessRow = {
 
 type ExpiredMentorshipRow = {
   user_id: string;
-  plan_slug: "one_to_one" | "group";
+  plan_slug: string | null;
 };
 
 type ExpiredAccessRow = {
   user_id: string;
+};
+
+type DiscordConnectionRoleAuditRow = {
+  user_id: string;
+  discord_user_id: string | null;
+};
+
+type DiscordRoleAuditTarget = {
+  kind: "one_to_one" | "group" | "live" | "news";
+  roleIds: string[];
 };
 
 function readServerEnv(name: string) {
@@ -63,14 +77,34 @@ function readServerEnv(name: string) {
       __ZACTRADES_SERVER_ENV__?: Record<string, string | undefined>;
     }
   ).__ZACTRADES_SERVER_ENV__?.[name];
-  const viteValue = (import.meta.env as Record<string, string | undefined>)[name];
   const processEnv = (
     globalThis as typeof globalThis & {
       process?: { env?: Record<string, string | undefined> };
     }
-  ).process?.env;
+  ).process?.env?.[name];
 
-  return runtimeValue ?? viteValue ?? processEnv?.[name];
+  if (runtimeValue ?? processEnv) {
+    return runtimeValue ?? processEnv;
+  }
+
+  if (name.startsWith("VITE_")) {
+    return (import.meta.env as Record<string, string | undefined>)[name];
+  }
+
+  return undefined;
+}
+
+function normalizeMentorshipPlanSlug(value: unknown): "one_to_one" | "group" | null {
+  if (value === "one_to_one" || value === "group") return value;
+  return null;
+}
+
+function discordAllowPendingAccess() {
+  return readServerEnv("DISCORD_ALLOW_PENDING_ACCESS") === "true";
+}
+
+function discordEligibleStatuses() {
+  return discordAllowPendingAccess() ? ["paid", "pending"] : ["paid"];
 }
 
 function getDiscordRedirectUri(origin: string) {
@@ -333,11 +367,66 @@ export const completeDiscordConnection = createServerFn({ method: "POST" })
       };
     }
 
+    const syncResult = await syncPaidDiscordAccess(adminClient, auth.userId);
+    const syncWarning =
+      syncResult.failedMessages.length > 0
+        ? " Some paid roles could not sync yet: " + syncResult.failedMessages.join("; ")
+        : "";
+    const connectedMessage =
+      syncResult.syncedCount > 0
+        ? "Discord connected as " + username + ". Your paid Discord access has been synced."
+        : "Discord connected as " + username + ". Server access will be assigned after payment.";
+
     return {
       ok: true,
       status: "connected",
       username,
-      message: `Discord connected as ${username}. Server access will be assigned after payment.`,
+      message: connectedMessage + syncWarning,
+    };
+  });
+
+export const syncDiscordPaidAccess = createServerFn({ method: "POST" })
+  .inputValidator(discordSyncSchema)
+  .handler(async ({ data }) => {
+    const adminClient = getAdminClient();
+
+    if (!adminClient) {
+      return {
+        ok: false,
+        status: "discord_not_configured",
+        message:
+          "Discord sync is not configured yet. Add SUPABASE_SERVICE_ROLE_KEY and restart the dev server.",
+      };
+    }
+
+    const auth = await getAuthenticatedUser(data.accessToken);
+
+    if (auth.error || !auth.userId) {
+      return { ok: false, status: "auth_required", message: auth.error };
+    }
+
+    const syncResult = await syncPaidDiscordAccess(adminClient, auth.userId);
+
+    if (syncResult.failedMessages.length > 0) {
+      return {
+        ok: false,
+        status: "discord_sync_failed",
+        message: syncResult.failedMessages.join("; "),
+      };
+    }
+
+    if (syncResult.syncedCount === 0) {
+      return {
+        ok: true,
+        status: "no_paid_access",
+        message: "Discord is connected, but no active paid access was found yet.",
+      };
+    }
+
+    return {
+      ok: true,
+      status: "synced",
+      message: "Discord paid roles synced successfully.",
     };
   });
 
@@ -349,17 +438,20 @@ async function syncPaidDiscordAccess(adminClient: SupabaseClient, userId: string
     .from("user_memberships")
     .select("plan_slug,status,access_expires_at")
     .eq("user_id", userId)
-    .eq("status", "paid");
+    .in("status", discordEligibleStatuses());
 
   if (membershipsError) {
     failedMessages.push(membershipsError.message);
   } else {
     for (const membership of ((memberships ?? []) as ExistingPaidMembershipRow[]).filter(
-      isActivePaidAccess,
+      isActiveDiscordAccess,
     )) {
+      const planSlug = normalizeMentorshipPlanSlug(membership.plan_slug);
+      if (!planSlug) continue;
+
       const result = await provisionDiscordAccess(adminClient, userId, {
         kind: "mentorship",
-        planSlug: membership.plan_slug,
+        planSlug,
       });
 
       if (result.ok) {
@@ -380,7 +472,7 @@ async function syncPaidDiscordAccess(adminClient: SupabaseClient, userId: string
     failedMessages.push(newsError.message);
   } else if (
     newsSubscription &&
-    isActivePaidAccess(newsSubscription as ExistingNewsSubscriptionRow)
+    isActiveDiscordAccess(newsSubscription as ExistingNewsSubscriptionRow)
   ) {
     const result = await provisionDiscordAccess(adminClient, userId, { kind: "news" });
 
@@ -399,7 +491,7 @@ async function syncPaidDiscordAccess(adminClient: SupabaseClient, userId: string
 
   if (liveError) {
     failedMessages.push(liveError.message);
-  } else if (liveAccess && isActivePaidAccess(liveAccess as ExistingLiveTradingAccessRow)) {
+  } else if (liveAccess && isActiveDiscordAccess(liveAccess as ExistingLiveTradingAccessRow)) {
     const result = await provisionDiscordAccess(adminClient, userId, { kind: "live" });
 
     if (result.ok) {
@@ -419,6 +511,11 @@ function isActivePaidAccess(access: { status: string; access_expires_at: string 
   const expiresAt = new Date(access.access_expires_at);
 
   return Number.isNaN(expiresAt.getTime()) || expiresAt > new Date();
+}
+
+function isActiveDiscordAccess(access: { status: string; access_expires_at: string | null }) {
+  if (access.status === "pending" && discordAllowPendingAccess()) return true;
+  return isActivePaidAccess(access);
 }
 
 export async function provisionDiscordAccess(
@@ -598,7 +695,9 @@ export async function expireAndRevokeDiscordAccess(adminClient: SupabaseClient) 
       news: false,
       live: false,
     };
-    entry.mentorshipPlans.add(row.plan_slug);
+    const planSlug = normalizeMentorshipPlanSlug(row.plan_slug);
+    if (!planSlug) continue;
+    entry.mentorshipPlans.add(planSlug);
     expiredByUser.set(row.user_id, entry);
   }
 
@@ -642,10 +741,140 @@ export async function expireAndRevokeDiscordAccess(adminClient: SupabaseClient) 
   return { expiredCount, revokedCount, failedMessages };
 }
 
+export async function reconcileDiscordRoleRemovals(adminClient: SupabaseClient) {
+  const botToken = readServerEnv("DISCORD_BOT_TOKEN");
+  const guildId = readServerEnv("DISCORD_GUILD_ID");
+
+  if (!botToken || !guildId) {
+    return {
+      checkedCount: 0,
+      expiredCount: 0,
+      failedMessages: ["Discord bot is not configured yet."],
+    };
+  }
+
+  const targets = getDiscordRoleAuditTargets();
+
+  if (!targets.length) {
+    return {
+      checkedCount: 0,
+      expiredCount: 0,
+      failedMessages: ["Discord paid role IDs are not configured yet."],
+    };
+  }
+
+  const { data: connections, error } = await adminClient
+    .from("discord_connections")
+    .select("user_id,discord_user_id")
+    .not("discord_user_id", "is", null);
+
+  if (error) {
+    return { checkedCount: 0, expiredCount: 0, failedMessages: [error.message] };
+  }
+
+  let checkedCount = 0;
+  let expiredCount = 0;
+  const failedMessages: string[] = [];
+
+  for (const connection of (connections ?? []) as DiscordConnectionRoleAuditRow[]) {
+    if (!connection.discord_user_id) continue;
+    checkedCount += 1;
+
+    const roleLookup = await fetchDiscordMemberRoleSet(
+      botToken,
+      guildId,
+      connection.discord_user_id,
+    );
+
+    if (!roleLookup.ok) {
+      failedMessages.push(roleLookup.message);
+      continue;
+    }
+
+    let userExpiredCount = 0;
+
+    for (const target of targets) {
+      if (target.roleIds.every((roleId) => roleLookup.roleIds.has(roleId))) continue;
+
+      const result = await expireAccessForMissingDiscordRole(
+        adminClient,
+        connection.user_id,
+        target,
+      );
+
+      if (result.error) {
+        failedMessages.push(result.error);
+      } else {
+        userExpiredCount += result.expiredCount;
+      }
+    }
+
+    if (userExpiredCount > 0) {
+      expiredCount += userExpiredCount;
+      await adminClient
+        .from("profiles")
+        .update({
+          discord_last_role_sync_at: new Date().toISOString(),
+          discord_role_sync_status: "manual_role_removed",
+          discord_role_sync_error: null,
+        })
+        .eq("id", connection.user_id);
+    }
+  }
+
+  return { checkedCount, expiredCount, failedMessages };
+}
+
 export async function handleDiscordExpiryRequest(
   request: Request,
   env: Record<string, string | undefined>,
 ) {
+  const authError = validateDiscordCronRequest(request, env);
+  if (authError) return authError;
+
+  const adminClient = getAdminClient();
+
+  if (!adminClient) {
+    return Response.json(
+      {
+        ok: false,
+        message: "Supabase service role is not configured.",
+      },
+      { status: 500 },
+    );
+  }
+
+  const expiry = await expireAndRevokeDiscordAccess(adminClient);
+  const roleReconciliation = await reconcileDiscordRoleRemovals(adminClient);
+
+  return Response.json({ ok: true, ...expiry, roleReconciliation });
+}
+
+export async function handleDiscordRoleReconcileRequest(
+  request: Request,
+  env: Record<string, string | undefined>,
+) {
+  const authError = validateDiscordCronRequest(request, env);
+  if (authError) return authError;
+
+  const adminClient = getAdminClient();
+
+  if (!adminClient) {
+    return Response.json(
+      {
+        ok: false,
+        message: "Supabase service role is not configured.",
+      },
+      { status: 500 },
+    );
+  }
+
+  const result = await reconcileDiscordRoleRemovals(adminClient);
+
+  return Response.json({ ok: true, ...result });
+}
+
+function validateDiscordCronRequest(request: Request, env: Record<string, string | undefined>) {
   const cronSecret = env.DISCORD_CRON_SECRET;
 
   if (!cronSecret) {
@@ -668,21 +897,7 @@ export async function handleDiscordExpiryRequest(
     return Response.json({ ok: false, message: "Unauthorized." }, { status: 401 });
   }
 
-  const adminClient = getAdminClient();
-
-  if (!adminClient) {
-    return Response.json(
-      {
-        ok: false,
-        message: "Supabase service role is not configured.",
-      },
-      { status: 500 },
-    );
-  }
-
-  const result = await expireAndRevokeDiscordAccess(adminClient);
-
-  return Response.json({ ok: true, ...result });
+  return null;
 }
 
 function getDiscordRoleIds(options: ProvisionDiscordOptions) {
@@ -708,6 +923,118 @@ function getDiscordRoleIds(options: ProvisionDiscordOptions) {
   }
 
   return Array.from(roleIds);
+}
+
+function getDiscordRoleAuditTargets() {
+  const targets: DiscordRoleAuditTarget[] = [];
+  const mentorshipRoleId = readServerEnv("DISCORD_MENTORSHIP_ROLE_ID");
+  const oneToOneRoleId = readServerEnv("DISCORD_ONE_TO_ONE_ROLE_ID");
+  const groupRoleId = readServerEnv("DISCORD_GROUP_ROLE_ID");
+  const liveTradingRoleId = readServerEnv("DISCORD_LIVE_TRADING_ROLE_ID");
+  const newsRoleId = readServerEnv("DISCORD_NEWS_ROLE_ID");
+
+  if (oneToOneRoleId || mentorshipRoleId) {
+    targets.push({
+      kind: "one_to_one",
+      roleIds: [oneToOneRoleId ?? mentorshipRoleId].filter((roleId): roleId is string =>
+        Boolean(roleId),
+      ),
+    });
+  }
+
+  if (groupRoleId || mentorshipRoleId) {
+    targets.push({
+      kind: "group",
+      roleIds: [groupRoleId ?? mentorshipRoleId].filter((roleId): roleId is string =>
+        Boolean(roleId),
+      ),
+    });
+  }
+
+  if (liveTradingRoleId) {
+    targets.push({ kind: "live", roleIds: [liveTradingRoleId] });
+  }
+
+  if (newsRoleId) {
+    targets.push({ kind: "news", roleIds: [newsRoleId] });
+  }
+
+  return targets.filter((target) => target.roleIds.length > 0);
+}
+
+async function fetchDiscordMemberRoleSet(botToken: string, guildId: string, discordUserId: string) {
+  const response = await fetch(
+    `https://discord.com/api/guilds/${guildId}/members/${discordUserId}`,
+    {
+      headers: {
+        authorization: `Bot ${botToken}`,
+      },
+    },
+  );
+
+  if (response.status === 404) {
+    return { ok: true as const, roleIds: new Set<string>() };
+  }
+
+  if (!response.ok) {
+    const message = await response.text();
+    return {
+      ok: false as const,
+      message: message || `Discord member role lookup failed with ${response.status}.`,
+    };
+  }
+
+  const member = (await response.json()) as { roles?: unknown };
+  const roles = Array.isArray(member.roles)
+    ? member.roles.filter((roleId): roleId is string => typeof roleId === "string")
+    : [];
+
+  return { ok: true as const, roleIds: new Set(roles) };
+}
+
+async function expireAccessForMissingDiscordRole(
+  adminClient: SupabaseClient,
+  userId: string,
+  target: DiscordRoleAuditTarget,
+) {
+  const now = new Date().toISOString();
+  const patch = {
+    status: "expired",
+    access_expires_at: now,
+    notes: `Access expired because the matching Discord role was removed manually (${target.kind}).`,
+  };
+
+  if (target.kind === "live") {
+    const { data, error } = await adminClient
+      .from("user_live_trading_access")
+      .update(patch)
+      .eq("user_id", userId)
+      .eq("status", "paid")
+      .select("user_id");
+
+    return { expiredCount: data?.length ?? 0, error: error?.message ?? null };
+  }
+
+  if (target.kind === "news") {
+    const { data, error } = await adminClient
+      .from("user_news_subscriptions")
+      .update(patch)
+      .eq("user_id", userId)
+      .eq("status", "paid")
+      .select("user_id");
+
+    return { expiredCount: data?.length ?? 0, error: error?.message ?? null };
+  }
+
+  const { data, error } = await adminClient
+    .from("user_memberships")
+    .update(patch)
+    .eq("user_id", userId)
+    .eq("plan_slug", target.kind)
+    .eq("status", "paid")
+    .select("user_id");
+
+  return { expiredCount: data?.length ?? 0, error: error?.message ?? null };
 }
 
 async function revokeExpiredDiscordRoles(
@@ -824,13 +1151,15 @@ async function getActiveDiscordAccessState(adminClient: SupabaseClient, userId: 
     .from("user_memberships")
     .select("plan_slug,status,access_expires_at")
     .eq("user_id", userId)
-    .eq("status", "paid");
+    .in("status", discordEligibleStatuses());
 
   const activeMemberships = ((memberships ?? []) as ExistingPaidMembershipRow[]).filter(
     (membership) =>
-      !membership.access_expires_at ||
-      Number.isNaN(new Date(membership.access_expires_at).getTime()) ||
-      membership.access_expires_at > now,
+      membership.status === "pending" && discordAllowPendingAccess()
+        ? true
+        : !membership.access_expires_at ||
+          Number.isNaN(new Date(membership.access_expires_at).getTime()) ||
+          membership.access_expires_at > now,
   );
 
   const { data: newsSubscription } = await adminClient
@@ -846,19 +1175,23 @@ async function getActiveDiscordAccessState(adminClient: SupabaseClient, userId: 
     .maybeSingle();
 
   const hasNews = Boolean(
-    newsSubscription && isActivePaidAccess(newsSubscription as ExistingNewsSubscriptionRow),
+    newsSubscription && isActiveDiscordAccess(newsSubscription as ExistingNewsSubscriptionRow),
   );
   const hasLive = Boolean(
-    liveAccess && isActivePaidAccess(liveAccess as ExistingLiveTradingAccessRow),
+    liveAccess && isActiveDiscordAccess(liveAccess as ExistingLiveTradingAccessRow),
   );
 
+  const activeMentorshipPlans = activeMemberships
+    .map((membership) => normalizeMentorshipPlanSlug(membership.plan_slug))
+    .filter((planSlug): planSlug is "one_to_one" | "group" => Boolean(planSlug));
+
   return {
-    hasOneToOne: activeMemberships.some((membership) => membership.plan_slug === "one_to_one"),
-    hasGroup: activeMemberships.some((membership) => membership.plan_slug === "group"),
-    hasMentorship: activeMemberships.length > 0,
+    hasOneToOne: activeMentorshipPlans.includes("one_to_one"),
+    hasGroup: activeMentorshipPlans.includes("group"),
+    hasMentorship: activeMentorshipPlans.length > 0,
     hasNews,
     hasLive,
-    hasAnyPaidAccess: activeMemberships.length > 0 || hasNews || hasLive,
+    hasAnyPaidAccess: activeMentorshipPlans.length > 0 || hasNews || hasLive,
   };
 }
 

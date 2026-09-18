@@ -55,11 +55,12 @@ function withSecurityHeaders(response: Response, request?: Request): Response {
     isLocalDevelopment
       ? [
           "default-src 'self'",
-          "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* http://127.0.0.1:* https://s3.tradingview.com https://www.tradingview.com",
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* http://127.0.0.1:* https://s3.tradingview.com https://www.tradingview.com https://*.tradingview.com https://*.tradingview-widget.com",
           "style-src 'self' 'unsafe-inline'",
-          "img-src 'self' data: blob: http://localhost:* http://127.0.0.1:* https://*.supabase.co https://cdn.discordapp.com https://*.tradingview.com https://www.tradingview.com",
-          "connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* https://*.supabase.co wss://*.supabase.co https://api.nowpayments.io https://discord.com https://*.tradingview.com wss://*.tradingview.com",
-          "frame-src 'self' http://localhost:* http://127.0.0.1:* https://*.tradingview.com https://www.tradingview.com https://*.supabase.co blob:",
+          "img-src 'self' data: blob: http://localhost:* http://127.0.0.1:* https://*.supabase.co https://cdn.discordapp.com https://*.ytimg.com https: https://*.tradingview.com https://www.tradingview.com https://*.tradingview-widget.com",
+          "media-src 'self' blob: data: http://localhost:* http://127.0.0.1:* https://*.supabase.co",
+          "connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* https://*.supabase.co wss://*.supabase.co https://api.nowpayments.io https://discord.com https://*.tradingview.com https://*.tradingview-widget.com wss://*.tradingview.com wss://*.tradingview-widget.com",
+          "frame-src 'self' http://localhost:* http://127.0.0.1:* https://*.tradingview.com https://www.tradingview.com https://*.tradingview-widget.com https://www.youtube.com https://www.youtube-nocookie.com https://*.supabase.co blob:",
           "object-src 'none'",
           "base-uri 'self'",
           "form-action 'self'",
@@ -69,9 +70,10 @@ function withSecurityHeaders(response: Response, request?: Request): Response {
           "default-src 'self'",
           "script-src 'self' 'unsafe-inline' https://s3.tradingview.com https://*.tradingview.com https://*.tradingview-widget.com",
           "style-src 'self' 'unsafe-inline'",
-          "img-src 'self' data: blob: https://*.supabase.co https://cdn.discordapp.com https://*.tradingview.com https://*.tradingview-widget.com",
-          "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.nowpayments.io https://discord.com https://*.tradingview.com https://*.tradingview-widget.com wss://*.tradingview.com",
-          "frame-src 'self' https://*.tradingview.com https://*.tradingview-widget.com https://*.supabase.co blob:",
+          "img-src 'self' data: blob: https://*.supabase.co https://cdn.discordapp.com https://*.ytimg.com https: https://*.tradingview.com https://*.tradingview-widget.com",
+          "media-src 'self' blob: data: https://*.supabase.co",
+          "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.nowpayments.io https://discord.com https://*.tradingview.com https://*.tradingview-widget.com wss://*.tradingview.com wss://*.tradingview-widget.com",
+          "frame-src 'self' https://*.tradingview.com https://*.tradingview-widget.com https://www.youtube.com https://www.youtube-nocookie.com https://*.supabase.co blob:",
           "object-src 'none'",
           "base-uri 'self'",
           "form-action 'self'",
@@ -144,9 +146,38 @@ export default {
         );
       }
 
+      if (url.pathname === "/api/discord/reconcile-roles") {
+        const { handleDiscordRoleReconcileRequest } = await import("./lib/discord-server");
+        return handleDiscordRoleReconcileRequest(
+          request,
+          env && typeof env === "object" ? (env as Record<string, string | undefined>) : {},
+        );
+      }
+
       if (url.pathname === "/api/nowpayments/ipn") {
         const { handleNowPaymentsIpnRequest } = await import("./lib/payment-server");
         return handleNowPaymentsIpnRequest(
+          request,
+          env && typeof env === "object" ? (env as Record<string, string | undefined>) : {},
+        );
+      }
+
+      if (url.pathname === "/api/payzone/launch") {
+        const { handlePayzoneLaunchRequest } = await import("./lib/payment-server");
+        return handlePayzoneLaunchRequest(
+          request,
+          env && typeof env === "object" ? (env as Record<string, string | undefined>) : {},
+        );
+      }
+
+      if (url.pathname === "/api/payzone/theme.css") {
+        const { handlePayzoneThemeCssRequest } = await import("./lib/payment-server");
+        return handlePayzoneThemeCssRequest(request);
+      }
+
+      if (url.pathname === "/api/payzone/callback") {
+        const { handlePayzoneCallbackRequest } = await import("./lib/payment-server");
+        return handlePayzoneCallbackRequest(
           request,
           env && typeof env === "object" ? (env as Record<string, string | undefined>) : {},
         );

@@ -94,8 +94,8 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
         if (!value) setTimeout(resetState, 200);
       }}
     >
-      <DialogContent className="glass-strong max-w-md border-border/60 p-0 sm:max-w-lg">
-        <DialogHeader className="border-b border-border/60 p-6 pb-4">
+      <DialogContent className="glass-strong max-h-[calc(100dvh-1rem)] max-w-md grid-rows-[auto_minmax(0,1fr)] overflow-hidden border-border/60 p-0 sm:max-w-lg">
+        <DialogHeader className="shrink-0 border-b border-border/60 p-5 pb-4 sm:p-6 sm:pb-4">
           <BrandLogo className="mb-3 h-20 w-20" />
           <DialogTitle className="font-display text-2xl">
             {isJoin ? t("auth.joinTitle") : t("auth.signInTitle")}
@@ -106,7 +106,7 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
         </DialogHeader>
 
         {successMessage ? (
-          <div className="p-6 text-center">
+          <div className="min-h-0 overflow-y-auto overscroll-contain p-5 text-center sm:p-6">
             <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-bull/15 text-bull">
               <Check className="h-7 w-7" strokeWidth={3} />
             </div>
@@ -123,7 +123,10 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
             </Button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4 p-6">
+          <form
+            onSubmit={handleSubmit}
+            className="min-h-0 space-y-4 overflow-y-auto overscroll-contain p-5 sm:p-6"
+          >
             {isJoin && (
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">

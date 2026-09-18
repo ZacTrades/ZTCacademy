@@ -1,17 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import {
-  BarChart3,
-  Check,
-  ExternalLink,
-  Lock,
-  LogIn,
-  RefreshCw,
-  Sparkles,
-  UserPlus,
-  Zap,
-} from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { BarChart3, ExternalLink, Lock, LogIn, RefreshCw, UserPlus, Zap } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AuthDialog } from "@/components/site/AuthDialog";
 import { CandleChart } from "@/components/site/CandleChart";
@@ -19,7 +9,6 @@ import { Footer } from "@/components/site/Footer";
 import { Navbar } from "@/components/site/Navbar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import tradingViewPreview from "@/assets/zactrades-tradingview-preview.jpeg";
 import {
   defaultIndicators,
   fetchIndicators,
@@ -53,11 +42,7 @@ const fadeUp = {
   transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const },
 };
 
-const memberBenefits = [
-  "TradingView-ready indicator access",
-  "Structured setup confirmation",
-  "Cleaner execution with less chart noise",
-];
+const comingSoonIndicatorSlugs = new Set(["liquidity_sweep", "smart_entry_ai"]);
 
 function IndicatorsPage() {
   const { user, loading: authLoading, isConfigured } = useAuth();
@@ -73,25 +58,18 @@ function IndicatorsPage() {
   };
 
   const loadIndicators = useCallback(async () => {
-    if (!user) return;
-
     setLoadingIndicators(true);
     const nextIndicators = await fetchIndicators();
     setIndicators(nextIndicators);
     setLoadingIndicators(false);
-  }, [user]);
+  }, []);
 
   useEffect(() => {
-    if (user) {
-      void loadIndicators();
-      return;
-    }
-
-    setIndicators([]);
-    setLoadingIndicators(false);
-  }, [loadIndicators, user]);
+    void loadIndicators();
+  }, [loadIndicators]);
 
   const visibleIndicators = indicators.length ? indicators : defaultIndicators;
+  const heroIndicator = visibleIndicators.find((indicator) => indicator.video_url?.trim());
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -106,14 +84,13 @@ function IndicatorsPage() {
             <motion.div {...fadeUp}>
               <Badge variant="outline" className="glass mb-6 gap-2 border-primary/40 text-xs">
                 <BarChart3 className="h-3.5 w-3.5 text-electric" />
-                Member Indicators
+                ZTC Indicators
               </Badge>
-              <h1 className="font-display text-5xl font-bold leading-tight tracking-tight md:text-7xl">
-                Premium indicators for cleaner <span className="text-gradient">execution.</span>
+              <h1 className="font-display text-4xl font-bold leading-tight tracking-tight sm:text-5xl md:text-7xl">
+                Built To Improve Your  <span className="text-gradient">Trading.</span>
               </h1>
               <p className="mt-6 max-w-2xl text-base leading-7 text-muted-foreground md:text-lg">
-                Access ZacTrades indicators built to support market structure, trend confirmation,
-                liquidity sweeps, and disciplined entries.
+                Professional TradingView indicators designed to complement your analysis and help you approach the market with greater clarity and confidence
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 {canAccess ? (
@@ -125,7 +102,7 @@ function IndicatorsPage() {
                     style={{ background: "var(--gradient-primary)" }}
                   >
                     <RefreshCw className={`h-4 w-4 ${loadingIndicators ? "animate-spin" : ""}`} />
-                    Refresh indicators
+                    Explore The Indicators
                   </Button>
                 ) : (
                   <>
@@ -157,46 +134,10 @@ function IndicatorsPage() {
             <motion.div
               {...fadeUp}
               transition={{ ...fadeUp.transition, delay: 0.1 }}
-              className="glass-strong relative overflow-hidden rounded-3xl p-5 md:p-6"
+              className="relative overflow-hidden rounded-3xl"
             >
               <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-primary/25 blur-3xl" />
-              <div className="relative">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-electric">
-                      TradingView Toolkit
-                    </div>
-                    <h2 className="mt-2 font-display text-2xl font-bold">What members unlock</h2>
-                  </div>
-                  <div className="grid h-12 w-12 place-items-center rounded-xl bg-gold/15 text-gold ring-1 ring-gold/30">
-                    <Sparkles className="h-5 w-5" />
-                  </div>
-                </div>
-                <div className="mt-6 grid gap-3">
-                  {memberBenefits.map((benefit) => (
-                    <div
-                      key={benefit}
-                      className="flex items-center gap-3 rounded-xl border border-border/50 bg-background/45 px-4 py-3 text-sm text-muted-foreground"
-                    >
-                      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-bull/15 text-bull">
-                        <Check className="h-3.5 w-3.5" strokeWidth={3} />
-                      </span>
-                      {benefit}
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-6 overflow-hidden rounded-2xl border border-primary/25 bg-[#05080d] p-2 shadow-[0_0_45px_-28px_hsl(var(--primary)/0.95)]">
-                  <div className="relative aspect-[1288/887] w-full overflow-hidden rounded-xl bg-background">
-                    <img
-                      src={tradingViewPreview}
-                      alt="TradingView chart preview with ZacTrades execution watermark"
-                      className="h-full w-full object-contain"
-                      loading="lazy"
-                    />
-                    <div className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-inset ring-white/10" />
-                  </div>
-                </div>
-              </div>
+              <HeroIndicatorPreview indicator={heroIndicator} />
             </motion.div>
           </div>
         </section>
@@ -207,47 +148,92 @@ function IndicatorsPage() {
               <AccessStatus title="Checking access" description="Verifying your member account." />
             ) : canAccess ? (
               <div className="grid gap-5 lg:grid-cols-3">
-                {visibleIndicators.map((indicator, index) => (
-                  <motion.div
-                    key={indicator.slug}
-                    {...fadeUp}
-                    transition={{ ...fadeUp.transition, delay: index * 0.06 }}
-                    className="glass group relative overflow-hidden rounded-2xl p-5 transition-all hover:-translate-y-1"
-                  >
-                    <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-primary/20 blur-3xl" />
-                    <div className="relative">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="grid h-11 w-11 place-items-center rounded-xl bg-primary/15 text-electric ring-1 ring-primary/25">
-                          <Zap className="h-5 w-5" />
+                {visibleIndicators.map((indicator, index) => {
+                  const isComingSoon = comingSoonIndicatorSlugs.has(indicator.slug);
+
+                  return (
+                    <motion.div
+                      key={indicator.slug}
+                      {...fadeUp}
+                      transition={{ ...fadeUp.transition, delay: index * 0.06 }}
+                      className={`glass group relative overflow-hidden rounded-2xl p-5 transition-all ${
+                        isComingSoon
+                          ? "border-destructive/35 bg-card/45 shadow-[0_0_45px_-30px_rgba(248,113,113,0.85)]"
+                          : "hover:-translate-y-1"
+                      }`}
+                    >
+                      <div
+                        className={`absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl ${
+                          isComingSoon ? "bg-destructive/20" : "bg-primary/20"
+                        }`}
+                      />
+                      {isComingSoon && (
+                        <>
+                          <div className="absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-destructive/70 to-transparent" />
+                          <div className="pointer-events-none absolute -right-16 top-16 h-24 w-56 rotate-12 bg-destructive/10 blur-2xl" />
+                        </>
+                      )}
+                      <div className="relative">
+                        <div className="flex items-start justify-between gap-4">
+                          <div
+                            className={`grid h-11 w-11 place-items-center rounded-xl ring-1 ${
+                              isComingSoon
+                                ? "bg-destructive/12 text-destructive ring-destructive/30"
+                                : "bg-primary/15 text-electric ring-primary/25"
+                            }`}
+                          >
+                            {isComingSoon ? <Lock className="h-5 w-5" /> : <Zap className="h-5 w-5" />}
+                          </div>
+                          {isComingSoon ? (
+                            <Badge className="gap-1.5 border-destructive/35 bg-destructive/12 px-3 py-1 text-destructive shadow-[0_0_22px_rgba(248,113,113,0.18)]">
+                              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-destructive" />
+                              Coming soon
+                            </Badge>
+                          ) : (
+                            <Badge className="border-gold/30 bg-gold/15 text-gold">Pro</Badge>
+                          )}
                         </div>
-                        <Badge className="border-gold/30 bg-gold/15 text-gold">
-                          {indicator.tag}
-                        </Badge>
+                        <h3 className="mt-5 font-display text-xl font-bold">{indicator.name}</h3>
+                        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                          {indicator.description}
+                        </p>
+                        <div className="relative mt-5 h-36 overflow-hidden rounded-xl bg-background/60 ring-1 ring-border/60">
+                          <CandleChart count={40} height={140} />
+                          {isComingSoon && (
+                            <div className="absolute inset-0 grid place-items-center bg-background/55 backdrop-blur-[2px]">
+                              <div className="rounded-full border border-destructive/35 bg-background/80 px-4 py-2 text-xs font-black uppercase tracking-[0.26em] text-destructive shadow-[0_0_24px_rgba(248,113,113,0.18)]">
+                                In development
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        {isComingSoon ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled
+                            className="mt-4 w-full border border-destructive/25 bg-destructive/10 font-semibold text-destructive opacity-100"
+                          >
+                            Coming soon
+                            <Lock className="h-3.5 w-3.5" />
+                          </Button>
+                        ) : (
+                          <Button
+                            asChild
+                            size="sm"
+                            className="mt-4 w-full font-semibold text-primary-foreground glow-primary hover:opacity-90"
+                            style={{ background: "var(--gradient-primary)" }}
+                          >
+                            <a href={indicator.tradingview_url} target="_blank" rel="noreferrer">
+                              Open on TradingView
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                          </Button>
+                        )}
                       </div>
-                      <h3 className="mt-5 font-display text-xl font-bold">{indicator.name}</h3>
-                      <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                        {indicator.description}
-                      </p>
-                      <div className="mt-5 h-36 overflow-hidden rounded-xl bg-background/60 ring-1 ring-border/60">
-                        <CandleChart count={40} height={140} />
-                      </div>
-                      <div className="mt-4 rounded-xl border border-border/50 bg-background/45 px-4 py-3 font-mono text-xs text-muted-foreground">
-                        {indicator.stats_label}
-                      </div>
-                      <Button
-                        asChild
-                        size="sm"
-                        className="mt-4 w-full font-semibold text-primary-foreground glow-primary hover:opacity-90"
-                        style={{ background: "var(--gradient-primary)" }}
-                      >
-                        <a href={indicator.tradingview_url} target="_blank" rel="noreferrer">
-                          Open on TradingView
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                      </Button>
-                    </div>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  );
+                })}
               </div>
             ) : (
               <motion.div
@@ -306,6 +292,63 @@ function IndicatorsPage() {
         onOpenChange={setAuthOpen}
         onModeChange={setAuthMode}
       />
+    </div>
+  );
+}
+
+function HeroIndicatorPreview({ indicator }: { indicator?: IndicatorRow }) {
+  const videoUrl = indicator?.video_url?.trim();
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  const playVideo = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || !videoUrl) return;
+
+    video.muted = true;
+    video.defaultMuted = true;
+    video.playsInline = true;
+    void video.play().catch(() => undefined);
+  }, [videoUrl]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !videoUrl) return;
+
+    video.muted = true;
+    video.defaultMuted = true;
+    video.playsInline = true;
+    video.load();
+
+    const playTimer = window.setTimeout(playVideo, 250);
+    return () => window.clearTimeout(playTimer);
+  }, [playVideo, videoUrl]);
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl bg-transparent shadow-[0_0_45px_-30px_hsl(var(--primary)/0.75)]">
+      <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-[#02060b]">
+        {videoUrl ? (
+          <video
+            ref={videoRef}
+            key={videoUrl}
+            className="h-full w-full object-cover"
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="auto"
+            disablePictureInPicture
+            aria-label={`Video preview for ${indicator?.name ?? "ZacTrades indicator"}`}
+            onLoadedData={playVideo}
+            onCanPlay={playVideo}
+          >
+            <source src={videoUrl} type="video/mp4" />
+          </video>
+        ) : (
+          <div className="grid h-full w-full place-items-center px-6 text-center text-sm text-muted-foreground">
+            Upload a video URL for the first indicator to show the preview here.
+          </div>
+        )}
+      </div>
     </div>
   );
 }

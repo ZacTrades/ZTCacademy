@@ -10,7 +10,9 @@ import {
 } from "@tanstack/react-router";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
+import { WhatsAppSupportButton } from "@/components/site/WhatsAppSupportButton";
 import { AuthProvider } from "@/lib/auth-provider";
+import { CurrencyProvider } from "@/lib/currency";
 import { LanguageProvider } from "@/lib/language";
 import { pageTransition, pageVariants } from "@/lib/motion";
 import appCss from "../styles.css?url";
@@ -19,7 +21,7 @@ function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
+        <h1 className="text-5xl font-bold text-foreground sm:text-7xl">404</h1>
         <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           The page you're looking for doesn't exist or has been moved.
@@ -77,14 +79,20 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "ZacTrades" },
+      {
+        name: "description",
+        content: "Trading education, live trading, mentorship, and market tools from ZacTrades.",
+      },
+      { name: "author", content: "ZacTrades" },
+      { property: "og:title", content: "ZacTrades" },
+      {
+        property: "og:description",
+        content: "Trading education, live trading, mentorship, and market tools from ZacTrades.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:site", content: "@ZacTrades" },
     ],
     links: [
       { rel: "icon", type: "image/png", sizes: "16x16", href: "/favicon-16x16.png" },
@@ -125,20 +133,23 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
-        <AuthProvider>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              variants={shouldReduceMotion ? undefined : pageVariants}
-              initial={shouldReduceMotion ? false : "hidden"}
-              animate={shouldReduceMotion ? { opacity: 1 } : "show"}
-              exit={shouldReduceMotion ? { opacity: 1 } : "exit"}
-              transition={pageTransition}
-            >
-              <Outlet />
-            </motion.div>
-          </AnimatePresence>
-        </AuthProvider>
+        <CurrencyProvider>
+          <AuthProvider>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={location.pathname}
+                variants={shouldReduceMotion ? undefined : pageVariants}
+                initial={shouldReduceMotion ? false : "hidden"}
+                animate={shouldReduceMotion ? { opacity: 1 } : "show"}
+                exit={shouldReduceMotion ? { opacity: 1 } : "exit"}
+                transition={pageTransition}
+              >
+                <Outlet />
+              </motion.div>
+            </AnimatePresence>
+            <WhatsAppSupportButton />
+          </AuthProvider>
+        </CurrencyProvider>
       </LanguageProvider>
     </QueryClientProvider>
   );

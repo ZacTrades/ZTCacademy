@@ -7,7 +7,6 @@ import {
   Compass,
   BadgePercent,
   GraduationCap,
-  MessageSquareText,
   Radar,
   ShieldCheck,
   Sparkles,
@@ -21,7 +20,8 @@ import { Footer } from "@/components/site/Footer";
 import { Navbar } from "@/components/site/Navbar";
 import { StaffCheckoutNotice } from "@/components/site/StaffCheckoutNotice";
 import { defaultCoachingPlans, fetchCoachingPlans } from "@/components/site/coachingPlans";
-import tradingViewPreview from "@/assets/zactrades-tradingview-preview.jpeg";
+import mentorshipLiveReviewPreview from "@/assets/mentorship-live-review-preview.png";
+import { useCurrency } from "@/lib/currency";
 import { useAuth } from "@/lib/use-auth";
 
 export const Route = createFileRoute("/mentorship")({
@@ -54,43 +54,58 @@ const fadeUp = {
 const processSteps = [
   {
     icon: ClipboardCheck,
-    title: "Onboarding",
-    label: "Week 0",
+    title: "Understand Where You Are",
     description:
-      "We map your level, goals, risk profile, schedule, and the exact problems blocking your consistency.",
+      "We start by looking at your current level, your experience, your trading habits, and the problems you're facing. This gives us a clear idea of what you actually need to work on.",
+  },
+  {
+    icon: GraduationCap,
+    title: "Build Your Foundation",
+    description:
+      "We work on the fundamentals that matter: market structure, liquidity, price action, risk management, and trade planning. The goal is to remove confusion and give you a clear way to read the market.",
   },
   {
     icon: Compass,
-    title: "Learning path",
-    label: "Week 1",
+    title: "Apply It To The Market",
     description:
-      "You get a focused plan covering market structure, risk rules, entries, journaling, and review habits.",
+      "We take what you learn and apply it to real market conditions. We go through setups, entries, invalidation, trade management, and the decisions behind each trade.",
   },
   {
     icon: Radar,
-    title: "Guided execution",
-    label: "Weeks 2-3",
+    title: "Review, Correct & Improve",
     description:
-      "We review setups, decision quality, timing, and trade management so your process becomes clearer.",
+      "This is where the real progress happens. We review your trades, identify mistakes and bad habits, and work on improving your decision-making, discipline, and execution.",
   },
   {
     icon: ShieldCheck,
-    title: "Accountability",
-    label: "Week 4",
+    title: "Build Your Own Process",
     description:
-      "You leave with cleaner rules, next steps, and a repeatable routine for studying and trading with discipline.",
+      "The goal is not for you to depend on me forever. By the end, you should have a clear trading process, defined rules, and a better understanding of why you take a trade - or why you stay out.",
   },
 ];
 
 const pillars = [
-  "Personal feedback instead of random lessons",
-  "Risk-first rules before any setup",
-  "Live market context and structured review",
-  "Clear next steps after each coaching cycle",
+  {
+    title: "Clear Direction",
+    description: "Know what to focus on instead of jumping between strategies.",
+  },
+  {
+    title: "Learn The Process",
+    description: "Understand how to analyze, plan, execute, and manage a trade.",
+  },
+  {
+    title: "Real Feedback",
+    description: "Get honest feedback on your trades and the decisions behind them.",
+  },
+  {
+    title: "Build Independence",
+    description: "Develop your own process instead of depending on signals.",
+  },
 ];
 
 function MentorshipPage() {
   const { isStaff } = useAuth();
+  const { formatPrice } = useCurrency();
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [selectedCoachingIndex, setSelectedCoachingIndex] = useState(0);
   const [coachingOptions, setCoachingOptions] = useState(defaultCoachingPlans);
@@ -120,31 +135,36 @@ function MentorshipPage() {
           <div className="grid-bg absolute inset-0 -z-10" />
           <div className="absolute inset-0 -z-10 bg-gradient-to-b from-background/45 via-background/80 to-background" />
 
-          <div className="mx-auto grid max-w-7xl gap-10 px-4 md:px-6 lg:grid-cols-[0.96fr_1.04fr] lg:items-center">
+          <div className="mx-auto grid max-w-7xl gap-10 px-4 md:px-6 lg:grid-cols-[0.94fr_1.06fr] lg:items-center">
             <motion.div {...fadeUp}>
               <Badge variant="outline" className="glass mb-6 border-gold/40 text-xs">
                 <GraduationCap className="mr-1.5 h-3.5 w-3.5 text-gold" />
                 ZacTrades Mentorship
               </Badge>
-              <h1 className="font-display text-5xl font-bold leading-tight tracking-tight md:text-7xl">
-                Build a trading process you can actually{" "}
-                <span className="text-gradient-gold">repeat.</span>
+              <h1 className="font-display text-4xl font-bold leading-tight tracking-tight sm:text-5xl md:text-7xl">
+                Stop Guessing. Start Building Your Own{" "}
+                <span className="text-gradient-gold">Trading Process.</span>
               </h1>
               <p className="mt-6 max-w-2xl text-base leading-7 text-muted-foreground md:text-lg">
-                Our mentorship is a guided training cycle for traders who want structure, feedback,
-                and accountability. We keep it brief, practical, and focused on the decisions you
-                make before, during, and after each trade.
+                Learn how to read the market, build a trading plan, manage risk, and make your own decisions with confidence. My mentorship is built around real market conditions, practical training, and direct feedback, not endless theory.
               </p>
               <div className="mt-8 grid gap-3 sm:grid-cols-2">
                 {pillars.map((pillar) => (
                   <div
-                    key={pillar}
-                    className="flex items-center gap-3 rounded-xl border border-border/50 bg-background/45 px-4 py-3 text-sm text-muted-foreground"
+                    key={pillar.title}
+                    className="group flex items-start gap-4 rounded-2xl border border-border/50 bg-background/45 px-4 py-4 transition hover:border-bull/35 hover:bg-bull/[0.04]"
                   >
-                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-bull/15 text-bull">
-                      <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                    <span className="mt-1 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-bull/15 text-bull ring-1 ring-bull/20 transition group-hover:bg-bull/20">
+                      <Check className="h-4 w-4" strokeWidth={3} />
                     </span>
-                    {pillar}
+                    <span>
+                      <span className="block font-display text-base font-bold text-foreground">
+                        {pillar.title}
+                      </span>
+                      <span className="mt-1 block text-sm leading-6 text-muted-foreground">
+                        {pillar.description}
+                      </span>
+                    </span>
                   </div>
                 ))}
               </div>
@@ -177,38 +197,16 @@ function MentorshipPage() {
               className="relative"
             >
               <div className="absolute -inset-8 -z-10 rounded-full bg-primary/20 blur-3xl" />
-              <div className="glass-strong overflow-hidden rounded-3xl p-3 md:p-4 glow-primary">
-                <div className="flex flex-wrap items-center gap-2 px-3 py-2">
-                  <span className="h-3 w-3 rounded-full bg-bear/70" />
-                  <span className="h-3 w-3 rounded-full bg-gold/70" />
-                  <span className="h-3 w-3 rounded-full bg-bull/70" />
-                  <span className="ml-0 min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground sm:ml-4">
-                    mentorship desk / live review
-                  </span>
-                  <span className="rounded-full border border-gold/30 bg-gold/10 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-gold">
-                    Guided
-                  </span>
-                </div>
-                <div className="relative overflow-hidden rounded-2xl border border-border/70 bg-[#070b10]">
+              <div className="absolute -bottom-8 left-10 right-10 -z-10 h-20 rounded-full bg-electric/20 blur-3xl" />
+              <div className="glass-strong overflow-hidden rounded-3xl border border-primary/20 p-2 shadow-[0_0_90px_rgba(0,149,255,0.18)] md:p-3">
+                <div className="relative overflow-hidden rounded-[1.35rem] bg-[#050910]">
                   <img
-                    src={tradingViewPreview}
-                    alt="TradingView execution review used in ZacTrades mentorship."
-                    className="aspect-[4/3] w-full object-contain md:aspect-[1.4/1]"
+                    src={mentorshipLiveReviewPreview}
+                    alt="ZacTrades mentorship desk showing one-to-one coaching, group mentoring, and live trading review."
+                    className="w-full object-cover"
                   />
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/50 via-transparent to-transparent" />
-                  <div className="absolute bottom-4 left-4 right-4 rounded-xl border border-border/50 bg-background/80 p-4 backdrop-blur">
-                    <div className="flex items-center gap-3">
-                      <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary/15 text-electric">
-                        <MessageSquareText className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold">Review the decision, not only P/L.</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Every session is built around clarity, rules, and execution quality.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                  <div className="pointer-events-none absolute inset-0 rounded-[1.35rem] ring-1 ring-inset ring-white/10" />
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/25 via-transparent to-white/[0.02]" />
                 </div>
               </div>
             </motion.div>
@@ -221,34 +219,69 @@ function MentorshipPage() {
               <Badge variant="outline" className="glass mb-4 border-primary/40 text-xs">
                 Process
               </Badge>
-              <h2 className="font-display text-4xl font-bold tracking-tight md:text-5xl">
-                From onboarding to guided execution
+              <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
+                From Learning To Independent Trading
               </h2>
               <p className="mt-4 text-muted-foreground">
-                A simple mentorship path designed to remove confusion and make your next trading
-                week more intentional.
+                A structured path designed to take you from understanding the basics to making your own informed trading decisions.
               </p>
             </motion.div>
 
-            <div className="relative mt-12 grid gap-5 lg:grid-cols-4">
-              <div className="absolute left-0 right-0 top-16 hidden h-px bg-gradient-to-r from-transparent via-primary/45 to-transparent lg:block" />
+            <div className="relative mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+              <motion.div
+                initial={{ scaleX: 0, opacity: 0 }}
+                whileInView={{ scaleX: 1, opacity: 1 }}
+                viewport={{ once: true, margin: "-80px" }}
+                transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+                className="absolute left-0 right-0 top-16 hidden h-px origin-left bg-gradient-to-r from-transparent via-primary/45 to-transparent xl:block"
+              />
               {processSteps.map((step, index) => (
                 <motion.div
                   key={step.title}
-                  {...fadeUp}
-                  transition={{ ...fadeUp.transition, delay: index * 0.07 }}
-                  className="glass relative rounded-2xl p-6"
+                  initial={{ opacity: 0, y: 34, scale: 0.96, filter: "blur(8px)" }}
+                  whileInView={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+                  viewport={{ once: true, margin: "-70px" }}
+                  transition={{
+                    duration: 0.72,
+                    delay: index * 0.13,
+                    ease: [0.22, 1, 0.36, 1],
+                  }}
+                  className="glass relative overflow-hidden rounded-2xl p-6"
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/15 text-electric ring-1 ring-primary/30">
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    whileInView={{ opacity: [0, 1, 0.35] }}
+                    viewport={{ once: true, margin: "-70px" }}
+                    transition={{ duration: 0.95, delay: index * 0.13 + 0.2 }}
+                    className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/16 via-transparent to-gold/12"
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.35 }}
+                    whileInView={{ opacity: [0, 0.85, 0.35], scale: [0.35, 1.15, 1] }}
+                    viewport={{ once: true, margin: "-70px" }}
+                    transition={{ duration: 0.9, delay: index * 0.13 + 0.25 }}
+                    className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-primary/20 blur-2xl"
+                  />
+                  <div className="relative flex items-start justify-between gap-4">
+                    <motion.div
+                      initial={{ rotate: -10, scale: 0.78 }}
+                      whileInView={{ rotate: 0, scale: 1 }}
+                      viewport={{ once: true, margin: "-70px" }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 260,
+                        damping: 16,
+                        delay: index * 0.13 + 0.18,
+                      }}
+                      className="grid h-12 w-12 place-items-center rounded-xl bg-primary/15 text-electric ring-1 ring-primary/30"
+                    >
                       <step.icon className="h-5 w-5" />
-                    </div>
-                    <span className="rounded-full border border-gold/30 bg-gold/10 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-gold">
-                      {step.label}
-                    </span>
+                    </motion.div>
                   </div>
-                  <h3 className="mt-5 font-display text-xl font-bold">{step.title}</h3>
-                  <p className="mt-3 text-sm leading-6 text-muted-foreground">{step.description}</p>
+                  <h3 className="relative mt-5 font-display text-xl font-bold">{step.title}</h3>
+                  <p className="relative mt-3 text-sm leading-6 text-muted-foreground">
+                    {step.description}
+                  </p>
                 </motion.div>
               ))}
             </div>
@@ -262,13 +295,11 @@ function MentorshipPage() {
                 <Sparkles className="mr-1.5 h-3.5 w-3.5 text-gold" />
                 What you receive
               </Badge>
-              <h2 className="font-display text-4xl font-bold tracking-tight md:text-5xl">
-                Coaching that stays close to your actual decisions.
+              <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
+                Coaching Built Around Your Trading.
               </h2>
               <p className="mt-5 text-sm leading-7 text-muted-foreground md:text-base">
-                The goal is not to overwhelm you with theory. The goal is to help you understand
-                what to look for, when to wait, how much to risk, and how to review the result
-                without emotion taking over.
+                You don't need more random trading information. You need to understand what you're doing, why you're doing it, and how to improve. We focus on your analysis, execution, risk management, and decision-making so you can build a process that is truly your own.
               </p>
             </motion.div>
 
@@ -278,16 +309,37 @@ function MentorshipPage() {
               className="grid gap-4 sm:grid-cols-2"
             >
               {[
-                "Clear trade plan structure",
-                "Risk and drawdown limits",
-                "Setup review and execution feedback",
-                "Journaling and weekly improvement loop",
+                {
+                  title: "Clear Trading Process",
+                  description:
+                    "Learn how to analyze the market, build a plan, identify your setup, and know when to stay out.",
+                },
+                {
+                  title: "Risk Management",
+                  description:
+                    "Understand how to manage your risk, protect your account, and control drawdown before thinking about profit.",
+                },
+                {
+                  title: "Trade Review & Feedback",
+                  description:
+                    "We review your trades together and break down your entries, execution, management, mistakes, and decision-making.",
+                },
+                {
+                  title: "Build Your Own System",
+                  description:
+                    "Develop clear rules and a repeatable process so you can trade independently instead of depending on signals.",
+                },
               ].map((item) => (
-                <div key={item} className="rounded-2xl border border-border/50 bg-card/35 p-5">
+                <div key={item.title} className="rounded-2xl border border-border/50 bg-card/35 p-5">
                   <div className="grid h-9 w-9 place-items-center rounded-lg bg-bull/15 text-bull">
                     <Check className="h-4 w-4" strokeWidth={3} />
                   </div>
-                  <p className="mt-4 text-sm font-semibold">{item}</p>
+                  <h3 className="mt-4 font-display text-lg font-bold text-foreground">
+                    {item.title}
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    {item.description}
+                  </p>
                 </div>
               ))}
             </motion.div>
@@ -298,13 +350,13 @@ function MentorshipPage() {
           <div className="mx-auto max-w-7xl px-4 md:px-6">
             <motion.div {...fadeUp} className="mx-auto max-w-2xl text-center">
               <Badge variant="outline" className="glass mb-4 border-primary/40 text-xs">
-                Choose your path
+                Choose Your Mentorship
               </Badge>
-              <h2 className="font-display text-4xl font-bold tracking-tight md:text-5xl">
-                Private focus or group momentum
+              <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
+                One-to-One Coaching or Group Mentoring
               </h2>
               <p className="mt-4 text-muted-foreground">
-                Pick the mentorship format that matches how you want to learn.
+                Choose the coaching format that fits your goals, experience, and the way you want to learn.
               </p>
             </motion.div>
 
@@ -380,7 +432,7 @@ function MentorshipPage() {
                       {option.promotionEnabled && option.originalPrice && (
                         <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-border/50 bg-background/60 px-3 py-1 font-mono text-xs text-muted-foreground">
                           <span>Was</span>
-                          <span className="line-through">{option.originalPrice}</span>
+                          <span className="line-through">{formatPrice(option.originalPrice)}</span>
                         </div>
                       )}
                       <div
@@ -388,7 +440,7 @@ function MentorshipPage() {
                           option.promotionEnabled ? "mt-2 text-gold" : "mt-1 text-primary"
                         }`}
                       >
-                        {option.price}
+                        {formatPrice(option.price)}
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">{option.duration}</div>
                     </div>

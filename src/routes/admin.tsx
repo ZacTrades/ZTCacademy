@@ -4,11 +4,12 @@ import {
   AlertCircle,
   BadgeDollarSign,
   BadgePercent,
+  BookOpen,
   Check,
   Loader2,
   Lock,
   MessageCircle,
-  Newspaper,
+  Pencil,
   Save,
   Search,
   ShieldCheck,
@@ -16,6 +17,7 @@ import {
   Plus,
   Printer,
   Radio,
+  Star,
   UserCog,
   Trash2,
   Upload,
@@ -29,12 +31,10 @@ import {
   type CoachingPlanSlug,
 } from "@/components/site/coachingPlans";
 import {
-  defaultBlogPosts,
   defaultCommunitySocials,
   defaultIndicators,
   defaultPropFirms,
   defaultTradingTools,
-  type BlogPostRow,
   type CommunitySocialRow,
   type IndicatorRow,
   type PropFirmRow,
@@ -70,6 +70,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import logoUrl from "@/assets/zactrades-logo4-clean.png";
+import {
+  defaultEducationArticleRows,
+  type EducationArticleCategory,
+  type EducationArticleRow,
+} from "@/lib/education-content";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/use-auth";
 
@@ -93,8 +98,11 @@ const fadeUp = {
   transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const },
 };
 
-const BLOG_PDF_BUCKET = "blog-pdfs";
-const MAX_BLOG_PDF_BYTES = 10 * 1024 * 1024;
+const PROP_FIRM_LOGO_BUCKET = "propfirm-logos";
+const TRADING_TOOL_LOGO_BUCKET = "trading-tool-logos";
+const MAX_PROP_FIRM_LOGO_BYTES = 2 * 1024 * 1024;
+const MAX_TRADING_TOOL_LOGO_BYTES = 2 * 1024 * 1024;
+const PROP_FIRM_LOGO_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 type EditablePlan = CoachingPlanRow & {
   featuresText: string;
@@ -108,9 +116,52 @@ type EditablePropFirm = PropFirmRow & {
   featuresText: string;
 };
 
-type EditableBlogPost = BlogPostRow;
-
 type EditableCommunitySocial = CommunitySocialRow;
+
+type EditableEducationArticle = EducationArticleRow;
+
+type MemberReviewStatus = "pending" | "approved" | "hidden";
+
+type MemberReviewRow = {
+  id: string;
+  user_id: string;
+  display_name: string;
+  email: string | null;
+  message: string;
+  rating: number;
+  status: MemberReviewStatus;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  image_urls: string[] | null;
+};
+
+type DiscountType = "percent" | "fixed";
+type DiscountApplyTarget = "all" | "live" | "mentorship_one_to_one" | "mentorship_group" | "news";
+type DiscountAppliesTo = string;
+
+type DiscountCodeRow = {
+  id: string;
+  code: string;
+  description: string | null;
+  discount_type: DiscountType;
+  discount_value: number;
+  applies_to: DiscountAppliesTo;
+  is_active: boolean;
+  max_redemptions: number | null;
+  redeemed_count: number;
+  starts_at: string | null;
+  expires_at: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+type EditableDiscountCode = DiscountCodeRow & {
+  maxRedemptionsText: string;
+  startsAtText: string;
+  expiresAtText: string;
+};
 
 type ProfileRole = "member" | "moderator" | "admin";
 type MembershipStatus = "unpaid" | "pending" | "paid" | "expired" | "cancelled";
@@ -192,12 +243,14 @@ type BasicProfileRow = Omit<
 >;
 
 type AdminPanelKey =
-  | "blog"
+  | "education"
   | "staff"
   | "communityMembers"
+  | "memberReviews"
   | "community"
   | "propfirms"
   | "coaching"
+  | "discounts"
   | "live"
   | "indicators"
   | "tools";
@@ -215,6 +268,13 @@ const membershipStatusOptions: Array<{ value: MembershipStatus; label: string }>
   { value: "cancelled", label: "Cancelled" },
 ];
 
+const educationCategoryOptions: Array<{ value: EducationArticleCategory; label: string }> = [
+  { value: "study", label: "Study" },
+  { value: "psychology", label: "Psychology" },
+  { value: "risk", label: "Risk Management" },
+  { value: "premium", label: "Premium" },
+];
+
 const staffVisiblePanelKeys: AdminPanelKey[] = ["communityMembers"];
 
 function AdminPage() {
@@ -226,15 +286,29 @@ function AdminPage() {
   const [indicators, setIndicators] = useState<IndicatorRow[]>([]);
   const [tools, setTools] = useState<EditableTool[]>([]);
   const [propFirms, setPropFirms] = useState<EditablePropFirm[]>([]);
-  const [blogPosts, setBlogPosts] = useState<EditableBlogPost[]>([]);
+  const [educationArticles, setEducationArticles] = useState<EditableEducationArticle[]>(
+    defaultEducationArticleRows,
+  );
   const [communitySocials, setCommunitySocials] = useState<EditableCommunitySocial[]>([]);
+  const [discountCodes, setDiscountCodes] = useState<EditableDiscountCode[]>([]);
+  const [memberReviews, setMemberReviews] = useState<MemberReviewRow[]>([]);
   const [profiles, setProfiles] = useState<UserProfileRow[]>([]);
   const [activePanel, setActivePanel] = useState<AdminPanelKey>("staff");
-  const [blogCreateOpen, setBlogCreateOpen] = useState(false);
+  const [liveExtensionDays, setLiveExtensionDays] = useState("7");
+  const [liveExtensionReason, setLiveExtensionReason] = useState("Business holiday");
   const [indicatorDeleteTarget, setIndicatorDeleteTarget] = useState<IndicatorRow | null>(null);
+  const [toolDeleteTarget, setToolDeleteTarget] = useState<EditableTool | null>(null);
   const [communitySocialDeleteTarget, setCommunitySocialDeleteTarget] =
     useState<EditableCommunitySocial | null>(null);
+  const [educationDeleteTarget, setEducationDeleteTarget] =
+    useState<EditableEducationArticle | null>(null);
+  const [discountDeleteTarget, setDiscountDeleteTarget] = useState<EditableDiscountCode | null>(
+    null,
+  );
   const [propFirmDeleteTarget, setPropFirmDeleteTarget] = useState<EditablePropFirm | null>(null);
+  const [memberReviewDeleteTarget, setMemberReviewDeleteTarget] = useState<MemberReviewRow | null>(
+    null,
+  );
   const [fetching, setFetching] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -256,9 +330,11 @@ function AdminPage() {
           liveResult,
           indicatorsResult,
           toolsResult,
-          blogResult,
+          educationResult,
           firmsResult,
           communityResult,
+          discountResult,
+          memberReviewsResult,
           profilesResult,
           membershipsResult,
           newsSubscriptionsResult,
@@ -278,30 +354,42 @@ function AdminPage() {
             .order("display_order", { ascending: true }),
           supabase
             .from("premium_indicators")
-            .select("slug,name,description,tag,stats_label,tradingview_url,is_active,display_order")
+            .select(
+              "slug,name,description,tag,stats_label,tradingview_url,video_url,is_active,display_order",
+            )
             .order("display_order", { ascending: true }),
           supabase
             .from("trading_tools")
             .select(
-              "slug,name,category,description,promo_code,discount,url,highlights,is_active,display_order",
+              "slug,name,category,description,promo_code,discount,url,logo_url,highlights,is_active,display_order",
             )
             .order("display_order", { ascending: true }),
           supabase
-            .from("blog_posts")
-            .select(
-              "slug,title,category,published_date,read_time,excerpt,content,pdf_url,is_featured,is_published,display_order",
-            )
+            .from("education_articles")
+            .select("*")
             .order("display_order", { ascending: true }),
           supabase
             .from("prop_firms")
             .select(
-              "slug,name,description,logo,discount,promo_code,color,rating,reviews,max_capital,profit_split,payout,features,url,is_featured,is_active,display_order",
+              "slug,name,description,logo,logo_url,discount,promo_code,color,rating,reviews,max_capital,profit_split,payout,features,url,is_featured,is_active,display_order",
             )
             .order("display_order", { ascending: true }),
           supabase
             .from("community_socials")
             .select("slug,name,handle,description,icon_key,url,tone_key,is_active,display_order")
             .order("display_order", { ascending: true }),
+          supabase
+            .from("discount_codes")
+            .select(
+              "id,code,description,discount_type,discount_value,applies_to,is_active,max_redemptions,redeemed_count,starts_at,expires_at,created_at,updated_at",
+            )
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("member_reviews")
+            .select(
+              "id,user_id,display_name,email,message,rating,status,reviewed_by,reviewed_at,created_at,updated_at,image_urls",
+            )
+            .order("created_at", { ascending: false }),
           supabase
             .from("profiles")
             .select(
@@ -335,9 +423,11 @@ function AdminPage() {
           liveResult.error ||
           indicatorsResult.error ||
           toolsResult.error ||
-          blogResult.error ||
+          educationResult.error ||
           firmsResult.error ||
           communityResult.error ||
+          discountResult.error ||
+          memberReviewsResult.error ||
           profilesResult.error ||
           membershipsResult.error ||
           newsSubscriptionsResult.error ||
@@ -368,8 +458,10 @@ function AdminPage() {
             ? (toolsResult.data as TradingToolRow[]).map(toEditableTool)
             : defaultTradingTools.map(toEditableTool),
         );
-        setBlogPosts(
-          blogResult.data?.length ? (blogResult.data as BlogPostRow[]) : defaultBlogPosts,
+        setEducationArticles(
+          educationResult.data?.length
+            ? (educationResult.data as EducationArticleRow[])
+            : defaultEducationArticleRows,
         );
         setPropFirms(
           firmsResult.data?.length
@@ -381,6 +473,12 @@ function AdminPage() {
             ? (communityResult.data as CommunitySocialRow[])
             : defaultCommunitySocials,
         );
+        setDiscountCodes(
+          discountResult.data?.length
+            ? (discountResult.data as DiscountCodeRow[]).map(toEditableDiscountCode)
+            : [],
+        );
+        setMemberReviews((memberReviewsResult.data as MemberReviewRow[]) ?? []);
         setProfiles(
           buildUserProfiles(
             (profilesResult.data as BasicProfileRow[]) ?? [],
@@ -397,9 +495,11 @@ function AdminPage() {
           setLivePackages(defaultLiveTradingPackageRows);
           setIndicators(defaultIndicators);
           setTools(defaultTradingTools.map(toEditableTool));
-          setBlogPosts(defaultBlogPosts);
+          setEducationArticles(defaultEducationArticleRows);
           setPropFirms(defaultPropFirms.map(toEditablePropFirm));
           setCommunitySocials(defaultCommunitySocials);
+          setDiscountCodes([]);
+          setMemberReviews([]);
           setProfiles([]);
         }
       } finally {
@@ -456,8 +556,8 @@ function AdminPage() {
     setErrorMessage("");
   };
 
-  const updateBlogPost = (slug: string, patch: Partial<EditableBlogPost>) => {
-    setBlogPosts((current) =>
+  const updateEducationArticle = (slug: string, patch: Partial<EditableEducationArticle>) => {
+    setEducationArticles((current) =>
       current.map((item) => (item.slug === slug ? { ...item, ...patch } : item)),
     );
     setMessage("");
@@ -469,6 +569,39 @@ function AdminPage() {
       current.map((item) => (item.slug === slug ? { ...item, ...patch } : item)),
     );
     setMessage("");
+    setErrorMessage("");
+  };
+
+  const updateDiscountCode = (id: string, patch: Partial<EditableDiscountCode>) => {
+    setDiscountCodes((current) =>
+      current.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+    );
+    setMessage("");
+    setErrorMessage("");
+  };
+
+  const addDiscountCode = () => {
+    const timestamp = Date.now();
+    const nextDiscount: EditableDiscountCode = {
+      id: `new-${timestamp}`,
+      code: "NEWCODE",
+      description: "",
+      discount_type: "percent",
+      discount_value: 10,
+      applies_to: "all",
+      is_active: true,
+      max_redemptions: null,
+      redeemed_count: 0,
+      starts_at: null,
+      expires_at: null,
+      maxRedemptionsText: "",
+      startsAtText: "",
+      expiresAtText: "",
+    };
+
+    setDiscountCodes((current) => [nextDiscount, ...current]);
+    setActivePanel("discounts");
+    setMessage("New discount code added. Fill the details, then save it.");
     setErrorMessage("");
   };
 
@@ -540,73 +673,8 @@ function AdminPage() {
     setErrorMessage("");
   };
 
-  const addBlogPost = () => {
-    setBlogCreateOpen(true);
-    setMessage("");
-    setErrorMessage("");
-  };
-
-  const createBlogPost = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!supabase) return;
-
-    const formData = new FormData(event.currentTarget);
-    const title = String(formData.get("title") ?? "").trim();
-    const manualSlug = String(formData.get("slug") ?? "").trim();
-    const slug = slugify(manualSlug || title);
-    const pdfFile = formData.get("pdf_file");
-    const manualPdfUrl = String(formData.get("pdf_url") ?? "").trim();
-    const nextOrder = blogPosts.length
-      ? Math.max(...blogPosts.map((post) => post.display_order)) + 1
-      : 1;
-
-    setSavingKey("blog:create");
-    setMessage("");
-    setErrorMessage("");
-
-    let pdfUrl = manualPdfUrl || null;
-
-    try {
-      pdfUrl = (await uploadBlogPdf(pdfFile, slug)) ?? pdfUrl;
-    } catch (error) {
-      console.error(error);
-      setErrorMessage(error instanceof Error ? error.message : "Failed to upload blog PDF.");
-      setSavingKey(null);
-      return;
-    }
-
-    const payload: BlogPostRow = {
-      slug,
-      title,
-      category: String(formData.get("category") ?? "").trim(),
-      published_date: String(formData.get("published_date") ?? "").trim(),
-      read_time: String(formData.get("read_time") ?? "").trim(),
-      excerpt: String(formData.get("excerpt") ?? "").trim(),
-      content: String(formData.get("content") ?? "").trim(),
-      pdf_url: pdfUrl,
-      is_featured: formData.get("is_featured") === "on",
-      is_published: formData.get("is_published") === "on",
-      display_order: nextOrder,
-    };
-
-    const { data, error } = await supabase
-      .from("blog_posts")
-      .insert(payload)
-      .select(
-        "slug,title,category,published_date,read_time,excerpt,content,pdf_url,is_featured,is_published,display_order",
-      )
-      .single();
-
-    if (error) {
-      console.error(error);
-      setErrorMessage(error.message);
-    } else if (data) {
-      setBlogPosts((current) => [data as BlogPostRow, ...current]);
-      setMessage(`${payload.title} blog post created.`);
-      setBlogCreateOpen(false);
-    }
-
-    setSavingKey(null);
+  const addEducationArticle = () => {
+    window.location.href = "/admin/education/new";
   };
 
   const savePlan = async (event: FormEvent<HTMLFormElement>, plan: EditablePlan) => {
@@ -704,6 +772,60 @@ function AdminPage() {
     setSavingKey(null);
   };
 
+  const extendLiveTradingAccess = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!supabase) return;
+
+    const extraDays = Number.parseInt(liveExtensionDays, 10);
+
+    if (!Number.isInteger(extraDays) || extraDays < 1 || extraDays > 365) {
+      setErrorMessage("Choose between 1 and 365 extra days.");
+      setMessage("");
+      return;
+    }
+
+    setSavingKey("live:extension");
+    setMessage("");
+    setErrorMessage("");
+
+    const { data, error } = await supabase.rpc("extend_active_live_trading_access", {
+      p_extra_days: extraDays,
+      p_reason: liveExtensionReason.trim() || null,
+    });
+
+    if (error) {
+      console.error(error);
+      setErrorMessage(error.message);
+      setSavingKey(null);
+      return;
+    }
+
+    const updatedRows = ((data ?? []) as UserLiveTradingAccessRow[]).filter(Boolean);
+    const updatedByUserId = new Map(updatedRows.map((row) => [row.user_id, row]));
+
+    if (updatedRows.length) {
+      setProfiles((current) =>
+        current.map((profile) => {
+          const updatedAccess = updatedByUserId.get(profile.id);
+
+          return updatedAccess
+            ? {
+                ...profile,
+                liveTradingAccess: updatedAccess,
+              }
+            : profile;
+        }),
+      );
+    }
+
+    setMessage(
+      `Live Trading access extended by ${extraDays} day${
+        extraDays === 1 ? "" : "s"
+      } for ${updatedRows.length} active paid user${updatedRows.length === 1 ? "" : "s"}.`,
+    );
+    setSavingKey(null);
+  };
+
   const saveIndicator = async (event: FormEvent<HTMLFormElement>, item: IndicatorRow) => {
     event.preventDefault();
     if (!supabase) return;
@@ -719,12 +841,15 @@ function AdminPage() {
       tag: item.tag.trim(),
       stats_label: item.stats_label.trim(),
       tradingview_url: item.tradingview_url.trim(),
+      video_url: item.video_url?.trim() || null,
     };
 
     const { data, error } = await supabase
       .from("premium_indicators")
       .upsert(payload, { onConflict: "slug" })
-      .select("slug,name,description,tag,stats_label,tradingview_url,is_active,display_order")
+      .select(
+        "slug,name,description,tag,stats_label,tradingview_url,video_url,is_active,display_order",
+      )
       .single();
 
     if (error) {
@@ -771,6 +896,20 @@ function AdminPage() {
     setMessage("");
     setErrorMessage("");
 
+    const formData = new FormData(event.currentTarget);
+    let logoUrl = item.logo_url?.trim() || null;
+
+    try {
+      logoUrl = (await uploadTradingToolLogo(formData.get("logo_file"), item.slug)) ?? logoUrl;
+    } catch (error) {
+      console.error(error);
+      setErrorMessage(
+        error instanceof Error ? error.message : "Failed to upload trading tool logo.",
+      );
+      setSavingKey(null);
+      return;
+    }
+
     const highlights = item.highlightsText
       .split("\n")
       .map((highlight) => highlight.trim())
@@ -784,6 +923,7 @@ function AdminPage() {
       promo_code: item.promo_code.trim(),
       discount: item.discount.trim(),
       url: item.url.trim(),
+      logo_url: logoUrl,
       highlights,
       is_active: item.is_active,
       display_order: item.display_order,
@@ -793,7 +933,7 @@ function AdminPage() {
       .from("trading_tools")
       .upsert(payload, { onConflict: "slug" })
       .select(
-        "slug,name,category,description,promo_code,discount,url,highlights,is_active,display_order",
+        "slug,name,category,description,promo_code,discount,url,logo_url,highlights,is_active,display_order",
       )
       .single();
 
@@ -812,6 +952,27 @@ function AdminPage() {
     setSavingKey(null);
   };
 
+  const deleteTool = async (item: EditableTool) => {
+    if (!supabase) return;
+
+    setSavingKey(`tool:delete:${item.slug}`);
+    setMessage("");
+    setErrorMessage("");
+
+    const { error } = await supabase.from("trading_tools").delete().eq("slug", item.slug);
+
+    if (error) {
+      console.error(error);
+      setErrorMessage(error.message);
+    } else {
+      setTools((current) => current.filter((currentItem) => currentItem.slug !== item.slug));
+      setMessage(`${item.name} deleted.`);
+    }
+
+    setToolDeleteTarget(null);
+    setSavingKey(null);
+  };
+
   const savePropFirm = async (event: FormEvent<HTMLFormElement>, item: EditablePropFirm) => {
     event.preventDefault();
     if (!supabase) return;
@@ -825,11 +986,24 @@ function AdminPage() {
       .map((feature) => feature.trim())
       .filter(Boolean);
 
+    const formData = new FormData(event.currentTarget);
+    const logoFile = formData.get("logo_file");
+    let logoUrl = item.logo_url?.trim() || null;
+
+    try {
+      logoUrl = (await uploadPropFirmLogo(logoFile, item.slug)) ?? logoUrl;
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to upload prop firm logo.");
+      setSavingKey(null);
+      return;
+    }
+
     const payload: PropFirmRow = {
       slug: item.slug,
       name: item.name.trim(),
       description: item.description.trim(),
       logo: item.logo.trim(),
+      logo_url: logoUrl,
       discount: item.discount.trim(),
       promo_code: item.promo_code.trim(),
       color: item.color.trim(),
@@ -849,7 +1023,7 @@ function AdminPage() {
       .from("prop_firms")
       .upsert(payload, { onConflict: "slug" })
       .select(
-        "slug,name,description,logo,discount,promo_code,color,rating,reviews,max_capital,profit_split,payout,features,url,is_featured,is_active,display_order",
+        "slug,name,description,logo,logo_url,discount,promo_code,color,rating,reviews,max_capital,profit_split,payout,features,url,is_featured,is_active,display_order",
       )
       .single();
 
@@ -889,59 +1063,181 @@ function AdminPage() {
     setSavingKey(null);
   };
 
-  const saveBlogPost = async (event: FormEvent<HTMLFormElement>, item: EditableBlogPost) => {
-    event.preventDefault();
+  const toggleEducationArticlePublished = async (item: EditableEducationArticle) => {
     if (!supabase) return;
 
-    setSavingKey(`blog:${item.slug}`);
+    const nextPublished = !item.is_published;
+    setSavingKey(`education:toggle:${item.slug}`);
     setMessage("");
     setErrorMessage("");
 
-    const formData = new FormData(event.currentTarget);
-    const pdfFile = formData.get("pdf_file");
-    const manualPdfUrl = String(formData.get("pdf_url") ?? "").trim();
-    const nextSlug = item.slug.trim();
-    let pdfUrl = manualPdfUrl || item.pdf_url || null;
-
-    try {
-      pdfUrl = (await uploadBlogPdf(pdfFile, nextSlug)) ?? pdfUrl;
-    } catch (error) {
-      console.error(error);
-      setErrorMessage(error instanceof Error ? error.message : "Failed to upload blog PDF.");
-      setSavingKey(null);
-      return;
-    }
-
-    const payload: BlogPostRow = {
-      ...item,
-      slug: nextSlug,
-      title: item.title.trim(),
-      category: item.category.trim(),
-      published_date: item.published_date.trim(),
-      read_time: item.read_time.trim(),
-      excerpt: item.excerpt.trim(),
-      content: item.content.trim(),
-      pdf_url: pdfUrl,
-    };
-
     const { data, error } = await supabase
-      .from("blog_posts")
-      .upsert(payload, { onConflict: "slug" })
-      .select(
-        "slug,title,category,published_date,read_time,excerpt,content,pdf_url,is_featured,is_published,display_order",
-      )
+      .from("education_articles")
+      .update({ is_published: nextPublished })
+      .eq("slug", item.slug)
+      .select("*")
       .single();
 
     if (error) {
       console.error(error);
       setErrorMessage(error.message);
     } else if (data) {
-      setBlogPosts((current) =>
+      setEducationArticles((current) =>
         current.map((currentItem) =>
-          currentItem.slug === item.slug ? (data as BlogPostRow) : currentItem,
+          currentItem.slug === item.slug ? (data as EducationArticleRow) : currentItem,
         ),
       );
-      setMessage(`${payload.title} blog post updated.`);
+      setMessage(
+        `${item.title} is now ${nextPublished ? "active on the Education page" : "hidden from users"}.`,
+      );
+    }
+
+    setSavingKey(null);
+  };
+
+  const deleteEducationArticle = async (item: EditableEducationArticle) => {
+    if (!supabase) return;
+
+    setSavingKey(`education:delete:${item.slug}`);
+    setMessage("");
+    setErrorMessage("");
+
+    const { error } = await supabase.from("education_articles").delete().eq("slug", item.slug);
+
+    if (error) {
+      console.error(error);
+      setErrorMessage(error.message);
+    } else {
+      setEducationArticles((current) => current.filter((article) => article.slug !== item.slug));
+      setMessage(`${item.title} education article deleted.`);
+    }
+
+    setEducationDeleteTarget(null);
+    setSavingKey(null);
+  };
+
+  const updateMemberReviewStatus = async (item: MemberReviewRow, status: MemberReviewStatus) => {
+    if (!supabase || !user) return;
+
+    setSavingKey(`review:${item.id}`);
+    setMessage("");
+    setErrorMessage("");
+
+    const result =
+      status === "approved"
+        ? await supabase.rpc("approve_member_review", { p_review_id: item.id })
+        : await supabase
+            .from("member_reviews")
+            .update({
+              status,
+              reviewed_by: user.id,
+              reviewed_at: new Date().toISOString(),
+            })
+            .eq("id", item.id)
+            .select(
+              "id,user_id,display_name,email,message,rating,status,reviewed_by,reviewed_at,created_at,updated_at,image_urls",
+            )
+            .single();
+
+    const { data, error } = result;
+
+    if (error) {
+      console.error(error);
+      setErrorMessage(error.message);
+    } else if (data) {
+      const updatedReview = data as MemberReviewRow;
+      setMemberReviews((current) =>
+        current
+          .map((review) => (review.id === item.id ? updatedReview : review))
+          .filter(
+            (review) =>
+              status !== "approved" ||
+              review.id === updatedReview.id ||
+              review.user_id !== updatedReview.user_id ||
+              review.status !== "approved",
+          ),
+      );
+      setMessage(
+        `${item.display_name || "Member"} review ${
+          status === "approved"
+            ? "approved. Older approved review from this member was removed."
+            : status === "hidden"
+              ? "hidden"
+              : "marked pending"
+        }.`,
+      );
+    }
+
+    setSavingKey(null);
+  };
+
+  const deleteMemberReview = async (item: MemberReviewRow) => {
+    if (!supabase) return;
+
+    setSavingKey(`review:delete:${item.id}`);
+    setMessage("");
+    setErrorMessage("");
+
+    const { error } = await supabase.from("member_reviews").delete().eq("id", item.id);
+
+    if (error) {
+      console.error(error);
+      setErrorMessage(error.message);
+    } else {
+      setMemberReviews((current) => current.filter((review) => review.id !== item.id));
+      setMessage(`${item.display_name || "Member"} review deleted.`);
+    }
+
+    setMemberReviewDeleteTarget(null);
+    setSavingKey(null);
+  };
+
+  const saveEducationArticle = async (
+    event: FormEvent<HTMLFormElement>,
+    item: EditableEducationArticle,
+  ) => {
+    event.preventDefault();
+    if (!supabase) return;
+
+    const previousSlug = item.slug;
+    const nextSlug = slugify(item.slug || item.title);
+
+    setSavingKey(`education:${previousSlug}`);
+    setMessage("");
+    setErrorMessage("");
+
+    const payload: EducationArticleRow = {
+      ...item,
+      slug: nextSlug,
+      title: item.title.trim(),
+      description: item.description.trim(),
+      category: item.category,
+      level: item.level.trim(),
+      read_time: item.read_time.trim(),
+      access: item.access,
+      published_date: item.published_date.trim(),
+      cover_title: item.cover_title.trim(),
+      cover_subtitle: item.cover_subtitle.trim(),
+      content: item.content.trim(),
+      display_order: item.display_order,
+    };
+
+    const { data, error } = await supabase
+      .from("education_articles")
+      .upsert(payload, { onConflict: "slug" })
+      .select("*")
+      .single();
+
+    if (error) {
+      console.error(error);
+      setErrorMessage(error.message);
+    } else if (data) {
+      setEducationArticles((current) =>
+        current.map((currentItem) =>
+          currentItem.slug === previousSlug ? (data as EducationArticleRow) : currentItem,
+        ),
+      );
+      setMessage(`${payload.title} education article updated.`);
     }
 
     setSavingKey(null);
@@ -1010,6 +1306,107 @@ function AdminPage() {
     }
 
     setCommunitySocialDeleteTarget(null);
+    setSavingKey(null);
+  };
+
+  const saveDiscountCode = async (
+    event: FormEvent<HTMLFormElement>,
+    item: EditableDiscountCode,
+  ) => {
+    event.preventDefault();
+    if (!supabase) return;
+
+    const code = normalizeAdminDiscountCode(item.code);
+    const value = Number(item.discount_value);
+    const maxRedemptions = item.maxRedemptionsText.trim()
+      ? Number(item.maxRedemptionsText.trim())
+      : null;
+
+    if (!code) {
+      setErrorMessage("Please enter a discount code.");
+      return;
+    }
+
+    if (!Number.isFinite(value) || value <= 0) {
+      setErrorMessage("Discount value must be greater than 0.");
+      return;
+    }
+
+    if (item.discount_type === "percent" && value > 100) {
+      setErrorMessage("Percent discounts cannot be more than 100%.");
+      return;
+    }
+
+    if (maxRedemptions !== null && (!Number.isFinite(maxRedemptions) || maxRedemptions < 1)) {
+      setErrorMessage("Max redemptions must be empty or at least 1.");
+      return;
+    }
+
+    setSavingKey(`discount:${item.id}`);
+    setMessage("");
+    setErrorMessage("");
+
+    const payload = {
+      code,
+      description: item.description?.trim() || null,
+      discount_type: item.discount_type,
+      discount_value: value,
+      applies_to: item.applies_to,
+      is_active: item.is_active,
+      max_redemptions: maxRedemptions,
+      starts_at: item.startsAtText.trim() || null,
+      expires_at: item.expiresAtText.trim() || null,
+    };
+
+    const query = item.id.startsWith("new-")
+      ? supabase.from("discount_codes").insert(payload)
+      : supabase.from("discount_codes").update(payload).eq("id", item.id);
+
+    const { data, error } = await query
+      .select(
+        "id,code,description,discount_type,discount_value,applies_to,is_active,max_redemptions,redeemed_count,starts_at,expires_at,created_at,updated_at",
+      )
+      .single();
+
+    if (error) {
+      console.error(error);
+      setErrorMessage(error.message);
+    } else if (data) {
+      const saved = toEditableDiscountCode(data as DiscountCodeRow);
+      setDiscountCodes((current) =>
+        current.map((currentItem) => (currentItem.id === item.id ? saved : currentItem)),
+      );
+      setMessage(`${saved.code} discount code saved.`);
+    }
+
+    setSavingKey(null);
+  };
+
+  const deleteDiscountCode = async (item: EditableDiscountCode) => {
+    if (!supabase) return;
+
+    if (item.id.startsWith("new-")) {
+      setDiscountCodes((current) => current.filter((currentItem) => currentItem.id !== item.id));
+      setDiscountDeleteTarget(null);
+      setMessage("Unsaved discount code removed.");
+      return;
+    }
+
+    setSavingKey(`discount:delete:${item.id}`);
+    setMessage("");
+    setErrorMessage("");
+
+    const { error } = await supabase.from("discount_codes").delete().eq("id", item.id);
+
+    if (error) {
+      console.error(error);
+      setErrorMessage(error.message);
+    } else {
+      setDiscountCodes((current) => current.filter((currentItem) => currentItem.id !== item.id));
+      setMessage(`${item.code} discount code deleted.`);
+    }
+
+    setDiscountDeleteTarget(null);
     setSavingKey(null);
   };
 
@@ -1103,6 +1500,7 @@ function AdminPage() {
   const memberProfiles = profiles.filter((profile) => profile.role === "member");
   const paidMemberProfiles = memberProfiles.filter(hasPaidMentorship);
   const paidNewsProfiles = memberProfiles.filter(hasPaidNewsSubscription);
+  const extendableLiveTradingProfiles = memberProfiles.filter(hasExtendableLiveTradingAccess);
   const registeredMemberProfiles = memberProfiles.filter((profile) => !hasPaidMentorship(profile));
 
   const adminPanels = [
@@ -1121,11 +1519,18 @@ function AdminPage() {
       icon: UserCog,
     },
     {
-      key: "blog" as const,
-      title: "ZacTrades Blog",
-      description: "Publish market notes and education posts.",
-      count: blogPosts.length,
-      icon: Newspaper,
+      key: "memberReviews" as const,
+      title: "Member Reviews",
+      description: "Approve member testimonials.",
+      count: memberReviews.filter((review) => review.status === "pending").length,
+      icon: MessageCircle,
+    },
+    {
+      key: "education" as const,
+      title: "Education Articles",
+      description: "Write Study, Psychology, Risk, and Premium lessons.",
+      count: educationArticles.length,
+      icon: BookOpen,
     },
     {
       key: "community" as const,
@@ -1147,6 +1552,13 @@ function AdminPage() {
       description: "Manage coaching prices and limited offers.",
       count: plans.length,
       icon: BadgeDollarSign,
+    },
+    {
+      key: "discounts" as const,
+      title: "Discount Codes",
+      description: "Create checkout promo codes.",
+      count: discountCodes.length,
+      icon: BadgePercent,
     },
     {
       key: "live" as const,
@@ -1197,12 +1609,12 @@ function AdminPage() {
                 <ShieldCheck className="mr-1.5 h-3.5 w-3.5 text-gold" />
                 Admin
               </Badge>
-              <h1 className="font-display text-5xl font-bold leading-tight tracking-tight md:text-7xl">
+              <h1 className="font-display text-4xl font-bold leading-tight tracking-tight sm:text-5xl md:text-7xl">
                 Site content <span className="text-gradient-gold">control room.</span>
               </h1>
               <p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground md:text-lg">
-                Edit blog posts, prop firm partners, coaching prices, live trading access, premium
-                indicators, trading tools, and member access across the site.
+                Edit prop firm partners, coaching prices, live trading access, premium indicators,
+                trading tools, education articles, and member access across the site.
               </p>
             </motion.div>
           </div>
@@ -1255,11 +1667,14 @@ function AdminPage() {
                       livePackages.length +
                       indicators.length +
                       tools.length +
-                      blogPosts.length +
+                      educationArticles.length +
                       propFirms.length +
                       communitySocials.length +
                       profiles.length +
-                      paidNewsProfiles.length
+                      extendableLiveTradingProfiles.length +
+                      paidNewsProfiles.length +
+                      memberReviews.length +
+                      discountCodes.length
                     }`}
                   />
                   <AdminStat label="Role" value={profileRoleLabel(role ?? "member")} />
@@ -1294,31 +1709,29 @@ function AdminPage() {
                       onChange={setActivePanel}
                     />
 
-                    {visibleActivePanel === "blog" && (
+                    {visibleActivePanel === "education" && (
                       <AdminSection
-                        title="ZacTrades Blog"
-                        description="Add and edit published posts shown on the ZacTrades Blog page."
+                        title="Education Articles"
+                        description="Manage articles shown inside the Study, Psychology, Risk Management, and Premium tabs."
+                        contentClassName="grid-cols-1"
                         action={
                           <Button
                             type="button"
-                            onClick={addBlogPost}
+                            onClick={addEducationArticle}
                             className="text-primary-foreground glow-primary hover:opacity-90"
                             style={{ background: "var(--gradient-primary)" }}
                           >
                             <Plus className="h-4 w-4" />
-                            Add Blog Post
+                            Add Education Article
                           </Button>
                         }
                       >
-                        {blogPosts.map((item) => (
-                          <BlogPostEditor
-                            key={item.slug}
-                            item={item}
-                            saving={savingKey === `blog:${item.slug}`}
-                            onChange={updateBlogPost}
-                            onSubmit={saveBlogPost}
-                          />
-                        ))}
+                        <EducationArticlesList
+                          articles={educationArticles}
+                          savingKey={savingKey}
+                          onTogglePublished={toggleEducationArticlePublished}
+                          onDelete={setEducationDeleteTarget}
+                        />
                       </AdminSection>
                     )}
 
@@ -1336,6 +1749,43 @@ function AdminPage() {
                             onSubmit={savePlan}
                           />
                         ))}
+                      </AdminSection>
+                    )}
+
+                    {visibleActivePanel === "discounts" && (
+                      <AdminSection
+                        title="Discount Codes"
+                        description="Create codes users can apply during checkout for live trading, mentorship, or news access."
+                        action={
+                          <Button
+                            type="button"
+                            onClick={addDiscountCode}
+                            className="text-primary-foreground glow-primary hover:opacity-90"
+                            style={{ background: "var(--gradient-primary)" }}
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add Discount Code
+                          </Button>
+                        }
+                      >
+                        {discountCodes.length ? (
+                          discountCodes.map((item) => (
+                            <DiscountCodeEditor
+                              key={item.id}
+                              item={item}
+                              saving={savingKey === `discount:${item.id}`}
+                              deleting={savingKey === `discount:delete:${item.id}`}
+                              onChange={updateDiscountCode}
+                              onSubmit={saveDiscountCode}
+                              onDelete={(discount) => setDiscountDeleteTarget(discount)}
+                            />
+                          ))
+                        ) : (
+                          <div className="glass rounded-2xl p-6 text-sm text-muted-foreground">
+                            No discount codes yet. Add your first code to let users apply a checkout
+                            discount.
+                          </div>
+                        )}
                       </AdminSection>
                     )}
 
@@ -1362,6 +1812,21 @@ function AdminPage() {
                         contentClassName="grid-cols-1"
                       >
                         <CommunityMembersPanel memberProfiles={memberProfiles} />
+                      </AdminSection>
+                    )}
+
+                    {visibleActivePanel === "memberReviews" && (
+                      <AdminSection
+                        title="Member Reviews"
+                        description="Approve member-submitted reviews before they appear on the homepage."
+                        contentClassName="grid-cols-1"
+                      >
+                        <MemberReviewsPanel
+                          reviews={memberReviews}
+                          savingKey={savingKey}
+                          onStatusChange={updateMemberReviewStatus}
+                          onDelete={setMemberReviewDeleteTarget}
+                        />
                       </AdminSection>
                     )}
 
@@ -1417,8 +1882,17 @@ function AdminPage() {
                     {visibleActivePanel === "live" && (
                       <AdminSection
                         title="Live Trading Access"
-                        description="Edit live-room package prices and badges."
+                        description="Edit live-room package prices, badges, and active access time."
                       >
+                        <LiveAccessExtensionTool
+                          activeCount={extendableLiveTradingProfiles.length}
+                          days={liveExtensionDays}
+                          reason={liveExtensionReason}
+                          saving={savingKey === "live:extension"}
+                          onDaysChange={setLiveExtensionDays}
+                          onReasonChange={setLiveExtensionReason}
+                          onSubmit={extendLiveTradingAccess}
+                        />
                         {livePackages.map((item) => (
                           <LivePackageEditor
                             key={item.slug}
@@ -1460,8 +1934,10 @@ function AdminPage() {
                             key={item.slug}
                             item={item}
                             saving={savingKey === `tool:${item.slug}`}
+                            deleting={savingKey === `tool:delete:${item.slug}`}
                             onChange={updateTool}
                             onSubmit={saveTool}
+                            onDelete={(tool) => setToolDeleteTarget(tool)}
                           />
                         ))}
                       </AdminSection>
@@ -1480,12 +1956,165 @@ function AdminPage() {
         onOpenChange={setAuthOpen}
         onModeChange={setAuthMode}
       />
-      <BlogPostCreateDialog
-        open={blogCreateOpen}
-        saving={savingKey === "blog:create"}
-        onOpenChange={setBlogCreateOpen}
-        onSubmit={createBlogPost}
-      />
+      <AlertDialog
+        open={Boolean(memberReviewDeleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setMemberReviewDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent className="glass-strong max-w-md border-border/60 p-0 shadow-2xl">
+          <div className="relative overflow-hidden rounded-2xl">
+            <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-bear/20 blur-3xl" />
+            <div className="relative p-6">
+              <AlertDialogHeader>
+                <div className="mb-2 grid h-12 w-12 place-items-center rounded-xl bg-bear/10 text-bear ring-1 ring-bear/30">
+                  <AlertCircle className="h-5 w-5" />
+                </div>
+                <AlertDialogTitle className="font-display text-2xl">
+                  Delete member review?
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-sm leading-6 text-muted-foreground">
+                  This will permanently remove the review from{" "}
+                  <span className="font-semibold text-foreground">
+                    {memberReviewDeleteTarget?.display_name ?? "this member"}
+                  </span>
+                  . This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+
+              <AlertDialogFooter className="mt-6 gap-3 sm:space-x-0">
+                <AlertDialogCancel
+                  disabled={savingKey?.startsWith("review:delete")}
+                  className="mt-0 border-border/60 bg-background/45"
+                >
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={!memberReviewDeleteTarget || savingKey?.startsWith("review:delete")}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    if (memberReviewDeleteTarget) void deleteMemberReview(memberReviewDeleteTarget);
+                  }}
+                  className="bg-bear text-white hover:bg-bear/90"
+                >
+                  {savingKey?.startsWith("review:delete") ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  Delete review
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </div>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={Boolean(educationDeleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setEducationDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent className="glass-strong max-w-md border-border/60 p-0 shadow-2xl">
+          <div className="relative overflow-hidden rounded-2xl">
+            <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-bear/20 blur-3xl" />
+            <div className="relative p-6">
+              <AlertDialogHeader>
+                <div className="mb-2 grid h-12 w-12 place-items-center rounded-xl bg-bear/10 text-bear ring-1 ring-bear/30">
+                  <AlertCircle className="h-5 w-5" />
+                </div>
+                <AlertDialogTitle className="font-display text-2xl">
+                  Delete education article?
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-sm leading-6 text-muted-foreground">
+                  This will remove{" "}
+                  <span className="font-semibold text-foreground">
+                    {educationDeleteTarget?.title ?? "this education article"}
+                  </span>{" "}
+                  from the Education page. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+
+              <AlertDialogFooter className="mt-6 gap-3 sm:space-x-0">
+                <AlertDialogCancel
+                  disabled={savingKey?.startsWith("education:delete")}
+                  className="mt-0 border-border/60 bg-background/45"
+                >
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={!educationDeleteTarget || savingKey?.startsWith("education:delete")}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    if (educationDeleteTarget) void deleteEducationArticle(educationDeleteTarget);
+                  }}
+                  className="bg-bear text-white hover:bg-bear/90"
+                >
+                  {savingKey?.startsWith("education:delete") ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  Delete education article
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </div>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={Boolean(discountDeleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDiscountDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent className="glass-strong max-w-md border-border/60 p-0 shadow-2xl">
+          <div className="relative overflow-hidden rounded-2xl">
+            <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-bear/20 blur-3xl" />
+            <div className="relative p-6">
+              <AlertDialogHeader>
+                <div className="mb-2 grid h-12 w-12 place-items-center rounded-xl bg-bear/10 text-bear ring-1 ring-bear/30">
+                  <AlertCircle className="h-5 w-5" />
+                </div>
+                <AlertDialogTitle className="font-display text-2xl">
+                  Delete discount code?
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-sm leading-6 text-muted-foreground">
+                  This will remove{" "}
+                  <span className="font-semibold text-foreground">
+                    {discountDeleteTarget?.code ?? "this discount code"}
+                  </span>{" "}
+                  from checkout. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+
+              <AlertDialogFooter className="mt-6 gap-3 sm:space-x-0">
+                <AlertDialogCancel
+                  disabled={savingKey?.startsWith("discount:delete")}
+                  className="mt-0 border-border/60 bg-background/45"
+                >
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={!discountDeleteTarget || savingKey?.startsWith("discount:delete")}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    if (discountDeleteTarget) void deleteDiscountCode(discountDeleteTarget);
+                  }}
+                  className="bg-bear text-white hover:bg-bear/90"
+                >
+                  {savingKey?.startsWith("discount:delete") ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  Delete discount code
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </div>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog
         open={Boolean(communitySocialDeleteTarget)}
         onOpenChange={(open) => {
@@ -1597,6 +2226,59 @@ function AdminPage() {
         </AlertDialogContent>
       </AlertDialog>
       <AlertDialog
+        open={Boolean(toolDeleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setToolDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent className="glass-strong max-w-md border-border/60 p-0 shadow-2xl">
+          <div className="relative overflow-hidden rounded-2xl">
+            <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-bear/20 blur-3xl" />
+            <div className="relative p-6">
+              <AlertDialogHeader>
+                <div className="mb-2 grid h-12 w-12 place-items-center rounded-xl bg-bear/10 text-bear ring-1 ring-bear/30">
+                  <AlertCircle className="h-5 w-5" />
+                </div>
+                <AlertDialogTitle className="font-display text-2xl">
+                  Delete trading tool?
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-sm leading-6 text-muted-foreground">
+                  This will remove{" "}
+                  <span className="font-semibold text-foreground">
+                    {toolDeleteTarget?.name ?? "this trading tool"}
+                  </span>{" "}
+                  from the Trading Tools section. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+
+              <AlertDialogFooter className="mt-6 gap-3 sm:space-x-0">
+                <AlertDialogCancel
+                  disabled={savingKey?.startsWith("tool:delete")}
+                  className="mt-0 border-border/60 bg-background/45"
+                >
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={!toolDeleteTarget || savingKey?.startsWith("tool:delete")}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    if (toolDeleteTarget) void deleteTool(toolDeleteTarget);
+                  }}
+                  className="bg-bear text-white hover:bg-bear/90"
+                >
+                  {savingKey?.startsWith("tool:delete") ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  Delete trading tool
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </div>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
         open={Boolean(propFirmDeleteTarget)}
         onOpenChange={(open) => {
           if (!open) setPropFirmDeleteTarget(null);
@@ -1678,12 +2360,12 @@ function PlanEditor({
             <Badge variant="outline" className="mb-4 border-primary/40 text-xs">
               {plan.slug === "one_to_one" ? "1-to-1" : "Group"}
             </Badge>
-            <h2 className="font-display text-2xl font-bold">{plan.title}</h2>
+            <h2 className="font-display text-xl font-bold sm:text-2xl">{plan.title}</h2>
             <p className="mt-2 text-sm text-muted-foreground">
               Visible on the homepage mentorship section.
             </p>
           </div>
-          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-gold/15 text-gold ring-1 ring-gold/30">
+          <div className="hidden h-12 w-12 shrink-0 sm:grid place-items-center rounded-xl bg-gold/15 text-gold ring-1 ring-gold/30">
             <BadgeDollarSign className="h-5 w-5" />
           </div>
         </div>
@@ -1846,7 +2528,7 @@ function PlanEditor({
               value={plan.featuresText}
               onChange={(event) => onChange(plan.slug, { featuresText: event.target.value })}
               className="mt-1 min-h-28 bg-background/45"
-              placeholder="One feature per line"
+              placeholder="One platform per line, e.g. TV, MT5, Web"
             />
           </div>
 
@@ -1925,306 +2607,435 @@ function AdminPanelChooser({
   );
 }
 
-function BlogPostCreateDialog({
-  open,
-  saving,
-  onOpenChange,
-  onSubmit,
+function MemberReviewsPanel({
+  reviews,
+  savingKey,
+  onStatusChange,
+  onDelete,
 }: {
-  open: boolean;
-  saving: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  reviews: MemberReviewRow[];
+  savingKey: string | null;
+  onStatusChange: (item: MemberReviewRow, status: MemberReviewStatus) => void;
+  onDelete: (item: MemberReviewRow) => void;
 }) {
+  const statusCounts = {
+    pending: reviews.filter((review) => review.status === "pending").length,
+    approved: reviews.filter((review) => review.status === "approved").length,
+    hidden: reviews.filter((review) => review.status === "hidden").length,
+  };
+
+  if (!reviews.length) {
+    return (
+      <div className="glass rounded-2xl p-8 text-center">
+        <MessageCircle className="mx-auto h-10 w-10 text-electric" />
+        <h3 className="mt-4 font-display text-2xl font-bold">No member reviews yet</h3>
+        <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+          When a logged-in member writes a review from the homepage, it will appear here first for
+          approval.
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => !saving && onOpenChange(nextOpen)}>
-      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto border-border/60 bg-background/95 p-0 shadow-2xl backdrop-blur-xl">
-        <div className="border-b border-border/60 bg-card/35 px-5 py-5 md:px-6">
-          <DialogHeader>
-            <Badge variant="outline" className="mb-3 w-fit border-gold/40 text-xs text-gold">
-              ZacTrades Blog
-            </Badge>
-            <DialogTitle className="font-display text-2xl font-bold">
-              Add a new blog post
-            </DialogTitle>
-            <DialogDescription>
-              Create the post shown on the ZacTrades Blog page and publish it when ready.
-            </DialogDescription>
-          </DialogHeader>
-        </div>
+    <div className="grid gap-5">
+      <div className="grid gap-3 md:grid-cols-3">
+        <ReviewStat label="Pending" value={statusCounts.pending} tone="gold" />
+        <ReviewStat label="Approved" value={statusCounts.approved} tone="bull" />
+        <ReviewStat label="Hidden" value={statusCounts.hidden} tone="muted" />
+      </div>
 
-        <form onSubmit={onSubmit} className="grid gap-5 p-5 md:p-6">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <Label htmlFor="create-blog-title" className="text-xs">
-                Title
-              </Label>
-              <Input
-                id="create-blog-title"
-                name="title"
-                required
-                placeholder="How to prepare before market open"
-                className="mt-1 bg-background/45"
-              />
-            </div>
+      <div className="grid gap-4 xl:grid-cols-2">
+        {reviews.map((review) => {
+          const saving = savingKey === `review:${review.id}`;
+          const deleting = savingKey === `review:delete:${review.id}`;
 
-            <div>
-              <Label htmlFor="create-blog-slug" className="text-xs">
-                Slug
-              </Label>
-              <Input
-                id="create-blog-slug"
-                name="slug"
-                placeholder="auto-created-from-title"
-                className="mt-1 bg-background/45"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="create-blog-category" className="text-xs">
-                Category
-              </Label>
-              <Input
-                id="create-blog-category"
-                name="category"
-                required
-                defaultValue="Market Notes"
-                className="mt-1 bg-background/45"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="create-blog-date" className="text-xs">
-                Published date
-              </Label>
-              <Input
-                id="create-blog-date"
-                name="published_date"
-                required
-                defaultValue="May 28, 2026"
-                className="mt-1 bg-background/45"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="create-blog-read-time" className="text-xs">
-                Read time
-              </Label>
-              <Input
-                id="create-blog-read-time"
-                name="read_time"
-                required
-                defaultValue="4 min read"
-                className="mt-1 bg-background/45"
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="create-blog-excerpt" className="text-xs">
-              Excerpt
-            </Label>
-            <Textarea
-              id="create-blog-excerpt"
-              name="excerpt"
-              required
-              placeholder="Short preview shown on the blog page"
-              className="mt-1 min-h-24 bg-background/45"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="create-blog-content" className="text-xs">
-              Body content
-            </Label>
-            <Textarea
-              id="create-blog-content"
-              name="content"
-              required
-              placeholder="Full article content"
-              className="mt-1 min-h-40 bg-background/45"
-            />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="create-blog-pdf-url" className="text-xs">
-                PDF URL
-              </Label>
-              <Input
-                id="create-blog-pdf-url"
-                name="pdf_url"
-                type="url"
-                placeholder="Optional existing PDF link"
-                className="mt-1 bg-background/45"
-              />
-            </div>
-            <div>
-              <PdfFileInput id="create-blog-pdf-file" label="Upload PDF" />
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-background/45 px-4 py-3 text-sm font-semibold">
-              Featured post
-              <input
-                name="is_featured"
-                type="checkbox"
-                className="h-4 w-4 accent-[hsl(var(--gold))]"
-              />
-            </label>
-            <label className="flex items-center justify-between gap-4 rounded-xl border border-bull/35 bg-bull/10 px-4 py-3 text-sm font-semibold text-bull">
-              Published
-              <input
-                name="is_published"
-                type="checkbox"
-                defaultChecked
-                className="h-4 w-4 accent-[hsl(var(--bull))]"
-              />
-            </label>
-          </div>
-
-          <div className="flex flex-col-reverse gap-3 border-t border-border/60 pt-5 sm:flex-row sm:justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={saving}
-              onClick={() => onOpenChange(false)}
+          return (
+            <article
+              key={review.id}
+              className="group overflow-hidden rounded-3xl border border-border/55 bg-card/35 p-5 transition-all hover:border-primary/35 hover:bg-primary/5"
             >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={saving}
-              className="text-primary-foreground glow-primary hover:opacity-90"
-              style={{ background: "var(--gradient-primary)" }}
-            >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              Create blog post
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+              <div className="flex flex-col gap-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary/15 font-display text-lg font-bold text-primary ring-1 ring-primary/25">
+                      {(review.display_name || "M")[0]?.toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="truncate font-display text-xl font-bold">
+                        {review.display_name || "ZacTrades member"}
+                      </h3>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {review.email || "No email"} · {formatAdminDate(review.created_at)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge
+                      variant="outline"
+                      className={`capitalize ${reviewStatusClass(review.status)}`}
+                    >
+                      {review.status}
+                    </Badge>
+                    <Badge variant="outline" className="border-gold/40 bg-gold/10 text-gold">
+                      {review.rating}/5
+                    </Badge>
+                  </div>
+                </div>
+
+                <p className="whitespace-pre-line rounded-2xl border border-border/50 bg-background/35 p-4 text-sm leading-7 text-muted-foreground">
+                  {review.message}
+                </p>
+
+                {review.image_urls?.length ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    {review.image_urls.map((imageUrl, imageIndex) => (
+                      <a
+                        key={`${review.id}-image-${imageIndex}`}
+                        href={imageUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="group/image overflow-hidden rounded-2xl border border-primary/20 bg-background/45"
+                      >
+                        <img
+                          src={imageUrl}
+                          alt={`${review.display_name || "Member"} review upload ${imageIndex + 1}`}
+                          className="aspect-video w-full object-cover transition-transform duration-300 group-hover/image:scale-105"
+                        />
+                      </a>
+                    ))}
+                  </div>
+                ) : null}
+
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                  <Button
+                    type="button"
+                    disabled={saving || deleting || review.status === "approved"}
+                    onClick={() => onStatusChange(review, "approved")}
+                    className="border border-bull/35 bg-bull/10 text-bull hover:bg-bull/15"
+                  >
+                    {saving ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Check className="h-4 w-4" />
+                    )}
+                    Approve
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={saving || deleting || review.status === "hidden"}
+                    onClick={() => onStatusChange(review, "hidden")}
+                    className="border border-gold/35 bg-gold/10 text-gold hover:bg-gold/15"
+                  >
+                    {saving ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Lock className="h-4 w-4" />
+                    )}
+                    Hide
+                  </Button>
+                  {review.status !== "pending" && (
+                    <Button
+                      type="button"
+                      disabled={saving || deleting}
+                      onClick={() => onStatusChange(review, "pending")}
+                      variant="outline"
+                      className="border-border/60 bg-background/40"
+                    >
+                      {saving ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <MessageCircle className="h-4 w-4" />
+                      )}
+                      Back to pending
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    disabled={saving || deleting}
+                    onClick={() => onDelete(review)}
+                    className="border border-bear/35 bg-bear/10 text-bear hover:bg-bear/15 sm:ml-auto"
+                  >
+                    {deleting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
-function BlogPostEditor({
+function ReviewStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: "gold" | "bull" | "muted";
+}) {
+  const toneClass =
+    tone === "gold" ? "text-gold" : tone === "bull" ? "text-bull" : "text-muted-foreground";
+
+  return (
+    <div className="rounded-2xl border border-border/55 bg-card/35 p-5">
+      <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">{label}</p>
+      <p className={`mt-3 font-display text-3xl font-bold ${toneClass}`}>{value}</p>
+    </div>
+  );
+}
+
+function reviewStatusClass(status: MemberReviewStatus) {
+  if (status === "approved") return "border-bull/40 bg-bull/10 text-bull";
+  if (status === "hidden") return "border-muted-foreground/35 bg-muted/20 text-muted-foreground";
+  return "border-gold/40 bg-gold/10 text-gold";
+}
+
+function EducationArticlesList({
+  articles,
+  savingKey,
+  onTogglePublished,
+  onDelete,
+}: {
+  articles: EditableEducationArticle[];
+  savingKey: string | null;
+  onTogglePublished: (item: EditableEducationArticle) => void;
+  onDelete: (item: EditableEducationArticle) => void;
+}) {
+  if (!articles.length) {
+    return (
+      <div className="glass rounded-2xl p-8 text-center">
+        <BookOpen className="mx-auto h-10 w-10 text-electric" />
+        <h3 className="mt-4 font-display text-2xl font-bold">No education articles yet</h3>
+        <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+          Add your first article from the dedicated editor page, then manage visibility here.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-3">
+      {articles.map((item) => {
+        const categoryLabel =
+          educationCategoryOptions.find((option) => option.value === item.category)?.label ??
+          "Education";
+        const toggleSaving = savingKey === `education:toggle:${item.slug}`;
+        const deleteSaving = savingKey === `education:delete:${item.slug}`;
+
+        return (
+          <article
+            key={item.slug}
+            className="group overflow-hidden rounded-2xl border border-border/55 bg-card/35 p-4 transition-all hover:border-primary/35 hover:bg-primary/5 md:p-5"
+          >
+            <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline" className="border-primary/40 text-electric">
+                    {categoryLabel}
+                  </Badge>
+                  <Badge
+                    variant="outline"
+                    className={
+                      item.is_published
+                        ? "border-bull/40 bg-bull/10 text-bull"
+                        : "border-bear/40 bg-bear/10 text-bear"
+                    }
+                  >
+                    {item.is_published ? "Active" : "Inactive"}
+                  </Badge>
+                  <Badge variant="outline" className="border-border/60 text-muted-foreground">
+                    {item.access}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">{item.read_time}</span>
+                </div>
+                <h3 className="mt-3 truncate font-display text-xl font-bold text-foreground md:text-2xl">
+                  {item.title}
+                </h3>
+                <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">
+                  {item.description}
+                </p>
+                <p className="mt-3 font-mono text-xs text-muted-foreground/80">/{item.slug}</p>
+              </div>
+
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap lg:min-w-[520px] lg:justify-end">
+                <Button asChild variant="outline" className="border-border/60 bg-background/40">
+                  <a href={`/education/${item.slug}`} target="_blank" rel="noreferrer">
+                    <BookOpen className="h-4 w-4" />
+                    Preview
+                  </a>
+                </Button>
+                <Button
+                  asChild
+                  variant="outline"
+                  className="border-primary/45 bg-primary/10 text-electric hover:bg-primary/15"
+                >
+                  <a href={`/admin/education/edit/${item.slug}`}>
+                    <Pencil className="h-4 w-4" />
+                    Edit
+                  </a>
+                </Button>
+                <Button
+                  type="button"
+                  disabled={toggleSaving || deleteSaving}
+                  onClick={() => onTogglePublished(item)}
+                  className={
+                    item.is_published
+                      ? "border border-bear/35 bg-bear/10 text-bear hover:bg-bear/15"
+                      : "border border-bull/35 bg-bull/10 text-bull hover:bg-bull/15"
+                  }
+                >
+                  {toggleSaving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Check className="h-4 w-4" />
+                  )}
+                  {item.is_published ? "Make inactive" : "Make active"}
+                </Button>
+                <Button
+                  type="button"
+                  disabled={toggleSaving || deleteSaving}
+                  onClick={() => onDelete(item)}
+                  className="border border-bear/35 bg-bear/10 text-bear hover:bg-bear/15"
+                >
+                  {deleteSaving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  Delete
+                </Button>
+              </div>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function EducationArticleEditor({
   item,
   saving,
   onChange,
   onSubmit,
 }: {
-  item: EditableBlogPost;
+  item: EditableEducationArticle;
   saving: boolean;
-  onChange: (slug: string, patch: Partial<EditableBlogPost>) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>, item: EditableBlogPost) => void;
+  onChange: (slug: string, patch: Partial<EditableEducationArticle>) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>, item: EditableEducationArticle) => void;
 }) {
   return (
     <form
       onSubmit={(event) => onSubmit(event, item)}
       className={`glass relative overflow-hidden rounded-2xl p-5 md:p-6 ${
-        item.is_featured ? "border-gold/35" : "border-primary/20"
+        item.access === "Members" ? "border-gold/35" : "border-primary/20"
       }`}
     >
-      <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-gold/20 blur-3xl" />
+      <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-primary/20 blur-3xl" />
       <div className="relative">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <Badge variant="outline" className="mb-4 border-gold/40 text-xs text-gold">
-              {item.is_featured ? "Featured blog" : "Blog post"}
+            <Badge variant="outline" className="mb-4 border-primary/40 text-xs text-electric">
+              {educationCategoryOptions.find((option) => option.value === item.category)?.label ??
+                "Education"}
             </Badge>
-            <h3 className="font-display text-2xl font-bold">{item.title}</h3>
+            <h3 className="font-display text-xl font-bold sm:text-2xl">{item.title}</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              Controls posts shown on the ZacTrades Blog page.
+              Controls articles shown on the Education Center tabs.
             </p>
           </div>
-          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-gold/15 text-gold ring-1 ring-gold/30">
-            <SlidersHorizontal className="h-5 w-5" />
+          <div className="hidden h-12 w-12 shrink-0 place-items-center rounded-xl bg-primary/15 text-electric ring-1 ring-primary/30 sm:grid">
+            <BookOpen className="h-5 w-5" />
           </div>
         </div>
 
         <div className="mt-6 grid gap-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field
-              id={`${item.slug}-blog-title`}
+              id={`${item.slug}-education-title`}
               label="Title"
               value={item.title}
               onChange={(value) => onChange(item.slug, { title: value })}
             />
+            <div>
+              <Label htmlFor={`${item.slug}-education-category`} className="text-xs">
+                Education tab
+              </Label>
+              <select
+                id={`${item.slug}-education-category`}
+                value={item.category}
+                onChange={(event) =>
+                  onChange(item.slug, {
+                    category: event.target.value as EducationArticleCategory,
+                  })
+                }
+                className="mt-1 h-10 w-full rounded-md border border-border/60 bg-background/45 px-3 text-sm text-foreground outline-none transition-colors focus:border-primary"
+              >
+                {educationCategoryOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <Field
-              id={`${item.slug}-blog-category`}
-              label="Category"
-              value={item.category}
-              onChange={(value) => onChange(item.slug, { category: value })}
+              id={`${item.slug}-education-level`}
+              label="Label"
+              value={item.level}
+              onChange={(value) => onChange(item.slug, { level: value })}
+              placeholder="Core, Mindset, Risk, Advanced"
             />
             <Field
-              id={`${item.slug}-blog-date`}
-              label="Published date"
-              value={item.published_date}
-              onChange={(value) => onChange(item.slug, { published_date: value })}
-            />
-            <Field
-              id={`${item.slug}-blog-read-time`}
+              id={`${item.slug}-education-read-time`}
               label="Read time"
               value={item.read_time}
               onChange={(value) => onChange(item.slug, { read_time: value })}
+              placeholder="12 min read"
             />
           </div>
 
           <Field
-            id={`${item.slug}-blog-slug`}
+            id={`${item.slug}-education-slug`}
             label="Slug"
             value={item.slug}
             onChange={(value) => onChange(item.slug, { slug: slugify(value) })}
           />
 
           <TextareaField
-            id={`${item.slug}-blog-excerpt`}
-            label="Excerpt"
-            value={item.excerpt}
-            onChange={(value) => onChange(item.slug, { excerpt: value })}
+            id={`${item.slug}-education-description`}
+            label="Card description"
+            value={item.description}
+            onChange={(value) => onChange(item.slug, { description: value })}
+            placeholder="Short description shown on the Education card."
+          />
+
+          <Field
+            id={`${item.slug}-education-cover-title`}
+            label="Cover title"
+            value={item.cover_title}
+            onChange={(value) => onChange(item.slug, { cover_title: value })}
+            placeholder="Liquidity Map"
           />
 
           <TextareaField
-            id={`${item.slug}-blog-content`}
-            label="Body content"
+            id={`${item.slug}-education-content`}
+            label="Full article content"
             value={item.content}
             onChange={(value) => onChange(item.slug, { content: value })}
-            placeholder="Full article content"
+            placeholder="Write paragraphs separated by a blank line."
           />
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field
-              id={`${item.slug}-blog-pdf-url`}
-              label="PDF URL"
-              value={item.pdf_url ?? ""}
-              onChange={(value) => onChange(item.slug, { pdf_url: value.trim() || null })}
-              placeholder="Optional PDF link"
-            />
-            <div>
-              <PdfFileInput id={`${item.slug}-blog-pdf-file`} label="Upload replacement PDF" />
-              {item.pdf_url ? (
-                <a
-                  href={item.pdf_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-2 block text-xs font-semibold text-electric hover:text-primary"
-                >
-                  View current PDF
-                </a>
-              ) : (
-                <p className="mt-2 text-xs text-muted-foreground">No PDF attached yet.</p>
-              )}
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <ToggleButton
-              active={item.is_featured}
-              label="Featured post"
-              onClick={() => onChange(item.slug, { is_featured: !item.is_featured })}
-            />
+          <div>
             <ToggleButton
               active={item.is_published}
               label="Published"
@@ -2241,7 +3052,7 @@ function BlogPostEditor({
           style={{ background: "var(--gradient-primary)" }}
         >
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Save blog post
+          Save education article
         </Button>
       </div>
     </form>
@@ -2271,12 +3082,12 @@ function LivePackageEditor({
             <Badge variant="outline" className="mb-4 border-bull/40 text-xs text-bull">
               Live access
             </Badge>
-            <h3 className="font-display text-2xl font-bold">{item.duration}</h3>
+            <h3 className="font-display text-xl font-bold sm:text-2xl">{item.duration}</h3>
             <p className="mt-2 text-sm text-muted-foreground">
               Controls the live-room package card and checkout price.
             </p>
           </div>
-          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-bull/15 text-bull ring-1 ring-bull/30">
+          <div className="hidden h-12 w-12 shrink-0 sm:grid place-items-center rounded-xl bg-bull/15 text-bull ring-1 ring-bull/30">
             <BadgeDollarSign className="h-5 w-5" />
           </div>
         </div>
@@ -2332,6 +3143,75 @@ function LivePackageEditor({
   );
 }
 
+function LiveAccessExtensionTool({
+  activeCount,
+  days,
+  reason,
+  saving,
+  onDaysChange,
+  onReasonChange,
+  onSubmit,
+}: {
+  activeCount: number;
+  days: string;
+  reason: string;
+  saving: boolean;
+  onDaysChange: (value: string) => void;
+  onReasonChange: (value: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <form onSubmit={onSubmit} className="glass relative overflow-hidden rounded-2xl p-5 md:p-6">
+      <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-gold/20 blur-3xl" />
+      <div className="relative grid gap-5 lg:grid-cols-[1.1fr_1.4fr] lg:items-end">
+        <div>
+          <Badge variant="outline" className="mb-4 w-fit border-gold/40 bg-gold/10 text-gold">
+            Live Trading pause
+          </Badge>
+          <h3 className="font-display text-xl font-bold sm:text-2xl">Extend active paid access</h3>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+            Adds days only to current paid Live Trading users with a future expiry date.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <AdminStat label="Eligible live users" value={String(activeCount)} />
+            <AdminStat label="Target" value="Live only" />
+          </div>
+        </div>
+
+        <div className="grid gap-4">
+          <div className="grid gap-4 sm:grid-cols-[160px_1fr]">
+            <Field
+              id="live-extension-days"
+              label="Extra days"
+              value={days}
+              onChange={onDaysChange}
+              placeholder="7"
+            />
+            <TextareaField
+              id="live-extension-reason"
+              label="Reason"
+              value={reason}
+              onChange={onReasonChange}
+              placeholder="Business holiday"
+            />
+          </div>
+
+          <Button
+            type="submit"
+            size="lg"
+            disabled={saving || activeCount === 0}
+            className="w-full text-primary-foreground glow-primary hover:opacity-90"
+            style={{ background: "var(--gradient-primary)" }}
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            Extend Live Trading access
+          </Button>
+        </div>
+      </div>
+    </form>
+  );
+}
+
 function IndicatorEditor({
   item,
   saving,
@@ -2359,12 +3239,12 @@ function IndicatorEditor({
             <Badge variant="outline" className="mb-4 border-primary/40 text-xs">
               Indicator
             </Badge>
-            <h3 className="font-display text-2xl font-bold">{item.name}</h3>
+            <h3 className="font-display text-xl font-bold sm:text-2xl">{item.name}</h3>
             <p className="mt-2 text-sm text-muted-foreground">
               Controls the premium indicators section and TradingView button.
             </p>
           </div>
-          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-primary/15 text-electric ring-1 ring-primary/30">
+          <div className="hidden h-12 w-12 shrink-0 sm:grid place-items-center rounded-xl bg-primary/15 text-electric ring-1 ring-primary/30">
             <SlidersHorizontal className="h-5 w-5" />
           </div>
         </div>
@@ -2404,6 +3284,13 @@ function IndicatorEditor({
               onChange={(value) => onChange(item.slug, { tradingview_url: value })}
             />
           </div>
+          <Field
+            id={`${item.slug}-video-url`}
+            label="Video URL"
+            value={item.video_url ?? ""}
+            onChange={(value) => onChange(item.slug, { video_url: value.trim() || null })}
+            placeholder="https://.../indicator-video.mp4"
+          />
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto]">
@@ -2441,13 +3328,17 @@ function IndicatorEditor({
 function ToolEditor({
   item,
   saving,
+  deleting,
   onChange,
   onSubmit,
+  onDelete,
 }: {
   item: EditableTool;
   saving: boolean;
+  deleting: boolean;
   onChange: (slug: string, patch: Partial<EditableTool>) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>, item: EditableTool) => void;
+  onDelete: (item: EditableTool) => void;
 }) {
   return (
     <form
@@ -2461,13 +3352,22 @@ function ToolEditor({
             <Badge variant="outline" className="mb-4 border-gold/40 text-xs text-gold">
               Trading tool
             </Badge>
-            <h3 className="font-display text-2xl font-bold">{item.name}</h3>
+            <h3 className="font-display text-xl font-bold sm:text-2xl">{item.name}</h3>
             <p className="mt-2 text-sm text-muted-foreground">
               Controls the tools stack, promo code, discount, and outbound link.
             </p>
           </div>
-          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-gold/15 text-gold ring-1 ring-gold/30">
-            <SlidersHorizontal className="h-5 w-5" />
+          <div className="hidden h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-xl border border-white/10 bg-white p-1.5 ring-1 ring-gold/30 sm:grid">
+            {item.logo_url ? (
+              <img
+                src={item.logo_url}
+                alt={`${item.name} logo`}
+                className="h-full w-full object-contain"
+                loading="lazy"
+              />
+            ) : (
+              <SlidersHorizontal className="h-5 w-5 text-gold" />
+            )}
           </div>
         </div>
 
@@ -2506,11 +3406,25 @@ function ToolEditor({
               onChange={(value) => onChange(item.slug, { discount: value })}
             />
           </div>
-          <Field
-            id={`${item.slug}-tool-url`}
-            label="URL"
-            value={item.url}
-            onChange={(value) => onChange(item.slug, { url: value })}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              id={`${item.slug}-tool-url`}
+              label="URL"
+              value={item.url}
+              onChange={(value) => onChange(item.slug, { url: value })}
+            />
+            <Field
+              id={`${item.slug}-tool-logo-url`}
+              label="Logo image URL"
+              value={item.logo_url ?? ""}
+              onChange={(value) => onChange(item.slug, { logo_url: value.trim() || null })}
+              placeholder="https://example.com/logo.png"
+            />
+          </div>
+          <LogoFileInput
+            id={`${item.slug}-tool-logo-file`}
+            label="Upload logo"
+            saveHint="click Save tool to upload."
           />
           <TextareaField
             id={`${item.slug}-highlights`}
@@ -2521,16 +3435,33 @@ function ToolEditor({
           />
         </div>
 
-        <Button
-          type="submit"
-          size="lg"
-          disabled={saving}
-          className="mt-5 w-full text-primary-foreground glow-primary hover:opacity-90"
-          style={{ background: "var(--gradient-primary)" }}
-        >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Save tool
-        </Button>
+        <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto]">
+          <Button
+            type="submit"
+            size="lg"
+            disabled={saving || deleting}
+            className="w-full text-primary-foreground glow-primary hover:opacity-90"
+            style={{ background: "var(--gradient-primary)" }}
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Save tool
+          </Button>
+          <Button
+            type="button"
+            size="lg"
+            variant="outline"
+            disabled={saving || deleting}
+            onClick={() => onDelete(item)}
+            className="border-bear/45 bg-bear/10 text-bear hover:bg-bear/15"
+          >
+            {deleting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+            Delete
+          </Button>
+        </div>
       </div>
     </form>
   );
@@ -2568,16 +3499,25 @@ function PropFirmEditor({
             <Badge variant="outline" className="mb-4 border-gold/40 text-xs text-gold">
               {item.is_featured ? "Featured prop firm" : "Prop firm"}
             </Badge>
-            <h3 className="font-display text-2xl font-bold">{item.name}</h3>
+            <h3 className="font-display text-xl font-bold sm:text-2xl">{item.name}</h3>
             <p className="mt-2 text-sm text-muted-foreground">
               Controls the Propfirms page partner cards and promo code rows.
             </p>
           </div>
           <div
-            className="grid h-12 w-12 shrink-0 place-items-center rounded-xl font-display text-sm font-bold text-white ring-1 ring-white/15"
-            style={{ backgroundColor: item.color }}
+            className="hidden h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl border border-white/10 bg-white/[0.04] font-display text-sm font-bold text-white ring-1 ring-white/15 sm:grid"
+            style={{ boxShadow: `0 0 22px color-mix(in oklab, ${item.color} 35%, transparent)` }}
           >
-            {item.logo}
+            {item.logo_url ? (
+              <img
+                src={item.logo_url}
+                alt={`${item.name} logo`}
+                className="h-full w-full object-contain p-1.5"
+                loading="lazy"
+              />
+            ) : (
+              item.logo
+            )}
           </div>
         </div>
 
@@ -2609,6 +3549,27 @@ function PropFirmEditor({
             />
           </div>
 
+          <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Prop firm logo</p>
+                <p className="text-xs text-muted-foreground">
+                  Upload a logo from your laptop, then click Save prop firm.
+                </p>
+              </div>
+              {item.logo_url ? (
+                <span className="rounded-full border border-bull/30 bg-bull/10 px-3 py-1 text-xs font-semibold text-bull">
+                  Logo saved
+                </span>
+              ) : (
+                <span className="rounded-full border border-border/50 bg-background/40 px-3 py-1 text-xs font-semibold text-muted-foreground">
+                  Initials fallback
+                </span>
+              )}
+            </div>
+            <LogoFileInput id={`${item.slug}-firm-logo-file`} label="Upload logo" />
+          </div>
+
           <TextareaField
             id={`${item.slug}-firm-description`}
             label="Description"
@@ -2617,24 +3578,10 @@ function PropFirmEditor({
           />
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Field
-              id={`${item.slug}-firm-color`}
-              label="Brand color"
-              value={item.color}
-              onChange={(value) => onChange(item.slug, { color: value })}
-              placeholder="#00d084"
-            />
-            <Field
+            <StarRatingEditor
               id={`${item.slug}-firm-rating`}
-              label="Rating"
-              value={`${item.rating}`}
-              onChange={(value) => onChange(item.slug, { rating: Number(value) || 0 })}
-            />
-            <Field
-              id={`${item.slug}-firm-reviews`}
-              label="Reviews"
-              value={`${item.reviews}`}
-              onChange={(value) => onChange(item.slug, { reviews: Number(value) || 0 })}
+              value={Number(item.rating) || 0}
+              onChange={(value) => onChange(item.slug, { rating: value })}
             />
             <Field
               id={`${item.slug}-firm-capital`}
@@ -2643,14 +3590,8 @@ function PropFirmEditor({
               onChange={(value) => onChange(item.slug, { max_capital: value })}
             />
             <Field
-              id={`${item.slug}-firm-split`}
-              label="Profit split"
-              value={item.profit_split}
-              onChange={(value) => onChange(item.slug, { profit_split: value })}
-            />
-            <Field
               id={`${item.slug}-firm-payout`}
-              label="Payout"
+              label="Payouts"
               value={item.payout}
               onChange={(value) => onChange(item.slug, { payout: value })}
             />
@@ -2665,10 +3606,10 @@ function PropFirmEditor({
 
           <TextareaField
             id={`${item.slug}-firm-features`}
-            label="Features"
+            label="Platforms"
             value={item.featuresText}
             onChange={(value) => onChange(item.slug, { featuresText: value })}
-            placeholder="One feature per line"
+            placeholder="One platform per line, e.g. TV, MT5, Web"
           />
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -2695,6 +3636,235 @@ function PropFirmEditor({
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Save prop firm
+          </Button>
+          <Button
+            type="button"
+            size="lg"
+            variant="outline"
+            disabled={saving || deleting}
+            onClick={() => onDelete(item)}
+            className="border-bear/45 bg-bear/10 text-bear hover:bg-bear/15"
+          >
+            {deleting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+            Delete
+          </Button>
+        </div>
+      </div>
+    </form>
+  );
+}
+
+function DiscountCodeEditor({
+  item,
+  saving,
+  deleting,
+  onChange,
+  onSubmit,
+  onDelete,
+}: {
+  item: EditableDiscountCode;
+  saving: boolean;
+  deleting: boolean;
+  onChange: (id: string, patch: Partial<EditableDiscountCode>) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>, item: EditableDiscountCode) => void;
+  onDelete: (item: EditableDiscountCode) => void;
+}) {
+  const selectedDiscountTargets = getDiscountApplyTargets(item.applies_to);
+  const selectedDiscountTargetSummary = formatDiscountApplyTargets(item.applies_to);
+
+  return (
+    <form
+      onSubmit={(event) => onSubmit(event, item)}
+      className="glass relative overflow-hidden rounded-2xl p-5 md:p-6"
+    >
+      <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-gold/20 blur-3xl" />
+      <div className="relative">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <Badge variant="outline" className="mb-4 border-gold/40 text-xs text-gold">
+              Checkout discount
+            </Badge>
+            <h3 className="font-display text-xl font-bold sm:text-2xl">
+              {item.code || "New discount code"}
+            </h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Users enter this code in checkout before paying. Final discounts are verified
+              server-side.
+            </p>
+          </div>
+          <div className="hidden h-12 w-12 shrink-0 sm:grid place-items-center rounded-xl bg-gold/15 text-gold ring-1 ring-gold/30">
+            <BadgePercent className="h-5 w-5" />
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              id={`${item.id}-discount-code`}
+              label="Code"
+              value={item.code}
+              onChange={(value) => onChange(item.id, { code: value })}
+              placeholder="ZAC10"
+            />
+            <Field
+              id={`${item.id}-discount-description`}
+              label="Description"
+              value={item.description ?? ""}
+              onChange={(value) => onChange(item.id, { description: value })}
+              placeholder="Launch offer"
+            />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <Label htmlFor={`${item.id}-discount-type`} className="text-xs">
+                Discount type
+              </Label>
+              <select
+                id={`${item.id}-discount-type`}
+                value={item.discount_type}
+                onChange={(event) =>
+                  onChange(item.id, { discount_type: event.target.value as DiscountType })
+                }
+                className="mt-1 h-10 w-full rounded-md border border-border/60 bg-background/45 px-3 text-sm text-foreground outline-none transition-colors focus:border-primary"
+              >
+                <option value="percent">Percent</option>
+                <option value="fixed">Fixed USD</option>
+              </select>
+            </div>
+
+            <div>
+              <Label htmlFor={`${item.id}-discount-value`} className="text-xs">
+                Value {item.discount_type === "percent" ? "(%)" : "(USD)"}
+              </Label>
+              <Input
+                id={`${item.id}-discount-value`}
+                type="number"
+                min="0"
+                step="0.01"
+                value={`${item.discount_value}`}
+                onChange={(event) =>
+                  onChange(item.id, { discount_value: Number(event.target.value) || 0 })
+                }
+                className="mt-1 bg-background/45"
+              />
+            </div>
+
+            <Field
+              id={`${item.id}-discount-max`}
+              label="Max uses"
+              value={item.maxRedemptionsText}
+              onChange={(value) => onChange(item.id, { maxRedemptionsText: value })}
+              placeholder="Unlimited"
+            />
+          </div>
+
+          <div className="rounded-2xl border border-border/60 bg-background/25 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:p-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <Label className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                  Coupon scope
+                </Label>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Choose one or more products where this code can be used.
+                </p>
+              </div>
+              <Badge variant="outline" className="w-fit border-gold/35 bg-gold/10 text-gold">
+                {selectedDiscountTargetSummary}
+              </Badge>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              {discountApplyTargetOptions.map((option) => {
+                const isSelected = selectedDiscountTargets.includes(option.value);
+
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() =>
+                      onChange(item.id, {
+                        applies_to: toggleDiscountApplyTarget(item.applies_to, option.value),
+                      })
+                    }
+                    className={`group relative min-h-11 min-w-[104px] overflow-hidden rounded-full border px-3.5 py-2 text-left transition-all duration-200 sm:min-w-[116px] ${
+                      isSelected
+                        ? "border-gold/70 bg-gradient-to-br from-gold/20 via-gold/10 to-primary/10 text-foreground shadow-[0_0_24px_rgba(245,184,63,0.14)]"
+                        : "border-border/60 bg-card/25 text-muted-foreground hover:-translate-y-0.5 hover:border-primary/45 hover:bg-primary/5 hover:text-foreground"
+                    }`}
+                  >
+                    <span
+                      className={`absolute inset-x-3 top-0 h-px transition-opacity ${
+                        isSelected
+                          ? "bg-gradient-to-r from-transparent via-gold/80 to-transparent opacity-100"
+                          : "bg-gradient-to-r from-transparent via-primary/50 to-transparent opacity-0 group-hover:opacity-100"
+                      }`}
+                    />
+                    <span className="flex items-start gap-2.5">
+                      <span
+                        className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border transition-colors ${
+                          isSelected
+                            ? "border-gold bg-gold text-background"
+                            : "border-border/70 bg-background/45 text-transparent group-hover:border-primary/60"
+                        }`}
+                      >
+                        <Check className="h-3 w-3" />
+                      </span>
+                      <span className="min-w-0 text-sm font-semibold leading-tight">
+                        {option.shortLabel}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <DateField
+              id={item.id + "-discount-start"}
+              label="Starts at"
+              value={item.startsAtText}
+              onChange={(value) => onChange(item.id, { startsAtText: value })}
+            />
+            <DateField
+              id={item.id + "-discount-expires"}
+              label="Expires at"
+              value={item.expiresAtText}
+              onChange={(value) => onChange(item.id, { expiresAtText: value })}
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ToggleButton
+              active={item.is_active}
+              label="Active"
+              onClick={() => onChange(item.id, { is_active: !item.is_active })}
+            />
+            <div className="rounded-xl border border-border/60 bg-background/35 px-4 py-3 text-sm">
+              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Used</div>
+              <div className="mt-1 font-display text-xl font-bold text-gold">
+                {item.redeemed_count}
+                {item.max_redemptions ? ` / ${item.max_redemptions}` : ""}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto]">
+          <Button
+            type="submit"
+            size="lg"
+            disabled={saving || deleting}
+            className="w-full text-primary-foreground glow-primary hover:opacity-90"
+            style={{ background: "var(--gradient-primary)" }}
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Save discount
           </Button>
           <Button
             type="button"
@@ -2744,7 +3914,7 @@ function CommunitySocialEditor({
             <Badge variant="outline" className="mb-4 border-primary/40 text-xs">
               ZacTrades community
             </Badge>
-            <h3 className="font-display text-2xl font-bold">{item.name}</h3>
+            <h3 className="font-display text-xl font-bold sm:text-2xl">{item.name}</h3>
             <p className="mt-2 text-sm text-muted-foreground">
               Controls the social card shown in the homepage community section.
             </p>
@@ -2753,7 +3923,7 @@ function CommunitySocialEditor({
               bull.
             </p>
           </div>
-          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-primary/15 text-electric ring-1 ring-primary/30">
+          <div className="hidden h-12 w-12 shrink-0 sm:grid place-items-center rounded-xl bg-primary/15 text-electric ring-1 ring-primary/30">
             <MessageCircle className="h-5 w-5" />
           </div>
         </div>
@@ -2939,7 +4109,7 @@ function StaffRoleGroup({
     <section className="rounded-2xl border border-border/50 bg-card/20 p-4">
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h3 className="font-display text-2xl font-bold">{title}</h3>
+          <h3 className="font-display text-xl font-bold sm:text-2xl">{title}</h3>
           <p className="mt-1 text-sm text-muted-foreground">{description}</p>
         </div>
         <Badge variant="outline" className="w-fit border-primary/35 text-electric">
@@ -3104,7 +4274,7 @@ function CommunityMembersTable({
     <section className="rounded-2xl border border-border/50 bg-card/20 p-4">
       <div className="mb-4 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <h3 className="font-display text-2xl font-bold">All Community Members</h3>
+          <h3 className="font-display text-xl font-bold sm:text-2xl">All Community Members</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             Registered members, paid mentorship members, and News Desk subscribers in one table.
           </p>
@@ -3129,35 +4299,159 @@ function CommunityMembersTable({
       </div>
 
       {profiles.length ? (
-        <div className="overflow-hidden rounded-xl border border-border/50 bg-background/35">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1180px] text-left text-sm">
-              <thead className="border-b border-border/60 bg-card/45 text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">Full name</th>
-                  <th className="px-4 py-3 font-semibold">Email</th>
-                  <th className="px-4 py-3 font-semibold">Phone</th>
-                  <th className="px-4 py-3 font-semibold">Discord user / ID</th>
-                  <th className="px-4 py-3 font-semibold">Role</th>
-                  <th className="px-4 py-3 font-semibold">Plan</th>
-                  <th className="px-4 py-3 font-semibold">Joined</th>
-                  <th className="px-4 py-3 text-right font-semibold">Invoice</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/45">
-                {profiles.map((profile) => (
-                  <CommunityMembersTableRow key={profile.id} profile={profile} />
-                ))}
-              </tbody>
-            </table>
+        <>
+          <div className="grid gap-3 md:hidden">
+            {profiles.map((profile) => (
+              <CommunityMemberMobileCard key={profile.id} profile={profile} />
+            ))}
           </div>
-        </div>
+          <div className="hidden overflow-hidden rounded-xl border border-border/50 bg-background/35 md:block">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1180px] text-left text-sm">
+                <thead className="border-b border-border/60 bg-card/45 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Full name</th>
+                    <th className="px-4 py-3 font-semibold">Email</th>
+                    <th className="px-4 py-3 font-semibold">Phone</th>
+                    <th className="px-4 py-3 font-semibold">Discord user / ID</th>
+                    <th className="px-4 py-3 font-semibold">Role</th>
+                    <th className="px-4 py-3 font-semibold">Plan</th>
+                    <th className="px-4 py-3 font-semibold">Joined</th>
+                    <th className="px-4 py-3 text-right font-semibold">Invoice</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/45">
+                  {profiles.map((profile) => (
+                    <CommunityMembersTableRow key={profile.id} profile={profile} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       ) : (
         <div className="rounded-xl border border-border/45 bg-background/35 p-5 text-sm text-muted-foreground">
           {emptyMessage}
         </div>
       )}
     </section>
+  );
+}
+
+function CommunityMemberMobileCard({ profile }: { profile: UserProfileRow }) {
+  const paidPlans = paidPlanItems(profile);
+  const whatsappUrl = whatsAppMessageUrl(profile.phone_number);
+  const paidMemberships = mentorshipMembershipPlans
+    .map(({ slug, label }) => ({
+      label,
+      membership: profile.memberships[slug],
+    }))
+    .filter(({ membership }) => membership.status === "paid");
+
+  return (
+    <article className="rounded-2xl border border-border/50 bg-background/35 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h4 className="truncate font-display text-lg font-bold">
+            {profile.full_name || "No name"}
+          </h4>
+          <p className="mt-1 break-words text-sm text-muted-foreground">
+            {profile.email || "No email recorded"}
+          </p>
+        </div>
+        <Badge variant="outline" className={profileRoleClassName(profile.role)}>
+          {profileRoleLabel(profile.role)}
+        </Badge>
+      </div>
+
+      <div className="mt-4 grid gap-3 text-sm">
+        <div className="rounded-xl border border-border/40 bg-card/25 p-3">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Phone
+          </div>
+          {profile.phone_number ? (
+            <div className="mt-2 flex flex-col gap-2">
+              <span className="break-words text-muted-foreground">{profile.phone_number}</span>
+              {whatsappUrl ? (
+                <Button
+                  asChild
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="w-full border-bull/40 bg-bull/10 text-bull hover:bg-bull/15"
+                >
+                  <a href={whatsappUrl} target="_blank" rel="noreferrer">
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    WhatsApp
+                  </a>
+                </Button>
+              ) : (
+                <span className="text-xs text-muted-foreground">Invalid WhatsApp number</span>
+              )}
+            </div>
+          ) : (
+            <p className="mt-2 text-muted-foreground">Not provided</p>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-border/40 bg-card/25 p-3">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Discord
+          </div>
+          <div className="mt-2 min-w-0">
+            <DiscordIdentityCell profile={profile} />
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-border/40 bg-card/25 p-3">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Plan
+          </div>
+          {paidPlans.length ? (
+            <div className="mt-2 grid gap-2">
+              {paidPlans.map((plan) => (
+                <div key={plan.key} className="grid gap-1">
+                  <Badge variant="outline" className={plan.className}>
+                    {plan.label}
+                  </Badge>
+                  {plan.detail && (
+                    <span className="text-xs text-muted-foreground">{plan.detail}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <Badge
+              variant="outline"
+              className="mt-2 border-muted-foreground/35 text-muted-foreground"
+            >
+              No paid plan
+            </Badge>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3 border-t border-border/50 pt-4 text-xs text-muted-foreground">
+        <span>Joined {formatAdminDate(profile.created_at)}</span>
+        {paidMemberships.length ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="w-full border-gold/35 text-gold hover:bg-gold/10"
+            aria-label={
+              "Print invoice for " + (profile.full_name || profile.email || "paid member")
+            }
+            onClick={() => printPaidMemberInvoice(profile, paidMemberships)}
+          >
+            <Printer className="h-3.5 w-3.5" />
+            Invoice
+          </Button>
+        ) : (
+          <span>No invoice</span>
+        )}
+      </div>
+    </article>
   );
 }
 
@@ -3612,7 +4906,7 @@ function DiscordIdentityCell({ profile }: { profile: UserProfileRow }) {
   }
 
   return (
-    <div className="grid min-w-[180px] gap-1">
+    <div className="grid min-w-0 gap-1 md:min-w-[180px]">
       <span className="font-medium text-foreground">
         {profile.discord_username || "Discord user"}
       </span>
@@ -4050,7 +5344,7 @@ function UserManagementGroup({
     <section className="rounded-2xl border border-border/50 bg-card/20 p-4">
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h3 className="font-display text-2xl font-bold">{title}</h3>
+          <h3 className="font-display text-xl font-bold sm:text-2xl">{title}</h3>
           <p className="mt-1 text-sm text-muted-foreground">{description}</p>
         </div>
         <Badge variant="outline" className="w-fit border-primary/35 text-electric">
@@ -4496,6 +5790,15 @@ function hasPaidLiveTradingAccess(profile: UserProfileRow) {
   );
 }
 
+function hasExtendableLiveTradingAccess(profile: UserProfileRow) {
+  const access = profile.liveTradingAccess;
+  const expiresAt = access.access_expires_at ? new Date(access.access_expires_at) : null;
+
+  if (!expiresAt) return false;
+
+  return access.status === "paid" && !Number.isNaN(expiresAt.getTime()) && expiresAt > new Date();
+}
+
 function profileRoleLabel(role: ProfileRole) {
   switch (role) {
     case "admin":
@@ -4549,6 +5852,115 @@ function Field({
   );
 }
 
+function StarRatingEditor({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  const rating = clampRating(value);
+
+  const updateRating = (nextValue: number) => {
+    onChange(clampRating(nextValue));
+  };
+
+  return (
+    <div className="rounded-2xl border border-gold/25 bg-gold/5 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <div className="flex items-center justify-between gap-3">
+        <Label htmlFor={id} className="text-xs">
+          Star rating
+        </Label>
+        <span className="rounded-full border border-gold/35 bg-gold/10 px-2.5 py-1 font-mono text-xs font-bold text-gold">
+          {rating.toFixed(1)}/5
+        </span>
+      </div>
+
+      <div className="mt-3 flex items-center gap-1.5">
+        {Array.from({ length: 5 }, (_, index) => {
+          const fillPercent = Math.max(0, Math.min(100, (rating - index) * 100));
+
+          return (
+            <button
+              key={index}
+              type="button"
+              onClick={() => updateRating(index + 1)}
+              className="grid h-10 w-10 place-items-center rounded-xl border border-border/55 bg-background/45 transition hover:border-gold/50 hover:bg-gold/10"
+              aria-label={`Set rating to ${index + 1} stars`}
+            >
+              <span className="relative grid h-5 w-5 place-items-center">
+                <Star className="h-5 w-5 fill-muted/20 text-muted/45" />
+                <span
+                  className="absolute inset-0 overflow-hidden"
+                  style={{ width: `${fillPercent}%` }}
+                >
+                  <Star className="h-5 w-5 fill-gold text-gold" />
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <input
+        id={id}
+        type="range"
+        min="0"
+        max="5"
+        step="0.1"
+        value={rating}
+        onChange={(event) => updateRating(Number(event.target.value))}
+        className="mt-3 w-full accent-[#f6c44d]"
+      />
+
+      <Input
+        type="number"
+        min="0"
+        max="5"
+        step="0.1"
+        value={rating.toFixed(1)}
+        onChange={(event) => updateRating(Number(event.target.value))}
+        className="mt-2 h-10 border-border/60 bg-background/45 font-mono"
+      />
+    </div>
+  );
+}
+
+function clampRating(value: number) {
+  if (!Number.isFinite(value)) return 0;
+
+  return Math.max(0, Math.min(5, Math.round(value * 10) / 10));
+}
+
+function DateField({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div>
+      <Label htmlFor={id} className="text-xs">
+        {label}
+      </Label>
+      <Input
+        id={id}
+        type="date"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-1 bg-background/45 text-foreground [color-scheme:dark]"
+      />
+    </div>
+  );
+}
+
 function TextareaField({
   id,
   label,
@@ -4578,8 +5990,23 @@ function TextareaField({
   );
 }
 
-function PdfFileInput({ id, label }: { id: string; label: string }) {
+function LogoFileInput({
+  id,
+  label,
+  saveHint = "click Save prop firm to upload.",
+}: {
+  id: string;
+  label: string;
+  saveHint?: string;
+}) {
   const [fileName, setFileName] = useState("");
+  const [previewUrl, setPreviewUrl] = useState("");
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   return (
     <div>
@@ -4588,21 +6015,36 @@ function PdfFileInput({ id, label }: { id: string; label: string }) {
       </Label>
       <label
         htmlFor={id}
-        className="mt-1 flex h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-4 text-sm font-semibold text-electric transition hover:border-primary/70 hover:bg-primary/15"
+        className="mt-1 flex min-h-12 cursor-pointer items-center justify-center gap-3 rounded-xl border border-gold/45 bg-gold/10 px-4 py-3 text-sm font-semibold text-gold transition hover:border-gold/70 hover:bg-gold/15"
       >
-        <Upload className="h-4 w-4" />
-        Upload PDF
+        {previewUrl ? (
+          <img
+            src={previewUrl}
+            alt="Selected prop firm logo preview"
+            className="h-8 w-8 rounded-lg object-contain ring-1 ring-white/10"
+          />
+        ) : (
+          <Upload className="h-4 w-4" />
+        )}
+        {previewUrl ? "Logo selected" : "Upload logo"}
       </label>
       <Input
         id={id}
-        name="pdf_file"
+        name="logo_file"
         type="file"
-        accept="application/pdf,.pdf"
+        accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
         className="sr-only"
-        onChange={(event) => setFileName(event.target.files?.[0]?.name ?? "")}
+        onChange={(event) => {
+          const file = event.target.files?.[0] ?? null;
+          setFileName(file?.name ?? "");
+          setPreviewUrl((currentPreviewUrl) => {
+            if (currentPreviewUrl) URL.revokeObjectURL(currentPreviewUrl);
+            return file ? URL.createObjectURL(file) : "";
+          });
+        }}
       />
       <p className="mt-2 truncate text-xs text-muted-foreground">
-        {fileName || "No PDF selected yet."}
+        {fileName ? `${fileName} - ${saveHint}` : "No logo selected yet."}
       </p>
     </div>
   );
@@ -4668,6 +6110,98 @@ function defaultEditablePlans(): EditablePlan[] {
   }));
 }
 
+const discountApplyTargetOptions: {
+  value: DiscountApplyTarget;
+  label: string;
+  shortLabel: string;
+}[] = [
+  { value: "all", label: "All checkout", shortLabel: "All" },
+  { value: "live", label: "Live Trading", shortLabel: "Live" },
+  { value: "mentorship_one_to_one", label: "1-to-1 Coaching", shortLabel: "1-to-1" },
+  { value: "mentorship_group", label: "Training Group Coaching", shortLabel: "Group" },
+  { value: "news", label: "News Subscription", shortLabel: "News" },
+];
+
+function getDiscountApplyTargets(value: string | null | undefined): DiscountApplyTarget[] {
+  const rawTargets = (value || "all")
+    .split(",")
+    .map((target) => target.trim())
+    .filter(Boolean);
+
+  if (rawTargets.includes("all")) return ["all"];
+
+  const targets = rawTargets.flatMap((target) =>
+    target === "mentorship" ? ["mentorship_one_to_one", "mentorship_group"] : [target],
+  );
+  const allowed = new Set(discountApplyTargetOptions.map((option) => option.value));
+  const cleanedTargets = targets.filter((target): target is DiscountApplyTarget =>
+    allowed.has(target as DiscountApplyTarget),
+  );
+
+  return cleanedTargets.length ? [...new Set(cleanedTargets)] : ["all"];
+}
+
+function encodeDiscountApplyTargets(targets: DiscountApplyTarget[]) {
+  const cleanedTargets = targets.filter((target) => target !== "all");
+
+  return cleanedTargets.length ? [...new Set(cleanedTargets)].join(",") : "all";
+}
+
+function toggleDiscountApplyTarget(currentValue: string, target: DiscountApplyTarget) {
+  if (target === "all") return "all";
+
+  const currentTargets = getDiscountApplyTargets(currentValue).filter(
+    (current) => current !== "all",
+  );
+  const nextTargets = currentTargets.includes(target)
+    ? currentTargets.filter((current) => current !== target)
+    : [...currentTargets, target];
+
+  return encodeDiscountApplyTargets(nextTargets);
+}
+
+function formatDiscountApplyTargets(value: string | null | undefined) {
+  const targets = getDiscountApplyTargets(value);
+  const labelByValue = new Map(
+    discountApplyTargetOptions.map((option) => [option.value, option.label] as const),
+  );
+
+  return targets.map((target) => labelByValue.get(target) ?? target).join(", ");
+}
+
+function normalizeAdminDiscountCode(value: string) {
+  return value
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9_-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function dateInputValue(value: string | null) {
+  if (!value) return "";
+  const trimmed = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed.slice(0, 10);
+
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return "";
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return year + "-" + month + "-" + day;
+}
+
+function toEditableDiscountCode(row: DiscountCodeRow): EditableDiscountCode {
+  return {
+    ...row,
+    description: row.description ?? "",
+    maxRedemptionsText: row.max_redemptions ? String(row.max_redemptions) : "",
+    startsAtText: dateInputValue(row.starts_at),
+    expiresAtText: dateInputValue(row.expires_at),
+  };
+}
+
 function toEditablePlan(row: CoachingPlanRow): EditablePlan {
   return {
     ...row,
@@ -4698,26 +6232,72 @@ function slugify(value: string) {
       .toLowerCase()
       .trim()
       .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "") || `blog-post-${Date.now()}`
+      .replace(/^-+|-+$/g, "") || `item-${Date.now()}`
   );
 }
 
-async function uploadBlogPdf(fileValue: FormDataEntryValue | null, slug: string) {
+function getLogoFileExtension(file: File) {
+  const extension = file.name.split(".").pop()?.toLowerCase();
+
+  if (extension && ["png", "jpg", "jpeg", "webp"].includes(extension)) {
+    return extension === "jpeg" ? "jpg" : extension;
+  }
+
+  if (file.type === "image/jpeg") return "jpg";
+  if (file.type === "image/png") return "png";
+  if (file.type === "image/webp") return "webp";
+
+  return "png";
+}
+
+function isAcceptedPropFirmLogo(file: File) {
+  const extension = getLogoFileExtension(file);
+
+  return (
+    (!file.type || PROP_FIRM_LOGO_TYPES.has(file.type)) &&
+    ["png", "jpg", "webp"].includes(extension)
+  );
+}
+
+function getLogoContentType(file: File) {
+  if (PROP_FIRM_LOGO_TYPES.has(file.type)) return file.type;
+
+  const extension = getLogoFileExtension(file);
+  if (extension === "jpg") return "image/jpeg";
+  if (extension === "webp") return "image/webp";
+
+  return "image/png";
+}
+
+async function uploadLogoFile({
+  fileValue,
+  slug,
+  bucket,
+  maxBytes,
+  fallbackName,
+}: {
+  fileValue: FormDataEntryValue | null;
+  slug: string;
+  bucket: string;
+  maxBytes: number;
+  fallbackName: string;
+}) {
   if (!supabase || !(fileValue instanceof File) || fileValue.size === 0) return null;
 
-  if (fileValue.size > MAX_BLOG_PDF_BYTES) {
-    throw new Error("Please upload a PDF smaller than 10 MB.");
+  if (fileValue.size > maxBytes) {
+    throw new Error("Please upload a logo smaller than 2 MB.");
   }
 
-  if (fileValue.type !== "application/pdf" && !fileValue.name.toLowerCase().endsWith(".pdf")) {
-    throw new Error("Please upload a PDF file.");
+  if (!isAcceptedPropFirmLogo(fileValue)) {
+    throw new Error("Please upload a PNG, JPG, or WEBP logo.");
   }
 
-  const safeFileName = slugify(fileValue.name.replace(/\.pdf$/i, "")) || "blog-file";
-  const storagePath = `${slug}/${crypto.randomUUID()}-${safeFileName}.pdf`;
-  const { error } = await supabase.storage.from(BLOG_PDF_BUCKET).upload(storagePath, fileValue, {
-    cacheControl: "3600",
-    contentType: "application/pdf",
+  const safeFileName = slugify(fileValue.name.replace(/\.[^.]+$/i, "")) || fallbackName;
+  const extension = getLogoFileExtension(fileValue);
+  const storagePath = `${slug}/${crypto.randomUUID()}-${safeFileName}.${extension}`;
+  const { error } = await supabase.storage.from(bucket).upload(storagePath, fileValue, {
+    cacheControl: "86400",
+    contentType: getLogoContentType(fileValue),
     upsert: true,
   });
 
@@ -4725,9 +6305,29 @@ async function uploadBlogPdf(fileValue: FormDataEntryValue | null, slug: string)
     throw new Error(error.message);
   }
 
-  const { data } = supabase.storage.from(BLOG_PDF_BUCKET).getPublicUrl(storagePath);
+  const { data } = supabase.storage.from(bucket).getPublicUrl(storagePath);
 
   return data.publicUrl;
+}
+
+async function uploadPropFirmLogo(fileValue: FormDataEntryValue | null, slug: string) {
+  return uploadLogoFile({
+    fileValue,
+    slug,
+    bucket: PROP_FIRM_LOGO_BUCKET,
+    maxBytes: MAX_PROP_FIRM_LOGO_BYTES,
+    fallbackName: "prop-firm-logo",
+  });
+}
+
+async function uploadTradingToolLogo(fileValue: FormDataEntryValue | null, slug: string) {
+  return uploadLogoFile({
+    fileValue,
+    slug,
+    bucket: TRADING_TOOL_LOGO_BUCKET,
+    maxBytes: MAX_TRADING_TOOL_LOGO_BYTES,
+    fallbackName: "trading-tool-logo",
+  });
 }
 
 function formatAdminDate(value: string) {

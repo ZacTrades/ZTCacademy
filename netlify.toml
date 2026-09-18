@@ -2,7 +2,19 @@
   command = "npm run build"
   publish = "dist/client"
 
+[build.environment]
+  NODE_VERSION = "22"
+
 [dev]
   command = "npm run dev"
   port = 8080
   targetPort = 8080
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=()"
+    X-Frame-Options = "SAMEORIGIN"

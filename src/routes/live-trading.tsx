@@ -26,7 +26,8 @@ import {
   fetchLiveTradingPackages,
   liveTradingPackages,
 } from "@/components/site/liveTradingPackages";
-import tradingViewPreview from "@/assets/zactrades-tradingview-preview.jpeg";
+import liveTradingPreview from "@/assets/live-trading-room-preview.png";
+import { useCurrency } from "@/lib/currency";
 import { useAuth } from "@/lib/use-auth";
 
 export const Route = createFileRoute("/live-trading")({
@@ -67,7 +68,7 @@ const roomBenefits = [
 const sessionFlow = [
   {
     icon: Clock3,
-    title: "Pre-market plan",
+    title: "Pre-market Preparation",
     description:
       "We mark liquidity, bias, invalidation, and the high-probability zones before the session starts.",
   },
@@ -87,6 +88,7 @@ const sessionFlow = [
 
 function LiveTradingPage() {
   const { isStaff } = useAuth();
+  const { formatPrice } = useCurrency();
   const [open, setOpen] = useState(false);
   const [selectedLivePackage, setSelectedLivePackage] = useState(0);
   const [livePackages, setLivePackages] = useState(liveTradingPackages);
@@ -123,16 +125,18 @@ function LiveTradingPage() {
 
           <div className="mx-auto grid max-w-7xl gap-12 px-4 md:px-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
             <motion.div {...fadeUp}>
-              <Badge variant="outline" className="glass mb-6 border-bull/40 text-xs">
+              <Badge
+                variant="outline"
+                className="glass mb-6 max-w-full border-bull/40 text-left text-xs uppercase tracking-[0.12em] whitespace-normal leading-relaxed sm:whitespace-nowrap"
+              >
                 <span className="mr-1.5 h-2 w-2 rounded-full bg-bull animate-pulse-glow" />
-                Live Trading Room
+                LIVE TRADING EVERY DAY AT 09H:00 AM (NEW YORK TIMEZONE)
               </Badge>
-              <h1 className="font-display text-5xl font-bold leading-tight tracking-tight md:text-7xl">
-                Trade the session with a live <span className="text-gradient">market desk.</span>
+              <h1 className="font-display text-4xl font-bold leading-tight tracking-tight sm:text-5xl md:text-7xl">
+                Trade With Me. <span className="text-gradient">Learn From The Process.</span>
               </h1>
               <p className="mt-6 max-w-2xl text-base leading-7 text-muted-foreground md:text-lg">
-                Join Zac live for real-time market preparation, trade execution, commentary, replay
-                access, and a premium community built for serious traders.
+                Join Me live every day during the New York session and see how I prepare, analyze, execute, and manage trades in real time. Learn the process behind every decision , not just the trade.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Button
@@ -141,7 +145,7 @@ function LiveTradingPage() {
                   style={{ background: "var(--gradient-primary)" }}
                   className="group h-12 px-7 font-semibold text-primary-foreground glow-primary hover:opacity-90"
                 >
-                  Choose Access
+                  JOIN THE LIVE ROOM
                   <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </Button>
                 <Button
@@ -168,8 +172,8 @@ function LiveTradingPage() {
                   <span className="ml-0 min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground sm:ml-4">
                     live-room / market execution
                   </span>
-                  <span className="rounded-full border border-bull/30 bg-bull/10 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-bull">
-                    Live Now
+                  <span className="rounded-full border border-bull/30 bg-bull/10 px-2.5 py-1 font-mono text-[10px] tracking-[0.12em] text-bull">
+                    https://www.zactrades.com/
                   </span>
                 </div>
 
@@ -185,19 +189,15 @@ function LiveTradingPage() {
                   </div>
                   <div className="group relative mt-4 overflow-hidden rounded-xl border border-border/60 bg-background/50">
                     <img
-                      src={tradingViewPreview}
+                      src={liveTradingPreview}
                       alt="ZacTrades live TradingView screen share"
-                      className="aspect-[16/9] w-full object-cover opacity-85 transition-transform duration-700 group-hover:scale-[1.015]"
+                      className="w-full object-cover opacity-95 transition-transform duration-700 group-hover:scale-[1.015]"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-background/55 via-transparent to-transparent" />
-                    <div className="absolute bottom-4 left-4 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur">
-                      Live market screen share
-                    </div>
                   </div>
                   <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                    <RoomStat label="Members live" value="1,284" icon={Users} />
+                    <RoomStat label="Members live" value="180" icon={Users} />
                     <RoomStat label="Session bias" value="Bullish" icon={TrendingUp} />
-                    <RoomStat label="Alerts sent" value="12" icon={Zap} />
+                    <RoomStat label="Trades Taken" value="1" icon={Zap} />
                   </div>
                 </div>
               </div>
@@ -212,7 +212,7 @@ function LiveTradingPage() {
                 <Play className="mr-1.5 h-3.5 w-3.5 text-electric" />
                 What You Get
               </Badge>
-              <h2 className="font-display text-4xl font-bold tracking-tight md:text-5xl">
+              <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
                 Built for traders who want live context
               </h2>
               <p className="mt-4 text-muted-foreground">
@@ -267,12 +267,12 @@ function LiveTradingPage() {
               <Badge variant="outline" className="glass mb-4 border-gold/40 text-xs">
                 Flexible Duration
               </Badge>
-              <h2 className="font-display text-4xl font-bold tracking-tight md:text-5xl">
-                Choose your live trading access
+              <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
+                Choose Your live Trading Plan
               </h2>
               <p className="mt-4 text-muted-foreground">
-                Select 1 month, 3 months, 6 months, or 12 months. You can open checkout directly
-                from any plan.
+                Choose the plan that fits you best. Get full access to the Live Trading Room, daily New York session trading, market analysis, Q&A, psychology, and the ZTC community.
+
               </p>
             </motion.div>
 
@@ -307,13 +307,15 @@ function LiveTradingPage() {
                     <div className="mt-6">
                       {option.originalPrice && (
                         <p className="mb-1 font-mono text-sm text-muted-foreground line-through">
-                          Before {option.originalPrice}
+                          Before {formatPrice(option.originalPrice)}
                         </p>
                       )}
                       <p className="font-mono text-4xl font-bold text-gradient-gold">
-                        {option.price}
+                        {formatPrice(option.price)}
                       </p>
-                      <p className="mt-1 text-sm text-muted-foreground">{option.monthly}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {formatPrice(option.monthly)}
+                      </p>
                     </div>
                     <div className="mt-6 flex items-center justify-between border-t border-border/50 pt-5">
                       <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -339,28 +341,27 @@ function LiveTradingPage() {
                     Premium Room
                   </Badge>
                   <h2 className="mt-4 font-display text-3xl font-bold tracking-tight md:text-4xl">
-                    Learn from live decisions, not after-the-fact screenshots.
+                    See The Thinking Behind Every Trade.
                   </h2>
                   <p className="mt-4 text-sm leading-6 text-muted-foreground">
-                    The room is designed to show context as the market moves: why a zone matters,
-                    when a setup is invalid, and how risk is managed before the trade is taken.
+                    You don't just see the entry. You see the analysis behind it — what I am looking for, why the setup makes sense, where it becomes invalid, and how risk is managed before the trade is taken
                   </p>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-3">
                   <TrustCard
                     icon={Shield}
-                    title="Risk first"
-                    text="Stops, invalidation, and sizing are part of the discussion."
+                    title="Risk comes before the trade."
+                    text="Every setup has a clear invalidation point, stop loss, and defined risk before execution."
                   />
                   <TrustCard
                     icon={MessageSquareText}
                     title="Ask questions"
-                    text="Use the room chat to clarify setups and session logic."
+                    text="Use the Room chat and Ask questions during the live session and understand the reasoning behind the analysis, setup, and trade management."
                   />
                   <TrustCard
                     icon={Users}
-                    title="Community"
-                    text="Stay connected with traders studying the same markets."
+                    title="Trade With The Community"
+                    text="Learn alongside other traders, share ideas, ask questions, and stay focused on improving your execution."
                   />
                 </div>
               </div>

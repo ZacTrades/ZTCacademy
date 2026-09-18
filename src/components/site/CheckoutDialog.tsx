@@ -8,6 +8,9 @@ import {
   UserPlus,
   AlertCircle,
   Wallet,
+  BadgePercent,
+  Loader2,
+  MessageCircle,
 } from "lucide-react";
 import {
   Dialog,
@@ -17,17 +20,21 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthDialog } from "@/components/site/AuthDialog";
 import { StaffCheckoutNotice } from "@/components/site/StaffCheckoutNotice";
 import { liveTradingPackages, type CheckoutPackage } from "@/components/site/liveTradingPackages";
 import {
+  previewDiscountCode,
   startLiveTradingCheckout,
   startMentorshipCheckout,
   startNewsSubscriptionCheckout,
 } from "@/lib/payment-server";
+import { formatPriceForCurrency, useCurrency } from "@/lib/currency";
 import { useAuth } from "@/lib/use-auth";
+import { startDiscordConnection } from "@/lib/discord-server";
 
 type Props = {
   open: boolean;
@@ -41,6 +48,14 @@ type Props = {
 };
 
 type PaymentMethod = "card" | "crypto";
+
+type AppliedDiscountPreview = {
+  code: string;
+  originalAmountLabel: string;
+  discountAmountLabel: string;
+  discountedAmountLabel: string;
+  message: string;
+};
 
 const cryptoPaymentOptions = [
   { asset: "USDT", network: "TRC20", label: "USDT TRC20" },
@@ -67,6 +82,7 @@ export function CheckoutDialog({
   packages = liveTradingPackages,
 }: Props) {
   const { user, session, isStaff, discordConnection } = useAuth();
+  const { currency, formatPrice } = useCurrency();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [statusTitle, setStatusTitle] = useState("Checkout complete");
@@ -77,19 +93,29 @@ export function CheckoutDialog({
   const [email, setEmail] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
   const [cryptoOption, setCryptoOption] = useState(cryptoPaymentOptions[0]);
+  const [discountCode, setDiscountCode] = useState("");
+  const [discountLoading, setDiscountLoading] = useState(false);
+  const [discountMessage, setDiscountMessage] = useState("");
+  const [appliedDiscount, setAppliedDiscount] = useState<AppliedDiscountPreview | null>(null);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
+  const [discordLoading, setDiscordLoading] = useState(false);
+  const [discordError, setDiscordError] = useState("");
   const [authMode, setAuthMode] = useState<"signin" | "join">("signin");
   const checkoutPackages = packages.length > 0 ? packages : liveTradingPackages;
   const activePackage = checkoutPackages[selectedPackage] ?? checkoutPackages[0];
-  const needsDiscordConnection =
-    Boolean(user) &&
-    !isStaff &&
-    (Boolean(mentorshipPlanSlug) || checkoutKind === "news") &&
-    !discordConnection?.userId;
+  const payablePriceLabel = appliedDiscount?.discountedAmountLabel ?? activePackage.price;
+  const formatCheckoutPrice = (priceLabel?: string | null) =>
+    paymentMethod === "crypto"
+      ? formatPriceForCurrency(priceLabel, "USD")
+      : formatPrice(priceLabel);
+  const needsDiscordConnection = Boolean(user) && !isStaff && !discordConnection?.userId;
 
   useEffect(() => {
     if (open) {
       setSelectedPackage(Math.min(initialPackageIndex, checkoutPackages.length - 1));
+      setAppliedDiscount(null);
+      setDiscountMessage("");
     }
   }, [checkoutPackages.length, initialPackageIndex, open]);
 
@@ -109,6 +135,22 @@ export function CheckoutDialog({
     }
 
     setErrorMessage("");
+
+    if (needsDiscordConnection) {
+      setErrorMessage("Connect Discord before paying so we can invite you and assign the correct access role automatically.");
+      return;
+    }
+
+    if (discountCode.trim() && !appliedDiscount) {
+      setErrorMessage("Click Apply discount before paying so we can verify the code.");
+      return;
+    }
+
+    if (!acceptedTerms) {
+      setErrorMessage("Please accept the terms and policies before continuing.");
+      return;
+    }
+
     setLoading(true);
 
     if (mentorshipPlanSlug) {
@@ -120,8 +162,10 @@ export function CheckoutDialog({
             customerEmail: email,
             cardholderName: name,
             paymentMethod,
+            currency,
             cryptoAsset: paymentMethod === "crypto" ? cryptoOption.asset : undefined,
             cryptoNetwork: paymentMethod === "crypto" ? cryptoOption.network : undefined,
+            discountCode: appliedDiscount?.code,
           },
         });
 
@@ -132,12 +176,7 @@ export function CheckoutDialog({
           return;
         }
         if (result.ok && result.status === "redirect_required" && result.checkoutUrl) {
-          window.open(result.checkoutUrl, "_blank", "noopener,noreferrer");
-          setStatusTitle("Secure checkout opened");
-          setStatusDescription(
-            "Complete payment in the new gateway tab. Your mentorship status will update after confirmation.",
-          );
-          setSuccess(true);
+          window.location.assign(result.checkoutUrl);
           return;
         }
 
@@ -162,8 +201,10 @@ export function CheckoutDialog({
             customerEmail: email,
             cardholderName: name,
             paymentMethod,
+            currency,
             cryptoAsset: paymentMethod === "crypto" ? cryptoOption.asset : undefined,
             cryptoNetwork: paymentMethod === "crypto" ? cryptoOption.network : undefined,
+            discountCode: appliedDiscount?.code,
           },
         });
 
@@ -174,12 +215,7 @@ export function CheckoutDialog({
           return;
         }
         if (result.ok && result.status === "redirect_required" && result.checkoutUrl) {
-          window.open(result.checkoutUrl, "_blank", "noopener,noreferrer");
-          setStatusTitle("Secure checkout opened");
-          setStatusDescription(
-            "Complete payment in the new gateway tab. Your news access will update after confirmation.",
-          );
-          setSuccess(true);
+          window.location.assign(result.checkoutUrl);
           return;
         }
 
@@ -204,8 +240,10 @@ export function CheckoutDialog({
           customerEmail: email,
           cardholderName: name,
           paymentMethod,
+          currency,
           cryptoAsset: paymentMethod === "crypto" ? cryptoOption.asset : undefined,
           cryptoNetwork: paymentMethod === "crypto" ? cryptoOption.network : undefined,
+          discountCode: appliedDiscount?.code,
         },
       });
 
@@ -216,12 +254,7 @@ export function CheckoutDialog({
         return;
       }
       if (result.ok && result.status === "redirect_required" && result.checkoutUrl) {
-        window.open(result.checkoutUrl, "_blank", "noopener,noreferrer");
-        setStatusTitle("Secure checkout opened");
-        setStatusDescription(
-          "Complete payment in the new gateway tab. Your live trading access will update after confirmation.",
-        );
-        setSuccess(true);
+        window.location.assign(result.checkoutUrl);
         return;
       }
 
@@ -244,11 +277,107 @@ export function CheckoutDialog({
     setEmail("");
     setPaymentMethod("card");
     setCryptoOption(cryptoPaymentOptions[0]);
+    setDiscountCode("");
+    setDiscountLoading(false);
+    setDiscountMessage("");
+    setAppliedDiscount(null);
+    setAcceptedTerms(false);
+  };
+
+  const handleDiscountInputChange = (value: string) => {
+    setDiscountCode(value.toUpperCase().replace(/\s+/g, ""));
+    setAppliedDiscount(null);
+    setDiscountMessage("");
+  };
+
+  const handleApplyDiscount = async () => {
+    if (!user) return;
+
+    const code = discountCode.trim();
+    if (!code) {
+      setDiscountMessage("Enter a discount code first.");
+      setAppliedDiscount(null);
+      return;
+    }
+
+    setDiscountLoading(true);
+    setDiscountMessage("");
+    setErrorMessage("");
+
+    try {
+      const result = await previewDiscountCode({
+        data: {
+          accessToken: session?.access_token ?? "",
+          checkoutKind: mentorshipPlanSlug ? "mentorship" : checkoutKind,
+          packageSlug:
+            !mentorshipPlanSlug && checkoutKind === "live"
+              ? (activePackage.slug as
+                  | "one_month"
+                  | "three_months"
+                  | "six_months"
+                  | "twelve_months")
+              : undefined,
+          planSlug: mentorshipPlanSlug,
+          discountCode: code,
+        },
+      });
+
+      if (result.ok && result.status === "discount_applied") {
+        setAppliedDiscount({
+          code: result.code,
+          originalAmountLabel: result.originalAmountLabel,
+          discountAmountLabel: result.discountAmountLabel,
+          discountedAmountLabel: result.discountedAmountLabel,
+          message: result.message,
+        });
+        setDiscountCode(result.code);
+        setDiscountMessage(result.message);
+        return;
+      }
+
+      setAppliedDiscount(null);
+      setDiscountMessage(result.message || "This discount code could not be applied.");
+    } catch (error) {
+      console.error(error);
+      setAppliedDiscount(null);
+      setDiscountMessage(error instanceof Error ? error.message : "Unable to apply discount code.");
+    } finally {
+      setDiscountLoading(false);
+    }
   };
 
   const openAuth = (mode: "signin" | "join") => {
     setAuthMode(mode);
     setAuthOpen(true);
+  };
+
+  const handleConnectDiscord = async () => {
+    if (!session?.access_token) return;
+
+    setDiscordLoading(true);
+    setDiscordError("");
+    setErrorMessage("");
+
+    try {
+      const result = await startDiscordConnection({
+        data: {
+          accessToken: session.access_token,
+          origin: window.location.origin,
+        },
+      });
+
+      if (result.ok && result.url) {
+        window.location.href = result.url;
+        return;
+      }
+
+      setDiscordError(result.message);
+    } catch (error) {
+      console.error(error);
+      setDiscordError(error instanceof Error ? error.message : "Unable to connect Discord.");
+    } finally {
+      setDiscordLoading(false);
+    }
   };
 
   return (
@@ -260,7 +389,7 @@ export function CheckoutDialog({
           if (!v) setTimeout(reset, 200);
         }}
       >
-        <DialogContent className="glass-strong max-h-[calc(100dvh-1.5rem)] max-w-md grid-rows-[auto_minmax(0,1fr)] overflow-hidden border-border/60 p-0 sm:max-w-lg">
+        <DialogContent className="glass-strong max-h-[calc(100dvh-1rem)] max-w-md grid-rows-[auto_minmax(0,1fr)] overflow-hidden border-border/60 p-0 sm:max-w-4xl">
           {success ? (
             <div className="p-8 text-center">
               <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-bull/15 text-bull">
@@ -277,15 +406,15 @@ export function CheckoutDialog({
             </div>
           ) : (
             <>
-              <DialogHeader className="shrink-0 border-b border-border/60 p-6 pb-4">
+              <DialogHeader className="shrink-0 border-b border-border/60 p-5 pb-4 sm:px-6 sm:py-4">
                 <DialogTitle className="font-display text-xl">Secure Checkout</DialogTitle>
                 <DialogDescription className="text-xs text-muted-foreground">
                   Encrypted payment · Cancel anytime
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="min-h-0 overflow-y-auto overscroll-contain">
-                <div className="px-6 pt-4">
+              <div className="min-h-0 overflow-y-auto overscroll-contain sm:grid sm:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)] sm:items-start sm:gap-5 sm:p-5 lg:p-6">
+                <div className="px-5 pt-4 sm:px-0 sm:pt-0">
                   <div className="rounded-xl border border-border/60 bg-background/40 p-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -303,13 +432,15 @@ export function CheckoutDialog({
                             {activePackage.badge}
                           </div>
                         )}
-                        {activePackage.originalPrice && (
+                        {(activePackage.originalPrice || appliedDiscount) && (
                           <div className="font-mono text-sm text-muted-foreground line-through">
-                            {activePackage.originalPrice}
+                            {formatCheckoutPrice(
+                              appliedDiscount?.originalAmountLabel ?? activePackage.originalPrice,
+                            )}
                           </div>
                         )}
                         <div className="font-mono text-2xl font-bold text-gradient-gold">
-                          {activePackage.price}
+                          {formatCheckoutPrice(payablePriceLabel)}
                         </div>
                       </div>
                     </div>
@@ -318,7 +449,11 @@ export function CheckoutDialog({
                         <button
                           key={option.duration}
                           type="button"
-                          onClick={() => setSelectedPackage(index)}
+                          onClick={() => {
+                            setSelectedPackage(index);
+                            setAppliedDiscount(null);
+                            setDiscountMessage("");
+                          }}
                           className={`rounded-lg border p-3 text-left transition-all ${
                             selectedPackage === index
                               ? "border-gold/60 bg-gold/10 ring-1 ring-gold/30"
@@ -334,7 +469,9 @@ export function CheckoutDialog({
                             )}
                           </div>
                           <div className="mt-2 flex items-baseline gap-2">
-                            <span className="font-mono text-lg font-bold">{option.price}</span>
+                            <span className="font-mono text-lg font-bold">
+                              {formatCheckoutPrice(option.price)}
+                            </span>
                           </div>
                         </button>
                       ))}
@@ -351,16 +488,50 @@ export function CheckoutDialog({
                       ))}
                     </ul>
                   </div>
-                  {needsDiscordConnection && (
-                    <div className="mt-3 rounded-xl border border-[#5865f2]/35 bg-[#5865f2]/10 p-3 text-xs leading-5 text-[#c8ceff]">
-                      Connect Discord from the header before paying if you want automatic server
-                      invite and role access after checkout.
+                  {needsDiscordConnection ? (
+                    <div className="mt-3 rounded-xl border border-[#5865f2]/40 bg-[#5865f2]/10 p-4 shadow-[0_0_34px_rgba(88,101,242,0.12)]">
+                      <div className="flex items-start gap-3">
+                        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#5865f2]/20 text-[#c8ceff]">
+                          <MessageCircle className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-display text-sm font-semibold text-foreground">
+                            Connect Discord to unlock checkout
+                          </p>
+                          <p className="mt-1 text-xs leading-5 text-[#c8ceff]/90">
+                            Payment opens only after Discord is connected, so your invite and paid role can be assigned automatically after purchase.
+                          </p>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="mt-3 border-[#5865f2]/50 bg-[#5865f2]/20 text-[#dbe0ff] hover:bg-[#5865f2]/30"
+                            variant="outline"
+                            onClick={handleConnectDiscord}
+                            disabled={discordLoading}
+                          >
+                            {discordLoading ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <MessageCircle className="h-4 w-4" />
+                            )}
+                            Connect Discord
+                          </Button>
+                          {discordError && (
+                            <p className="mt-2 text-xs leading-5 text-destructive">{discordError}</p>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  )}
+                  ) : user && !isStaff && discordConnection?.userId ? (
+                    <div className="mt-3 flex items-center gap-2 rounded-xl border border-bull/25 bg-bull/10 p-3 text-xs font-medium text-bull">
+                      <Check className="h-4 w-4" strokeWidth={3} />
+                      Discord connected. Checkout is ready.
+                    </div>
+                  ) : null}
                 </div>
 
                 {!user ? (
-                  <div className="p-6">
+                  <div className="p-5 sm:p-0">
                     <div className="rounded-xl border border-primary/30 bg-primary/10 p-5 text-center">
                       <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-primary/15 text-electric">
                         <Lock className="h-5 w-5" />
@@ -387,11 +558,11 @@ export function CheckoutDialog({
                     </div>
                   </div>
                 ) : isStaff ? (
-                  <div className="p-6">
+                  <div className="p-5 sm:p-0">
                     <StaffCheckoutNotice description="Admins and moderators cannot buy mentorship, coaching, live trading, or paid subscriptions from the client checkout. Use a regular member account to test purchases." />
                   </div>
                 ) : (
-                  <form onSubmit={handleSubmit} className="space-y-4 p-6">
+                  <form onSubmit={handleSubmit} className="space-y-4 p-5 sm:p-0">
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="sm:col-span-2">
                         <Label htmlFor="email" className="text-xs">
@@ -425,7 +596,7 @@ export function CheckoutDialog({
 
                       <div className="sm:col-span-2">
                         <Label className="text-xs">Payment method</Label>
-                        <div className="mt-1 grid grid-cols-2 gap-2">
+                        <div className="mt-2 grid grid-cols-2 gap-2">
                           {[
                             { value: "card" as const, label: "Card", icon: CreditCard },
                             { value: "crypto" as const, label: "Crypto", icon: Wallet },
@@ -452,58 +623,73 @@ export function CheckoutDialog({
                         </div>
                       </div>
 
-                      {paymentMethod === "card" ? (
-                        <div className="sm:col-span-2 rounded-xl border border-primary/30 bg-primary/10 p-4">
-                          <div className="flex items-start gap-3">
-                            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary/15 text-electric ring-1 ring-primary/30">
-                              <CreditCard className="h-4 w-4" />
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-semibold text-foreground">
-                                Hosted card checkout
-                              </h4>
-                              <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                                Card details are entered only on the connected payment provider
-                                page. ZacTrades does not collect or store card numbers, expiry
-                                dates, or CVC.
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
+                      {paymentMethod === "crypto" && (
                         <div className="sm:col-span-2 rounded-xl border border-gold/30 bg-gold/10 p-4">
-                          <Label htmlFor="crypto-network" className="text-xs">
-                            Crypto asset / network
-                          </Label>
-                          <select
-                            id="crypto-network"
-                            value={`${cryptoOption.asset}:${cryptoOption.network}`}
-                            onChange={(event) => {
-                              const nextOption =
-                                cryptoPaymentOptions.find(
-                                  (option) =>
-                                    `${option.asset}:${option.network}` === event.target.value,
-                                ) ?? cryptoPaymentOptions[0];
-                              setCryptoOption(nextOption);
-                            }}
-                            className="mt-1 h-10 w-full rounded-md border border-border/60 bg-background/55 px-3 text-sm text-foreground outline-none transition-colors focus:border-primary"
-                          >
-                            {cryptoPaymentOptions.map((option) => (
-                              <option
-                                key={`${option.asset}:${option.network}`}
-                                value={`${option.asset}:${option.network}`}
-                              >
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
+                          <div className="mb-4 rounded-lg border border-primary/20 bg-background/45 px-4 py-3 text-center shadow-inner shadow-primary/5">
+                            <p className="text-xs font-medium uppercase tracking-[0.28em] text-primary/80">
+                              Pay in crypto with
+                            </p>
+                            <p className="mt-1 text-xl font-bold text-foreground">
+                              <span className="text-primary">NOW</span>Payments
+                            </p>
+                          </div>
                           <p className="mt-3 text-xs leading-5 text-muted-foreground">
-                            Crypto payment opens in a hosted NOWPayments invoice when configured. Do
-                            not paste transaction hashes here; payment is confirmed only by a
-                            verified provider webhook.
+                            You will be redirected to NOWPayments. Choose or confirm the final coin
+                            and network on their secure invoice page. Payment is confirmed only by a
+                            verified NOWPayments IPN webhook.
                           </p>
                         </div>
                       )}
+
+                      <div className="sm:col-span-2 rounded-xl border border-border/60 bg-background/35 p-3">
+                        <Label htmlFor="discount-code" className="text-xs">
+                          Discount code
+                        </Label>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
+                          <div className="relative">
+                            <BadgePercent className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              id="discount-code"
+                              value={discountCode}
+                              onChange={(event) => handleDiscountInputChange(event.target.value)}
+                              placeholder="Enter code"
+                              className="bg-background/45 pl-9 uppercase"
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={discountLoading || !discountCode.trim()}
+                            onClick={handleApplyDiscount}
+                            className="border-primary/40 bg-primary/10 text-primary hover:bg-primary/15"
+                          >
+                            {discountLoading ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <BadgePercent className="h-4 w-4" />
+                            )}
+                            Apply
+                          </Button>
+                        </div>
+                        {discountMessage && (
+                          <p
+                            className={`mt-2 text-xs leading-5 ${
+                              appliedDiscount ? "text-bull" : "text-muted-foreground"
+                            }`}
+                          >
+                            {discountMessage}
+                          </p>
+                        )}
+                        {appliedDiscount && (
+                          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-bull/30 bg-bull/10 px-3 py-2 text-xs text-bull">
+                            <span>Discount applied: {appliedDiscount.code}</span>
+                            <span>
+                              -{formatCheckoutPrice(appliedDiscount.discountAmountLabel)} | Total{" "}
+                              {formatCheckoutPrice(appliedDiscount.discountedAmountLabel)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {errorMessage && (
@@ -513,10 +699,49 @@ export function CheckoutDialog({
                       </div>
                     )}
 
-                    <div className="sticky bottom-0 -mx-6 mt-2 border-t border-border/60 bg-background/95 px-6 py-4 backdrop-blur-xl">
+                    <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/60 bg-background/35 p-3 text-xs leading-5 text-muted-foreground">
+                      <Checkbox
+                        checked={acceptedTerms}
+                        onCheckedChange={(checked) => setAcceptedTerms(checked === true)}
+                        className="mt-0.5"
+                        aria-label="Accept terms and policies"
+                      />
+                      <span>
+                        I accept the{" "}
+                        <a
+                          href="/terms-of-service"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-semibold text-primary hover:text-primary/80"
+                        >
+                          Terms of Service
+                        </a>
+                        ,{" "}
+                        <a
+                          href="/privacy-policy"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-semibold text-primary hover:text-primary/80"
+                        >
+                          Privacy Policy
+                        </a>
+                        , and{" "}
+                        <a
+                          href="/refund-policy"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-semibold text-primary hover:text-primary/80"
+                        >
+                          Refund Policy
+                        </a>
+                        .
+                      </span>
+                    </label>
+
+                    <div className="sticky bottom-0 -mx-5 mt-2 border-t border-border/60 bg-background/95 px-5 py-4 backdrop-blur-xl sm:static sm:mx-0 sm:border-t-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-0">
                       <Button
                         type="submit"
-                        disabled={loading}
+                        disabled={loading || !acceptedTerms || needsDiscordConnection}
                         size="lg"
                         className="h-auto min-h-12 w-full whitespace-normal px-4 py-3 text-center text-sm font-semibold leading-tight text-primary-foreground glow-primary hover:opacity-90 sm:text-base"
                         style={{ background: "var(--gradient-primary)" }}
@@ -524,18 +749,39 @@ export function CheckoutDialog({
                         <span className="block w-full">
                           {loading
                             ? "Processing…"
-                            : paymentMethod === "crypto"
-                              ? `Pay ${activePackage.price} with Crypto`
-                              : `Pay ${activePackage.price} & Get Access`}
+                            : needsDiscordConnection
+                              ? "Connect Discord to Pay"
+                              : paymentMethod === "crypto"
+                              ? `Pay ${formatCheckoutPrice(payablePriceLabel)} with NOWPayments`
+                              : `Pay ${formatCheckoutPrice(payablePriceLabel)} & Get Access`}
                         </span>
                       </Button>
                     </div>
 
-                    <div className="flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
-                      <ShieldCheck className="h-3.5 w-3.5 text-bull" />
-                      {paymentMethod === "card"
-                        ? "Secured with 256-bit SSL encryption · PCI DSS compliant"
-                        : "Crypto checkout metadata is encrypted and recorded securely"}
+                    <div className="flex flex-wrap items-center justify-center gap-2 text-[11px] text-muted-foreground">
+                      <span className="flex items-center gap-2">
+                        <ShieldCheck className="h-3.5 w-3.5 text-bull" />
+                        {paymentMethod === "card"
+                          ? "Secured with 3D Secure"
+                          : "Secured crypto checkout by NOWPayments"}
+                      </span>
+
+                      {paymentMethod === "card" && (
+                        <span className="flex flex-wrap items-center justify-center gap-1.5">
+                          <span className="rounded-md bg-white px-1.5 py-0.5 text-[0.65rem] font-black tracking-tight text-[#143b8f] shadow-sm">
+                            VISA
+                          </span>
+                          <span className="flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 shadow-sm">
+                            <span className="relative flex h-3 w-5 items-center">
+                              <span className="absolute left-0 h-3 w-3 rounded-full bg-[#eb001b]" />
+                              <span className="absolute right-0 h-3 w-3 rounded-full bg-[#f79e1b] mix-blend-multiply" />
+                            </span>
+                            <span className="text-[0.48rem] font-bold lowercase text-slate-900">
+                              mastercard
+                            </span>
+                          </span>
+                        </span>
+                      )}
                     </div>
                   </form>
                 )}

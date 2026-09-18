@@ -16,6 +16,9 @@ dist-ssr
 .nitro
 .netlify/
 *.local
+tmp/
+output/
+.kilo/
 
 # Wrangler / Cloudflare
 .wrangler/

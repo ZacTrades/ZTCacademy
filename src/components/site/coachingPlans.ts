@@ -1,4 +1,4 @@
-import { MessageSquareText, Users } from "lucide-react";
+import { UserCheck, Users } from "lucide-react";
 
 import type { CheckoutPackage } from "@/components/site/liveTradingPackages";
 import { supabase } from "@/lib/supabase";
@@ -7,7 +7,7 @@ export type CoachingPlanSlug = "one_to_one" | "group";
 
 export type CoachingPlan = {
   slug: CoachingPlanSlug;
-  icon: typeof MessageSquareText;
+  icon: typeof UserCheck;
   title: string;
   desc: string;
   price: string;
@@ -46,7 +46,7 @@ export type CoachingPlanRow = {
 export const defaultCoachingPlans: CoachingPlan[] = [
   {
     slug: "one_to_one",
-    icon: MessageSquareText,
+    icon: UserCheck,
     title: "1-to-1 Coaching",
     desc: "The elite private coaching experience, tailored to you with live sessions, a personal trading framework, mindset work, and prop-firm accountability.",
     price: "$980.99",
