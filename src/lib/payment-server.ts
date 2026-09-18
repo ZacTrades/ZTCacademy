@@ -585,7 +585,11 @@ function discordAllowPendingAccess() {
   return readServerEnv("DISCORD_ALLOW_PENDING_ACCESS") === "true";
 }
 
-async function provisionPendingDiscordAccess(adminClient: AdminClient, userId: string, product: PaymentProduct) {
+async function provisionPendingDiscordAccess(
+  adminClient: AdminClient,
+  userId: string,
+  product: PaymentProduct,
+) {
   if (!discordAllowPendingAccess()) return;
 
   if (product.kind === "live") {
@@ -1963,15 +1967,21 @@ async function insertPayzoneWebhookEvent(
 }
 
 function normalizePayzoneStatus(status: string | undefined) {
-  return String(status ?? "").trim().toUpperCase();
+  return String(status ?? "")
+    .trim()
+    .toUpperCase();
 }
 
 function normalizePayzoneTransactionState(state: string | undefined) {
-  return String(state ?? "").trim().toUpperCase();
+  return String(state ?? "")
+    .trim()
+    .toUpperCase();
 }
 
 function normalizePayzoneTransactionType(type: string | undefined) {
-  return String(type ?? "").trim().toUpperCase();
+  return String(type ?? "")
+    .trim()
+    .toUpperCase();
 }
 
 function payzoneApprovedTransaction(payload: PayzoneCallbackPayload) {
@@ -1981,13 +1991,16 @@ function payzoneApprovedTransaction(payload: PayzoneCallbackPayload) {
     return (
       normalizePayzoneTransactionState(transaction.state) === "APPROVED" &&
       Number(transaction.resultCode) === 0 &&
-      (!type || type === "CHARGE" || type === "AUTHORIZATION")
+      (!type || type === "CHARGE" || type === "AUTHORIZATION" || type === "SETTLE")
     );
   });
 }
 
 function isPayzonePaidStatus(payload: PayzoneCallbackPayload) {
-  return Boolean(payzoneApprovedTransaction(payload)) && !isPayzoneTerminalFailure(payload.status);
+  return (
+    normalizePayzoneStatus(payload.status) === "CHARGED" &&
+    Boolean(payzoneApprovedTransaction(payload))
+  );
 }
 
 function isPayzoneTerminalFailure(status: string | undefined) {
