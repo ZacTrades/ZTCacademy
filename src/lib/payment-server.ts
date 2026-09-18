@@ -2031,6 +2031,17 @@ function validatePayzoneAmount(target: PaymentTarget, payload: PayzoneCallbackPa
   );
 }
 
+function logPayzoneCallback(message: string, details: Record<string, unknown> = {}) {
+  console.info(
+    "[payzone-callback]",
+    message,
+    JSON.stringify({
+      ...details,
+      at: new Date().toISOString(),
+    }),
+  );
+}
+
 export async function handlePayzoneCallbackRequest(
   request: Request,
   env: Record<string, string | undefined>,
@@ -2038,6 +2049,7 @@ export async function handlePayzoneCallbackRequest(
   globalThis.__ZACTRADES_SERVER_ENV__ = env;
 
   if (request.method !== "POST") {
+    logPayzoneCallback("method_not_allowed", { method: request.method });
     return Response.json({ status: "KO", message: "Method not allowed" }, { status: 405 });
   }
 
@@ -2048,16 +2060,25 @@ export async function handlePayzoneCallbackRequest(
   const signature = request.headers.get("x-callback-signature") ?? "";
 
   if (!supabaseUrl || !serviceRoleKey || !notificationKey || !merchantAccount) {
+    logPayzoneCallback("webhook_not_configured", {
+      hasSupabaseUrl: Boolean(supabaseUrl),
+      hasServiceRoleKey: Boolean(serviceRoleKey),
+      hasNotificationKey: Boolean(notificationKey),
+      hasMerchantAccount: Boolean(merchantAccount),
+    });
     return Response.json({ status: "KO", message: "Webhook not configured" }, { status: 503 });
   }
 
   if (!signature) {
+    logPayzoneCallback("missing_signature");
     return Response.json({ status: "KO", message: "Missing signature" }, { status: 401 });
   }
 
   const rawBody = await request.text();
+  logPayzoneCallback("received", { bodyLength: rawBody.length });
   const expectedSignature = await hmacSha256Hex(notificationKey, rawBody);
   if (!safeEqualHex(expectedSignature, signature)) {
+    logPayzoneCallback("invalid_signature", { bodyLength: rawBody.length });
     return Response.json({ status: "KO", message: "Error signature" }, { status: 401 });
   }
 
@@ -2065,26 +2086,49 @@ export async function handlePayzoneCallbackRequest(
   try {
     payload = JSON.parse(rawBody) as PayzoneCallbackPayload;
   } catch {
+    logPayzoneCallback("invalid_json");
     return Response.json({ status: "KO", message: "Invalid JSON" }, { status: 400 });
   }
 
   if (payload.merchantAccount && payload.merchantAccount !== merchantAccount) {
+    logPayzoneCallback("merchant_mismatch", {
+      payloadMerchantAccount: payload.merchantAccount,
+      expectedMerchantAccount: merchantAccount,
+      orderId: payload.orderId ?? null,
+      status: payload.status ?? null,
+    });
     return Response.json({ status: "KO", message: "Merchant mismatch" }, { status: 400 });
   }
 
   const eventId = payzoneEventId(payload);
   if (!eventId) {
+    logPayzoneCallback("missing_event_id", {
+      orderId: payload.orderId ?? null,
+      status: payload.status ?? null,
+    });
     return Response.json({ status: "KO", message: "Missing event id" }, { status: 400 });
   }
+
+  logPayzoneCallback("validated", {
+    eventId,
+    orderId: payload.orderId ?? null,
+    invoiceId: payload.id ?? null,
+    status: payload.status ?? null,
+  });
 
   const adminClient = createAdminClient(supabaseUrl, serviceRoleKey);
   const insertResult = await insertPayzoneWebhookEvent(adminClient, payload, eventId);
 
   if (insertResult.duplicate) {
+    logPayzoneCallback("duplicate", { eventId });
     return Response.json({ status: "OK", message: "Duplicate callback ignored" });
   }
 
   if (insertResult.error) {
+    logPayzoneCallback("event_record_failed", {
+      eventId,
+      error: insertResult.error.message,
+    });
     return Response.json({ status: "KO", message: "Event record failed" }, { status: 500 });
   }
 
@@ -2099,6 +2143,12 @@ export async function handlePayzoneCallbackRequest(
   );
 
   if (!target) {
+    logPayzoneCallback("target_not_found", {
+      eventId,
+      orderId: payload.orderId ?? null,
+      invoiceId: payload.id ?? null,
+      status: payload.status ?? null,
+    });
     await markWebhookEventProcessed(
       adminClient,
       eventId,
@@ -2110,12 +2160,22 @@ export async function handlePayzoneCallbackRequest(
   }
 
   if (target.status === "paid") {
+    logPayzoneCallback("already_paid", { eventId, targetKind: target.kind });
     await markWebhookEventProcessed(adminClient, eventId, true, undefined, "payzone");
     return Response.json({ status: "OK", message: "Already paid" });
   }
 
   if (isPayzonePaidStatus(payload)) {
     if (!validatePayzoneAmount(target, payload)) {
+      logPayzoneCallback("amount_or_currency_mismatch", {
+        eventId,
+        targetKind: target.kind,
+        targetAmountLabel: target.amountLabel,
+        payloadAmount:
+          payload.lineItem?.amount ?? payzoneApprovedTransaction(payload)?.amount ?? null,
+        payloadCurrency:
+          payload.lineItem?.currency ?? payzoneApprovedTransaction(payload)?.currency ?? null,
+      });
       await markWebhookEventProcessed(
         adminClient,
         eventId,
@@ -2136,10 +2196,16 @@ export async function handlePayzoneCallbackRequest(
       ),
     });
     await markWebhookEventProcessed(adminClient, eventId, true, undefined, "payzone");
+    logPayzoneCallback("paid_recorded", { eventId, targetKind: target.kind });
     return Response.json({ status: "OK", message: "Status recorded successfully" });
   }
 
   if (isPayzoneTerminalFailure(payload.status)) {
+    logPayzoneCallback("terminal_failure", {
+      eventId,
+      targetKind: target.kind,
+      status: payload.status ?? null,
+    });
     await applyFailedTarget(adminClient, target, {
       providerLabel: "Payzone",
       rawStatus: payload.status ?? "unknown",
@@ -2150,6 +2216,11 @@ export async function handlePayzoneCallbackRequest(
   }
 
   await markWebhookEventProcessed(adminClient, eventId, true, undefined, "payzone");
+  logPayzoneCallback("pending_or_unhandled_status", {
+    eventId,
+    targetKind: target.kind,
+    status: payload.status ?? null,
+  });
   return Response.json({ status: "OK", message: "Status recorded successfully" });
 }
 
