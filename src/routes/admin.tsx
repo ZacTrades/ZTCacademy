@@ -295,7 +295,6 @@ function AdminPage() {
   const [profiles, setProfiles] = useState<UserProfileRow[]>([]);
   const [activePanel, setActivePanel] = useState<AdminPanelKey>("staff");
   const [liveExtensionDays, setLiveExtensionDays] = useState("7");
-  const [liveExtensionReason, setLiveExtensionReason] = useState("Business holiday");
   const [indicatorDeleteTarget, setIndicatorDeleteTarget] = useState<IndicatorRow | null>(null);
   const [toolDeleteTarget, setToolDeleteTarget] = useState<EditableTool | null>(null);
   const [communitySocialDeleteTarget, setCommunitySocialDeleteTarget] =
@@ -640,6 +639,87 @@ function AdminPage() {
     setErrorMessage("");
   };
 
+  const addTradingTool = () => {
+    setTools((current) => {
+      const existingSlugs = new Set(current.map((item) => item.slug));
+      let slug = slugify("new-trading-tool");
+      let suffix = 2;
+
+      while (existingSlugs.has(slug)) {
+        slug = slugify(`new-trading-tool-${suffix}`);
+        suffix += 1;
+      }
+
+      const nextOrder = current.length
+        ? Math.max(...current.map((item) => item.display_order)) + 1
+        : 1;
+
+      const newTool: EditableTool = {
+        slug,
+        name: "New Trading Tool",
+        category: "Trading Tool",
+        description: "Add a short description for this trading tool.",
+        promo_code: "ZACTRADES",
+        discount: "Partner link",
+        url: "https://",
+        logo_url: null,
+        highlights: ["Main benefit"],
+        highlightsText: "Main benefit",
+        is_active: true,
+        display_order: nextOrder,
+      };
+
+      return [newTool, ...current];
+    });
+    setActivePanel("tools");
+    setMessage("New trading tool added. Fill the details, then save it.");
+    setErrorMessage("");
+  };
+
+  const addPropFirm = () => {
+    setPropFirms((current) => {
+      const existingSlugs = new Set(current.map((item) => item.slug));
+      let slug = slugify("new-prop-firm");
+      let suffix = 2;
+
+      while (existingSlugs.has(slug)) {
+        slug = slugify(`new-prop-firm-${suffix}`);
+        suffix += 1;
+      }
+
+      const nextOrder = current.length
+        ? Math.max(...current.map((item) => item.display_order)) + 1
+        : 1;
+
+      const newPropFirm: EditablePropFirm = {
+        slug,
+        name: "New Prop Firm",
+        description: "Add a short description for this prop firm.",
+        logo: "PF",
+        logo_url: null,
+        discount: "Max Discount",
+        promo_code: "ZACTRADES",
+        color: "#38bdf8",
+        rating: 4,
+        reviews: 0,
+        max_capital: "$100K",
+        profit_split: "80%",
+        payout: "Bi-weekly",
+        features: ["MT5", "Web"],
+        featuresText: "MT5\nWeb",
+        url: "https://",
+        is_featured: false,
+        is_active: true,
+        display_order: nextOrder,
+      };
+
+      return [newPropFirm, ...current];
+    });
+    setActivePanel("propfirms");
+    setMessage("New prop firm added. Fill the details, then save it.");
+    setErrorMessage("");
+  };
+
   const updateProfile = (id: string, patch: Partial<UserProfileRow>) => {
     setProfiles((current) =>
       current.map((profile) => (profile.id === id ? { ...profile, ...patch } : profile)),
@@ -784,13 +864,19 @@ function AdminPage() {
       return;
     }
 
+    const confirmed = window.confirm(
+      `Extend active paid Live Trading access by ${extraDays} day${extraDays === 1 ? "" : "s"}?`,
+    );
+
+    if (!confirmed) return;
+
     setSavingKey("live:extension");
     setMessage("");
     setErrorMessage("");
 
     const { data, error } = await supabase.rpc("extend_active_live_trading_access", {
       p_extra_days: extraDays,
-      p_reason: liveExtensionReason.trim() || null,
+      p_reason: null,
     });
 
     if (error) {
@@ -819,7 +905,7 @@ function AdminPage() {
     }
 
     setMessage(
-      `Live Trading access extended by ${extraDays} day${
+      `Success: Live Trading access extended by ${extraDays} day${
         extraDays === 1 ? "" : "s"
       } for ${updatedRows.length} active paid user${updatedRows.length === 1 ? "" : "s"}.`,
     );
@@ -1864,6 +1950,17 @@ function AdminPage() {
                       <AdminSection
                         title="Propfirms"
                         description="Edit partner firm cards, promo codes, discounts, ratings, and featured status."
+                        action={
+                          <Button
+                            type="button"
+                            onClick={addPropFirm}
+                            className="text-primary-foreground glow-primary hover:opacity-90"
+                            style={{ background: "var(--gradient-primary)" }}
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add Prop Firm
+                          </Button>
+                        }
                       >
                         {propFirms.map((item) => (
                           <PropFirmEditor
@@ -1887,10 +1984,8 @@ function AdminPage() {
                         <LiveAccessExtensionTool
                           activeCount={extendableLiveTradingProfiles.length}
                           days={liveExtensionDays}
-                          reason={liveExtensionReason}
                           saving={savingKey === "live:extension"}
                           onDaysChange={setLiveExtensionDays}
-                          onReasonChange={setLiveExtensionReason}
                           onSubmit={extendLiveTradingAccess}
                         />
                         {livePackages.map((item) => (
@@ -1928,6 +2023,17 @@ function AdminPage() {
                       <AdminSection
                         title="Trading Tools"
                         description="Edit the tools used for consistent execution, including discounts and promo codes."
+                        action={
+                          <Button
+                            type="button"
+                            onClick={addTradingTool}
+                            className="text-primary-foreground glow-primary hover:opacity-90"
+                            style={{ background: "var(--gradient-primary)" }}
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add Trading Tool
+                          </Button>
+                        }
                       >
                         {tools.map((item) => (
                           <ToolEditor
@@ -3097,24 +3203,20 @@ function LivePackageEditor({
 function LiveAccessExtensionTool({
   activeCount,
   days,
-  reason,
   saving,
   onDaysChange,
-  onReasonChange,
   onSubmit,
 }: {
   activeCount: number;
   days: string;
-  reason: string;
   saving: boolean;
   onDaysChange: (value: string) => void;
-  onReasonChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
     <form onSubmit={onSubmit} className="glass relative overflow-hidden rounded-2xl p-5 md:p-6">
       <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-gold/20 blur-3xl" />
-      <div className="relative grid gap-5 lg:grid-cols-[1.1fr_1.4fr] lg:items-end">
+      <div className="relative grid gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
         <div>
           <Badge variant="outline" className="mb-4 w-fit border-gold/40 bg-gold/10 text-gold">
             Live Trading pause
@@ -3123,29 +3225,16 @@ function LiveAccessExtensionTool({
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
             Adds days only to current paid Live Trading users with a future expiry date.
           </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <AdminStat label="Eligible live users" value={String(activeCount)} />
-            <AdminStat label="Target" value="Live only" />
-          </div>
         </div>
 
         <div className="grid gap-4">
-          <div className="grid gap-4 sm:grid-cols-[160px_1fr]">
-            <Field
-              id="live-extension-days"
-              label="Extra days"
-              value={days}
-              onChange={onDaysChange}
-              placeholder="7"
-            />
-            <TextareaField
-              id="live-extension-reason"
-              label="Reason"
-              value={reason}
-              onChange={onReasonChange}
-              placeholder="Business holiday"
-            />
-          </div>
+          <Field
+            id="live-extension-days"
+            label="Extra days"
+            value={days}
+            onChange={onDaysChange}
+            placeholder="7"
+          />
 
           <Button
             type="submit"
@@ -3357,21 +3446,12 @@ function ToolEditor({
               onChange={(value) => onChange(item.slug, { discount: value })}
             />
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field
-              id={`${item.slug}-tool-url`}
-              label="URL"
-              value={item.url}
-              onChange={(value) => onChange(item.slug, { url: value })}
-            />
-            <Field
-              id={`${item.slug}-tool-logo-url`}
-              label="Logo image URL"
-              value={item.logo_url ?? ""}
-              onChange={(value) => onChange(item.slug, { logo_url: value.trim() || null })}
-              placeholder="https://example.com/logo.png"
-            />
-          </div>
+          <Field
+            id={`${item.slug}-tool-url`}
+            label="URL"
+            value={item.url}
+            onChange={(value) => onChange(item.slug, { url: value })}
+          />
           <LogoFileInput
             id={`${item.slug}-tool-logo-file`}
             label="Upload logo"

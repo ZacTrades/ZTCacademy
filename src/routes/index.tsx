@@ -1041,7 +1041,7 @@ const toolThemes = [
   {
     accent: "#00a3ff",
     halo: "rgba(0, 163, 255, 0.2)",
-    badge: "MAX DISCOUNT%",
+    badge: "BEST CHARTS",
     subtitle: "CHARTING PLATFORM",
     logo: "TradingView",
   },
@@ -1329,6 +1329,42 @@ type MemberReviewRow = {
   created_at: string;
   image_urls: string[] | null;
 };
+
+function reviewAccessBadges(planLabel?: string) {
+  return (planLabel ?? "")
+    .split("+")
+    .map((label) => label.trim())
+    .filter(Boolean)
+    .map((label) => {
+      const normalized = label.toLowerCase();
+
+      if (normalized === "live trading") {
+        return {
+          label: "Premium Access",
+          className: "border-gold/45 bg-gold/10 text-gold",
+        };
+      }
+
+      if (normalized === "1-to-1 coaching") {
+        return {
+          label: "1-to-1 Coaching",
+          className: "border-bull/45 bg-bull/10 text-bull",
+        };
+      }
+
+      if (normalized === "training group coaching" || normalized === "group coaching") {
+        return {
+          label: "Group Coaching",
+          className: "border-sky-400/45 bg-sky-400/10 text-sky-300",
+        };
+      }
+
+      return {
+        label,
+        className: "border-primary/35 bg-primary/10 text-electric",
+      };
+    });
+}
 
 function Testimonials() {
   const { user, isStaff } = useAuth();
@@ -1654,83 +1690,92 @@ function Testimonials() {
         </motion.div>
 
         <div className="mt-7 grid gap-5 md:mt-9 md:grid-cols-2">
-          {visibleReviews.map((review, i) => (
-            <motion.div
-              key={`${review.name}-${review.time}`}
-              {...fadeUp}
-              transition={{ ...fadeUp.transition, delay: (i % 3) * 0.06 }}
-              className="glass group flex h-full flex-col overflow-hidden rounded-2xl border-border/60 bg-[#1f2024]/70 transition-all hover:-translate-y-1 hover:border-primary/35 hover:bg-[#23252b]/80"
-            >
-              <div className="flex items-start gap-3 p-5">
-                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary/15 text-sm font-bold text-primary ring-1 ring-primary/25">
-                  {review.name[0]}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={`font-display text-lg font-bold ${review.tone}`}>
-                      {review.name}
-                    </span>
-                    {review.planLabel ? (
-                      <span className="rounded-full border border-primary/35 bg-primary/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-electric">
-                        {review.planLabel}
-                      </span>
-                    ) : (
-                      review.badges.map((badge) => (
-                        <span
-                          key={`${review.name}-${badge}`}
-                          className="rounded-md bg-muted/60 px-1.5 py-0.5 text-[10px] font-bold text-foreground ring-1 ring-white/10"
-                        >
-                          {badge}
-                        </span>
-                      ))
-                    )}
-                    {review.rating ? (
-                      <span className="inline-flex items-center gap-0.5 rounded-full border border-gold/35 bg-gold/10 px-2.5 py-1 text-gold">
-                        {Array.from({ length: 5 }).map((_, starIndex) => (
-                          <Star
-                            key={`${review.name}-rating-${starIndex}`}
-                            className={`h-3.5 w-3.5 ${
-                              starIndex < (review.rating ?? 0)
-                                ? "fill-gold text-gold"
-                                : "text-muted-foreground/35"
-                            }`}
-                          />
-                        ))}
-                      </span>
-                    ) : null}
-                    <span className="text-xs font-medium text-muted-foreground">{review.time}</span>
+          {visibleReviews.map((review, i) => {
+            const accessBadges = reviewAccessBadges(review.planLabel);
+
+            return (
+              <motion.div
+                key={`${review.name}-${review.time}`}
+                {...fadeUp}
+                transition={{ ...fadeUp.transition, delay: (i % 3) * 0.06 }}
+                className="glass group flex h-full flex-col overflow-hidden rounded-2xl border-border/60 bg-[#1f2024]/70 transition-all hover:-translate-y-1 hover:border-primary/35 hover:bg-[#23252b]/80"
+              >
+                <div className="flex items-start gap-3 p-5">
+                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary/15 text-sm font-bold text-primary ring-1 ring-primary/25">
+                    {review.name[0]}
                   </div>
-                  <div className="mt-3 pr-2 text-sm leading-7 text-foreground/95 md:text-[15px]">
-                    <p className="whitespace-pre-line">
-                      <span className="mr-2 rounded-md bg-primary/25 px-1.5 py-0.5 font-semibold text-primary">
-                        @Zac Trades
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-display text-lg font-bold text-white">
+                        {review.name}
                       </span>
-                      {review.quote}
-                    </p>
-                    {review.imageUrls?.length ? (
-                      <div className="mt-4 grid grid-cols-2 gap-3">
-                        {review.imageUrls.map((imageUrl, imageIndex) => (
-                          <a
-                            key={`${review.name}-${review.time}-image-${imageIndex}`}
-                            href={imageUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="group/image overflow-hidden rounded-2xl border border-primary/20 bg-background/45"
-                          >
-                            <img
-                              src={imageUrl}
-                              alt={`${review.name} review image ${imageIndex + 1}`}
-                              className="aspect-video w-full object-cover transition-transform duration-300 group-hover/image:scale-105"
+                      {accessBadges.length
+                        ? accessBadges.map((badge) => (
+                            <span
+                              key={`${review.name}-${badge.label}`}
+                              className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${badge.className}`}
+                            >
+                              {badge.label}
+                            </span>
+                          ))
+                        : review.badges.map((badge) => (
+                            <span
+                              key={`${review.name}-${badge}`}
+                              className="rounded-md bg-muted/60 px-1.5 py-0.5 text-[10px] font-bold text-foreground ring-1 ring-white/10"
+                            >
+                              {badge}
+                            </span>
+                          ))}
+                      {review.rating ? (
+                        <span className="inline-flex items-center gap-0.5 rounded-full border border-gold/35 bg-gold/10 px-2.5 py-1 text-gold">
+                          {Array.from({ length: 5 }).map((_, starIndex) => (
+                            <Star
+                              key={`${review.name}-rating-${starIndex}`}
+                              className={`h-3.5 w-3.5 ${
+                                starIndex < (review.rating ?? 0)
+                                  ? "fill-gold text-gold"
+                                  : "text-muted-foreground/35"
+                              }`}
                             />
-                          </a>
-                        ))}
-                      </div>
-                    ) : null}
+                          ))}
+                        </span>
+                      ) : null}
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {review.time}
+                      </span>
+                    </div>
+                    <div className="mt-3 pr-2 text-sm leading-7 text-foreground/95 md:text-[15px]">
+                      <p className="whitespace-pre-line">
+                        <span className="mr-2 rounded-md bg-primary/25 px-1.5 py-0.5 font-semibold text-primary">
+                          @Zac Trades
+                        </span>
+                        {review.quote}
+                      </p>
+                      {review.imageUrls?.length ? (
+                        <div className="mt-4 grid grid-cols-2 gap-3">
+                          {review.imageUrls.map((imageUrl, imageIndex) => (
+                            <a
+                              key={`${review.name}-${review.time}-image-${imageIndex}`}
+                              href={imageUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="group/image overflow-hidden rounded-2xl border border-primary/20 bg-background/45"
+                            >
+                              <img
+                                src={imageUrl}
+                                alt={`${review.name} review image ${imageIndex + 1}`}
+                                className="aspect-video w-full object-cover transition-transform duration-300 group-hover/image:scale-105"
+                              />
+                            </a>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
         </div>
 
         {hasMoreReviews && (

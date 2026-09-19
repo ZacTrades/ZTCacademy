@@ -142,19 +142,24 @@ const curatedTradingToolUrls = new Map(defaultTradingTools.map((tool) => [tool.s
 
 function mergeCuratedTradingTools(data: TradingToolRow[] | null | undefined) {
   const rowsBySlug = new Map((data ?? []).map((tool) => [tool.slug, tool]));
+  const curatedSlugs = new Set(defaultTradingTools.map((tool) => tool.slug));
+  const customRows = (data ?? []).filter((tool) => !curatedSlugs.has(tool.slug));
 
-  return defaultTradingTools.map((fallback) => {
-    const stored = rowsBySlug.get(fallback.slug);
+  return [
+    ...defaultTradingTools.map((fallback) => {
+      const stored = rowsBySlug.get(fallback.slug);
 
-    if (!stored) return fallback;
+      if (!stored) return fallback;
 
-    return {
-      ...fallback,
-      ...stored,
-      url: curatedTradingToolUrls.get(fallback.slug) ?? fallback.url,
-      display_order: fallback.display_order,
-    };
-  });
+      return {
+        ...fallback,
+        ...stored,
+        url: curatedTradingToolUrls.get(fallback.slug) ?? fallback.url,
+        display_order: fallback.display_order,
+      };
+    }),
+    ...customRows,
+  ].sort((first, second) => first.display_order - second.display_order);
 }
 
 export const defaultPropFirms: PropFirmRow[] = [
@@ -311,19 +316,24 @@ const curatedPropFirmUrls = new Map(defaultPropFirms.map((firm) => [firm.slug, f
 
 function mergeCuratedPropFirms(data: PropFirmRow[] | null | undefined) {
   const rowsBySlug = new Map((data ?? []).map((firm) => [firm.slug, firm]));
+  const curatedSlugs = new Set(defaultPropFirms.map((firm) => firm.slug));
+  const customRows = (data ?? []).filter((firm) => !curatedSlugs.has(firm.slug));
 
-  return defaultPropFirms.map((fallback) => {
-    const stored = rowsBySlug.get(fallback.slug);
+  return [
+    ...defaultPropFirms.map((fallback) => {
+      const stored = rowsBySlug.get(fallback.slug);
 
-    if (!stored) return fallback;
+      if (!stored) return fallback;
 
-    return {
-      ...fallback,
-      ...stored,
-      url: curatedPropFirmUrls.get(fallback.slug) ?? fallback.url,
-      display_order: fallback.display_order,
-    };
-  });
+      return {
+        ...fallback,
+        ...stored,
+        url: curatedPropFirmUrls.get(fallback.slug) ?? fallback.url,
+        display_order: fallback.display_order,
+      };
+    }),
+    ...customRows,
+  ].sort((first, second) => first.display_order - second.display_order);
 }
 
 export async function fetchIndicators() {
