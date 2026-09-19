@@ -875,7 +875,7 @@ export async function handleDiscordRoleReconcileRequest(
 }
 
 function validateDiscordCronRequest(request: Request, env: Record<string, string | undefined>) {
-  const cronSecret = env.DISCORD_CRON_SECRET;
+  const cronSecret = env.DISCORD_CRON_SECRET ?? readServerEnv("DISCORD_CRON_SECRET");
 
   if (!cronSecret) {
     return Response.json(

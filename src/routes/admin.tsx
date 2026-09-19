@@ -84,7 +84,7 @@ export const Route = createFileRoute("/admin")({
       { title: "Admin | ZacTrades" },
       {
         name: "description",
-        content: "ZacTrades admin controls for coaching plan pricing.",
+        content: "ZacTrades admin controls for site content, discounts, members, and reviews.",
       },
     ],
   }),
@@ -695,11 +695,11 @@ function AdminPage() {
       title: plan.title.trim(),
       description: plan.description.trim(),
       display_price: plan.display_price.trim(),
-      promotion_enabled: plan.promotion_enabled,
-      promotion_label: plan.promotion_label?.trim() || null,
-      promotion_original_price: plan.promotion_original_price?.trim() || null,
-      promotion_note: plan.promotion_note?.trim() || null,
-      promotion_ends_at: plan.promotion_ends_at?.trim() || null,
+      promotion_enabled: false,
+      promotion_label: null,
+      promotion_original_price: null,
+      promotion_note: null,
+      promotion_ends_at: null,
       duration: plan.duration.trim(),
       checkout_price: plan.checkout_price.trim(),
       checkout_monthly_label: plan.checkout_monthly_label.trim(),
@@ -1548,8 +1548,8 @@ function AdminPage() {
     },
     {
       key: "coaching" as const,
-      title: "Coaching Promos",
-      description: "Manage coaching prices and limited offers.",
+      title: "Mentorship Offers",
+      description: "Edit 1-to-1 and formation group coaching.",
       count: plans.length,
       icon: BadgeDollarSign,
     },
@@ -1737,11 +1737,11 @@ function AdminPage() {
 
                     {visibleActivePanel === "coaching" && (
                       <AdminSection
-                        title="Coaching Prices & Promotions"
-                        description="Edit 1-to-1 coaching and group coaching pricing, promo labels, original prices, and campaign notes."
+                        title="Mentorship Offers"
+                        description="Edit the two mentorship offers shown on the site. Promo campaigns are handled only with discount codes."
                       >
                         {plans.map((plan) => (
-                          <PlanEditor
+                          <MentorshipPlanEditor
                             key={plan.slug}
                             plan={plan}
                             saving={savingKey === `coaching:${plan.slug}`}
@@ -2335,7 +2335,7 @@ function AdminPage() {
   );
 }
 
-function PlanEditor({
+function MentorshipPlanEditor({
   plan,
   saving,
   onChange,
@@ -2346,6 +2346,8 @@ function PlanEditor({
   onChange: (slug: CoachingPlanSlug, patch: Partial<EditablePlan>) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>, plan: EditablePlan) => void;
 }) {
+  const label = plan.slug === "one_to_one" ? "1-to-1 Coaching" : "Formation Group Coaching";
+
   return (
     <form
       onSubmit={(event) => onSubmit(event, plan)}
@@ -2353,27 +2355,36 @@ function PlanEditor({
         plan.is_featured ? "border-gold/35" : "border-primary/20"
       }`}
     >
-      <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-primary/20 blur-3xl" />
+      <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-primary/15 blur-3xl" />
       <div className="relative">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <Badge variant="outline" className="mb-4 border-primary/40 text-xs">
-              {plan.slug === "one_to_one" ? "1-to-1" : "Group"}
+            <Badge variant="outline" className="mb-4 border-primary/40 text-xs text-electric">
+              {label}
             </Badge>
             <h2 className="font-display text-xl font-bold sm:text-2xl">{plan.title}</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Visible on the homepage mentorship section.
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Edit the offer content and checkout price. Use discount codes for promotions.
             </p>
           </div>
-          <div className="hidden h-12 w-12 shrink-0 sm:grid place-items-center rounded-xl bg-gold/15 text-gold ring-1 ring-gold/30">
-            <BadgeDollarSign className="h-5 w-5" />
+          <div className="flex shrink-0 gap-2">
+            <ToggleButton
+              active={plan.is_active}
+              label="Visible"
+              onClick={() => onChange(plan.slug, { is_active: !plan.is_active })}
+            />
+            <ToggleButton
+              active={plan.is_featured}
+              label="Featured"
+              onClick={() => onChange(plan.slug, { is_featured: !plan.is_featured })}
+            />
           </div>
         </div>
 
         <div className="mt-6 grid gap-4">
           <div>
             <Label htmlFor={`${plan.slug}-title`} className="text-xs">
-              Plan title
+              Offer title
             </Label>
             <Input
               id={`${plan.slug}-title`}
@@ -2398,13 +2409,13 @@ function PlanEditor({
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor={`${plan.slug}-display-price`} className="text-xs">
-                Promo/current homepage price
+                Display price
               </Label>
               <Input
                 id={`${plan.slug}-display-price`}
                 value={plan.display_price}
                 onChange={(event) => onChange(plan.slug, { display_price: event.target.value })}
-                placeholder="$499/mo"
+                placeholder="$499"
                 className="mt-1 bg-background/45"
               />
             </div>
@@ -2421,6 +2432,20 @@ function PlanEditor({
               />
             </div>
             <div>
+              <Label htmlFor={`${plan.slug}-monthly-label`} className="text-xs">
+                Checkout price label
+              </Label>
+              <Input
+                id={`${plan.slug}-monthly-label`}
+                value={plan.checkout_monthly_label}
+                onChange={(event) =>
+                  onChange(plan.slug, { checkout_monthly_label: event.target.value })
+                }
+                placeholder="$499"
+                className="mt-1 bg-background/45"
+              />
+            </div>
+            <div>
               <Label htmlFor={`${plan.slug}-duration`} className="text-xs">
                 Duration
               </Label>
@@ -2430,80 +2455,6 @@ function PlanEditor({
                 onChange={(event) => onChange(plan.slug, { duration: event.target.value })}
                 className="mt-1 bg-background/45"
               />
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-gold/25 bg-gold/10 p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="flex items-center gap-2 font-display text-lg font-bold">
-                  <BadgePercent className="h-5 w-5 text-gold" />
-                  Promotion
-                </div>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  Turn on a limited offer without losing the normal/original price.
-                </p>
-              </div>
-              <ToggleButton
-                active={plan.promotion_enabled}
-                label="Promotion live"
-                onClick={() => onChange(plan.slug, { promotion_enabled: !plan.promotion_enabled })}
-              />
-            </div>
-
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div>
-                <Label htmlFor={`${plan.slug}-promotion-label`} className="text-xs">
-                  Promo badge
-                </Label>
-                <Input
-                  id={`${plan.slug}-promotion-label`}
-                  value={plan.promotion_label ?? ""}
-                  onChange={(event) => onChange(plan.slug, { promotion_label: event.target.value })}
-                  placeholder="Summer promo"
-                  className="mt-1 bg-background/45"
-                />
-              </div>
-              <div>
-                <Label htmlFor={`${plan.slug}-promotion-original-price`} className="text-xs">
-                  Original price
-                </Label>
-                <Input
-                  id={`${plan.slug}-promotion-original-price`}
-                  value={plan.promotion_original_price ?? ""}
-                  onChange={(event) =>
-                    onChange(plan.slug, { promotion_original_price: event.target.value })
-                  }
-                  placeholder="$699/mo"
-                  className="mt-1 bg-background/45"
-                />
-              </div>
-              <div>
-                <Label htmlFor={`${plan.slug}-promotion-note`} className="text-xs">
-                  Promo note
-                </Label>
-                <Input
-                  id={`${plan.slug}-promotion-note`}
-                  value={plan.promotion_note ?? ""}
-                  onChange={(event) => onChange(plan.slug, { promotion_note: event.target.value })}
-                  placeholder="Limited seats this month"
-                  className="mt-1 bg-background/45"
-                />
-              </div>
-              <div>
-                <Label htmlFor={`${plan.slug}-promotion-ends`} className="text-xs">
-                  Promo end label
-                </Label>
-                <Input
-                  id={`${plan.slug}-promotion-ends`}
-                  value={plan.promotion_ends_at ?? ""}
-                  onChange={(event) =>
-                    onChange(plan.slug, { promotion_ends_at: event.target.value })
-                  }
-                  placeholder="Ends June 30"
-                  className="mt-1 bg-background/45"
-                />
-              </div>
             </div>
           </div>
 
@@ -2527,8 +2478,8 @@ function PlanEditor({
               id={`${plan.slug}-features`}
               value={plan.featuresText}
               onChange={(event) => onChange(plan.slug, { featuresText: event.target.value })}
-              className="mt-1 min-h-28 bg-background/45"
-              placeholder="One platform per line, e.g. TV, MT5, Web"
+              className="mt-1 min-h-32 bg-background/45"
+              placeholder="One feature per line"
             />
           </div>
 
@@ -2540,7 +2491,7 @@ function PlanEditor({
             style={{ background: "var(--gradient-primary)" }}
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Save changes
+            Save mentorship offer
           </Button>
         </div>
       </div>
@@ -6093,11 +6044,11 @@ function defaultEditablePlans(): EditablePlan[] {
     title: plan.title,
     description: plan.desc,
     display_price: plan.price,
-    promotion_enabled: plan.promotionEnabled,
-    promotion_label: plan.promotionLabel ?? null,
-    promotion_original_price: plan.originalPrice ?? null,
-    promotion_note: plan.promotionNote ?? null,
-    promotion_ends_at: plan.promotionEndsAt ?? null,
+    promotion_enabled: false,
+    promotion_label: null,
+    promotion_original_price: null,
+    promotion_note: null,
+    promotion_ends_at: null,
     duration: plan.duration,
     checkout_price: plan.checkoutPackages[0].price,
     checkout_monthly_label: plan.checkoutPackages[0].monthly,
