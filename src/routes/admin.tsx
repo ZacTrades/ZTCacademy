@@ -308,6 +308,7 @@ function AdminPage() {
   const [memberReviewDeleteTarget, setMemberReviewDeleteTarget] = useState<MemberReviewRow | null>(
     null,
   );
+  const [liveExtensionConfirmDays, setLiveExtensionConfirmDays] = useState<number | null>(null);
   const [fetching, setFetching] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -854,7 +855,6 @@ function AdminPage() {
 
   const extendLiveTradingAccess = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!supabase) return;
 
     const extraDays = Number.parseInt(liveExtensionDays, 10);
 
@@ -864,11 +864,13 @@ function AdminPage() {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Extend active paid Live Trading access by ${extraDays} day${extraDays === 1 ? "" : "s"}?`,
-    );
+    setLiveExtensionConfirmDays(extraDays);
+  };
 
-    if (!confirmed) return;
+  const confirmLiveTradingAccessExtension = async () => {
+    if (!supabase || !liveExtensionConfirmDays) return;
+
+    const extraDays = liveExtensionConfirmDays;
 
     setSavingKey("live:extension");
     setMessage("");
@@ -883,6 +885,7 @@ function AdminPage() {
       console.error(error);
       setErrorMessage(error.message);
       setSavingKey(null);
+      setLiveExtensionConfirmDays(null);
       return;
     }
 
@@ -909,6 +912,7 @@ function AdminPage() {
         extraDays === 1 ? "" : "s"
       } for ${updatedRows.length} active paid user${updatedRows.length === 1 ? "" : "s"}.`,
     );
+    setLiveExtensionConfirmDays(null);
     setSavingKey(null);
   };
 
@@ -2062,6 +2066,60 @@ function AdminPage() {
         onOpenChange={setAuthOpen}
         onModeChange={setAuthMode}
       />
+      <AlertDialog
+        open={liveExtensionConfirmDays !== null}
+        onOpenChange={(open) => {
+          if (!open && savingKey !== "live:extension") setLiveExtensionConfirmDays(null);
+        }}
+      >
+        <AlertDialogContent className="glass-strong max-w-md border-border/60 p-0 shadow-2xl">
+          <div className="relative overflow-hidden rounded-2xl">
+            <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-gold/20 blur-3xl" />
+            <div className="relative p-6">
+              <AlertDialogHeader>
+                <div className="mb-2 grid h-12 w-12 place-items-center rounded-xl bg-gold/10 text-gold ring-1 ring-gold/30">
+                  <Plus className="h-5 w-5" />
+                </div>
+                <AlertDialogTitle className="font-display text-2xl">
+                  Extend Live Trading access?
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-sm leading-6 text-muted-foreground">
+                  This will add{" "}
+                  <span className="font-semibold text-foreground">
+                    {liveExtensionConfirmDays ?? 0} day
+                    {liveExtensionConfirmDays === 1 ? "" : "s"}
+                  </span>{" "}
+                  to every active paid Live Trading user with a future expiry date.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+
+              <AlertDialogFooter className="mt-6 gap-3 sm:space-x-0">
+                <AlertDialogCancel
+                  disabled={savingKey === "live:extension"}
+                  className="mt-0 border-border/60 bg-background/45"
+                >
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={savingKey === "live:extension" || liveExtensionConfirmDays === null}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void confirmLiveTradingAccessExtension();
+                  }}
+                  className="bg-gold text-background hover:bg-gold/90"
+                >
+                  {savingKey === "live:extension" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                  Confirm extension
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </div>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog
         open={Boolean(memberReviewDeleteTarget)}
         onOpenChange={(open) => {
