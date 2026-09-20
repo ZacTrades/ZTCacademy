@@ -89,7 +89,6 @@ export function CheckoutDialog({
   const [statusDescription, setStatusDescription] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [selectedPackage, setSelectedPackage] = useState(0);
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
   const [cryptoOption, setCryptoOption] = useState(cryptoPaymentOptions[0]);
@@ -109,6 +108,11 @@ export function CheckoutDialog({
     paymentMethod === "crypto"
       ? formatPriceForCurrency(priceLabel, "USD")
       : formatPrice(priceLabel);
+  const customerEmail = user?.email ?? email;
+  const billingName =
+    String(user?.user_metadata?.full_name ?? "").trim() ||
+    customerEmail.split("@")[0] ||
+    "ZacTrades member";
   const needsDiscordConnection = Boolean(user) && !isStaff && !discordConnection?.userId;
 
   useEffect(() => {
@@ -137,7 +141,14 @@ export function CheckoutDialog({
     setErrorMessage("");
 
     if (needsDiscordConnection) {
-      setErrorMessage("Connect Discord before paying so we can invite you and assign the correct access role automatically.");
+      setErrorMessage(
+        "Connect Discord before paying so we can invite you and assign the correct access role automatically.",
+      );
+      return;
+    }
+
+    if (!customerEmail) {
+      setErrorMessage("Your account email is required before continuing.");
       return;
     }
 
@@ -159,8 +170,8 @@ export function CheckoutDialog({
           data: {
             accessToken: session?.access_token ?? "",
             planSlug: mentorshipPlanSlug,
-            customerEmail: email,
-            cardholderName: name,
+            customerEmail,
+            cardholderName: billingName,
             paymentMethod,
             currency,
             cryptoAsset: paymentMethod === "crypto" ? cryptoOption.asset : undefined,
@@ -198,8 +209,8 @@ export function CheckoutDialog({
         const result = await startNewsSubscriptionCheckout({
           data: {
             accessToken: session?.access_token ?? "",
-            customerEmail: email,
-            cardholderName: name,
+            customerEmail,
+            cardholderName: billingName,
             paymentMethod,
             currency,
             cryptoAsset: paymentMethod === "crypto" ? cryptoOption.asset : undefined,
@@ -237,8 +248,8 @@ export function CheckoutDialog({
           packageSlug:
             (activePackage.slug as "one_month" | "three_months" | "six_months" | "twelve_months") ??
             "one_month",
-          customerEmail: email,
-          cardholderName: name,
+          customerEmail,
+          cardholderName: billingName,
           paymentMethod,
           currency,
           cryptoAsset: paymentMethod === "crypto" ? cryptoOption.asset : undefined,
@@ -273,7 +284,6 @@ export function CheckoutDialog({
     setStatusDescription("");
     setErrorMessage("");
     setSelectedPackage(Math.min(initialPackageIndex, checkoutPackages.length - 1));
-    setName("");
     setEmail("");
     setPaymentMethod("card");
     setCryptoOption(cryptoPaymentOptions[0]);
@@ -499,7 +509,8 @@ export function CheckoutDialog({
                             Connect Discord to unlock checkout
                           </p>
                           <p className="mt-1 text-xs leading-5 text-[#c8ceff]/90">
-                            Payment opens only after Discord is connected, so your invite and paid role can be assigned automatically after purchase.
+                            Payment opens only after Discord is connected, so your invite and paid
+                            role can be assigned automatically after purchase.
                           </p>
                           <Button
                             type="button"
@@ -517,7 +528,9 @@ export function CheckoutDialog({
                             Connect Discord
                           </Button>
                           {discordError && (
-                            <p className="mt-2 text-xs leading-5 text-destructive">{discordError}</p>
+                            <p className="mt-2 text-xs leading-5 text-destructive">
+                              {discordError}
+                            </p>
                           )}
                         </div>
                       </div>
@@ -573,24 +586,10 @@ export function CheckoutDialog({
                           type="email"
                           required
                           value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          placeholder="you@example.com"
-                          className="mt-1 bg-background/40"
-                        />
-                      </div>
-                      <div className="sm:col-span-2">
-                        <Label htmlFor="name" className="text-xs">
-                          {paymentMethod === "card" ? "Cardholder name" : "Billing name"}
-                        </Label>
-                        <Input
-                          id="name"
-                          required
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          placeholder={
-                            paymentMethod === "card" ? "Full name on card" : "Billing full name"
-                          }
-                          className="mt-1 bg-background/40"
+                          readOnly
+                          aria-readonly="true"
+                          placeholder="Account email"
+                          className="mt-1 cursor-not-allowed bg-background/35 text-muted-foreground"
                         />
                       </div>
 
@@ -752,8 +751,8 @@ export function CheckoutDialog({
                             : needsDiscordConnection
                               ? "Connect Discord to Pay"
                               : paymentMethod === "crypto"
-                              ? `Pay ${formatCheckoutPrice(payablePriceLabel)} with NOWPayments`
-                              : `Pay ${formatCheckoutPrice(payablePriceLabel)} & Get Access`}
+                                ? `Pay ${formatCheckoutPrice(payablePriceLabel)} with NOWPayments`
+                                : `Pay ${formatCheckoutPrice(payablePriceLabel)} & Get Access`}
                         </span>
                       </Button>
                     </div>

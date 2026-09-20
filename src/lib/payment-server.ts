@@ -171,6 +171,7 @@ type PaymentTarget =
       table: "user_live_trading_access";
       userId: string;
       packageSlug: string | null;
+      durationLabel?: string | null;
       amountLabel: string | null;
       status: string;
       notes?: string | null;
@@ -576,9 +577,70 @@ function isActivePaidAccess(access: { status: string; access_expires_at: string 
   return Number.isNaN(expiresAt.getTime()) || expiresAt > new Date();
 }
 
+function normalizeLivePackageSlug(value: unknown) {
+  if (
+    value === "one_month" ||
+    value === "three_months" ||
+    value === "six_months" ||
+    value === "twelve_months"
+  ) {
+    return value;
+  }
+
+  return null;
+}
+
 function normalizeMentorshipPlanSlug(value: unknown): "one_to_one" | "group" | null {
   if (value === "one_to_one" || value === "group") return value;
   return null;
+}
+
+const LIVE_REPLACEMENT_NOTE_PREFIX = "Pending live replacement:";
+
+function liveReplacementNoteForProduct(product: PaymentProduct) {
+  if (product.kind !== "live") return "";
+
+  return ` ${LIVE_REPLACEMENT_NOTE_PREFIX} ${JSON.stringify({
+    package_slug: product.slug,
+    duration_label: product.durationLabel,
+    amount_label: product.amountLabel,
+  })}.`;
+}
+
+function pendingLiveReplacementFromNotes(notes: string | null | undefined) {
+  const rawJson = notes?.match(/Pending live replacement:\s*(\{[^}]+\})/)?.[1];
+  if (!rawJson) return null;
+
+  try {
+    const parsed = JSON.parse(rawJson) as {
+      package_slug?: unknown;
+      duration_label?: unknown;
+      amount_label?: unknown;
+    };
+    const packageSlug = normalizeLivePackageSlug(parsed.package_slug);
+    if (!packageSlug) return null;
+
+    return {
+      packageSlug,
+      durationLabel:
+        typeof parsed.duration_label === "string" && parsed.duration_label.trim()
+          ? parsed.duration_label
+          : null,
+      amountLabel:
+        typeof parsed.amount_label === "string" && parsed.amount_label.trim()
+          ? parsed.amount_label
+          : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function shouldSkipAlreadyPaidTarget(target: PaymentTarget) {
+  if (target.status !== "paid") return false;
+  if (target.kind !== "live") return true;
+
+  return !pendingLiveReplacementFromNotes(target.notes);
 }
 
 function discordAllowPendingAccess() {
@@ -663,7 +725,7 @@ function paidAccessExpiresAt(product: Pick<PaymentProduct, "kind" | "slug">) {
   if (product.kind === "mentorship") {
     if (product.slug === "one_to_one")
       return new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
-    return new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString();
+    return new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString();
   }
 
   const monthsBySlug: Record<string, number> = {
@@ -691,6 +753,26 @@ async function createPendingRecord(data: {
   const notes = `Checkout started at ${now}. ${paymentNote(data.paymentMethod, data.provider)}${discountNoteForProduct(data.product)}`;
 
   if (data.product.kind === "live") {
+    const { data: existingAccess } = await data.adminClient
+      .from("user_live_trading_access")
+      .select("status,access_expires_at")
+      .eq("user_id", data.userId)
+      .maybeSingle();
+
+    if (existingAccess && isActivePaidAccess(existingAccess)) {
+      return data.adminClient
+        .from("user_live_trading_access")
+        .update({
+          payment_provider: data.provider,
+          provider_customer_id: data.customerEmail,
+          provider_checkout_id: data.checkoutId,
+          provider_subscription_id: data.providerPublicOrderId ?? null,
+          amount_label: data.product.amountLabel,
+          notes: `${notes}${liveReplacementNoteForProduct(data.product)}`,
+        })
+        .eq("user_id", data.userId);
+    }
+
     return data.adminClient.from("user_live_trading_access").upsert(
       {
         user_id: data.userId,
@@ -757,7 +839,7 @@ async function updateNowPaymentsInvoiceId(data: {
 }) {
   const patch = {
     provider_subscription_id: data.invoiceId,
-    notes: `NOWPayments invoice created. Awaiting verified IPN confirmation.${discountNoteForProduct(data.product)}`,
+    notes: `NOWPayments invoice created. Awaiting verified IPN confirmation.${discountNoteForProduct(data.product)}${liveReplacementNoteForProduct(data.product)}`,
   };
 
   if (data.product.kind === "live") {
@@ -952,7 +1034,7 @@ async function updateProviderCheckoutMetadata(data: {
   const patch = {
     provider_subscription_id: data.providerCheckoutId,
     provider_customer_id: data.providerCustomerId,
-    notes: `Hosted checkout created. Awaiting verified provider webhook confirmation.${discountNoteForProduct(data.product)}`,
+    notes: `Hosted checkout created. Awaiting verified provider webhook confirmation.${discountNoteForProduct(data.product)}${liveReplacementNoteForProduct(data.product)}`,
   };
 
   if (data.product.kind === "live") {
@@ -1038,24 +1120,6 @@ export const startLiveTradingCheckout = createServerFn({ method: "POST" })
         ok: false,
         status: "invalid_product",
         message: "Selected live package is unavailable.",
-      };
-    }
-
-    const { data: existingAccess, error: existingError } = await context.adminClient
-      .from("user_live_trading_access")
-      .select("status,access_expires_at")
-      .eq("user_id", context.user.id)
-      .maybeSingle();
-
-    if (existingError) {
-      return { ok: false, status: "live_access_lookup_failed", message: "Unable to check access." };
-    }
-
-    if (existingAccess && isActivePaidAccess(existingAccess)) {
-      return {
-        ok: true,
-        status: "already_paid",
-        message: "Your live trading access is already active.",
       };
     }
 
@@ -1319,7 +1383,7 @@ async function findPaymentTargetByColumn(
   const live = await maybeSingleTarget(
     adminClient
       .from("user_live_trading_access")
-      .select("user_id,package_slug,status,amount_label,notes")
+      .select("user_id,package_slug,duration_label,status,amount_label,notes")
       .eq("payment_provider", provider)
       .eq(column, value)
       .maybeSingle(),
@@ -1330,6 +1394,7 @@ async function findPaymentTargetByColumn(
       table: "user_live_trading_access" as const,
       userId: String(live.user_id),
       packageSlug: live.package_slug ? String(live.package_slug) : null,
+      durationLabel: live.duration_label ? String(live.duration_label) : null,
       amountLabel: live.amount_label ? String(live.amount_label) : null,
       status: String(live.status),
       notes: live.notes ? String(live.notes) : null,
@@ -1457,7 +1522,22 @@ async function applyPaidTarget(
   }
 
   if (target.kind === "live") {
-    await adminClient.from("user_live_trading_access").update(patch).eq("user_id", target.userId);
+    const pendingReplacement = pendingLiveReplacementFromNotes(target.notes);
+    const livePackageSlug = pendingReplacement?.packageSlug ?? target.packageSlug;
+
+    await adminClient
+      .from("user_live_trading_access")
+      .update({
+        ...patch,
+        package_slug: livePackageSlug,
+        duration_label: pendingReplacement?.durationLabel ?? target.durationLabel ?? null,
+        amount_label: pendingReplacement?.amountLabel ?? target.amountLabel ?? null,
+        access_expires_at: paidAccessExpiresAt({
+          kind: "live",
+          slug: livePackageSlug,
+        }),
+      })
+      .eq("user_id", target.userId);
     await provisionDiscordAccess(adminClient, target.userId, { kind: "live" });
     return;
   }
@@ -1602,7 +1682,8 @@ function payzonePublicOrigin(requestOrigin: string) {
 
 function payzoneDescription(target: PaymentTarget) {
   if (target.kind === "live") {
-    return `ZacTrades Live Trading - ${target.packageSlug ?? "Access"}`;
+    const pendingReplacement = pendingLiveReplacementFromNotes(target.notes);
+    return `ZacTrades Live Trading - ${pendingReplacement?.packageSlug ?? target.packageSlug ?? "Access"}`;
   }
 
   if (target.kind === "mentorship") {
@@ -1617,7 +1698,7 @@ async function findPayzoneLaunchTarget(adminClient: AdminClient, checkoutId: str
     adminClient
       .from("user_live_trading_access")
       .select(
-        "user_id,package_slug,status,amount_label,provider_customer_id,provider_subscription_id",
+        "user_id,package_slug,duration_label,status,amount_label,provider_customer_id,provider_subscription_id,notes",
       )
       .eq("payment_provider", "payzone")
       .eq("provider_checkout_id", checkoutId)
@@ -1629,8 +1710,10 @@ async function findPayzoneLaunchTarget(adminClient: AdminClient, checkoutId: str
       table: "user_live_trading_access" as const,
       userId: String(live.user_id),
       packageSlug: live.package_slug ? String(live.package_slug) : null,
+      durationLabel: live.duration_label ? String(live.duration_label) : null,
       amountLabel: live.amount_label ? String(live.amount_label) : null,
       status: String(live.status),
+      notes: live.notes ? String(live.notes) : null,
     } satisfies PaymentTarget;
     return {
       ...target,
@@ -1872,7 +1955,7 @@ export async function handlePayzoneLaunchRequest(
     return Response.json({ ok: false, error: "checkout_not_found" }, { status: 404 });
   }
 
-  if (target.status === "paid") {
+  if (shouldSkipAlreadyPaidTarget(target)) {
     return Response.redirect(
       paymentResultUrl(url.origin, "PAYZONE_SUCCESS_URL", "/payment/success"),
     );
@@ -2159,7 +2242,7 @@ export async function handlePayzoneCallbackRequest(
     return Response.json({ status: "OK", message: "Callback ignored" });
   }
 
-  if (target.status === "paid") {
+  if (shouldSkipAlreadyPaidTarget(target)) {
     logPayzoneCallback("already_paid", { eventId, targetKind: target.kind });
     await markWebhookEventProcessed(adminClient, eventId, true, undefined, "payzone");
     return Response.json({ status: "OK", message: "Already paid" });
@@ -2286,7 +2369,7 @@ export async function handleNowPaymentsIpnRequest(
     return Response.json({ ok: true, ignored: true });
   }
 
-  if (target.status === "paid") {
+  if (shouldSkipAlreadyPaidTarget(target)) {
     await markWebhookEventProcessed(adminClient, eventId, true);
     return Response.json({ ok: true, alreadyPaid: true });
   }

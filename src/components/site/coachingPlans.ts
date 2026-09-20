@@ -108,11 +108,11 @@ export function mapCoachingPlanRow(row: CoachingPlanRow): CoachingPlan {
     title: row.title || fallback.title,
     desc: row.description || fallback.desc,
     price: row.display_price || fallback.price,
-    originalPrice: row.promotion_original_price || fallback.originalPrice,
-    promotionLabel: row.promotion_label || fallback.promotionLabel,
-    promotionNote: row.promotion_note || fallback.promotionNote,
-    promotionEndsAt: row.promotion_ends_at || fallback.promotionEndsAt,
-    promotionEnabled: row.promotion_enabled ?? fallback.promotionEnabled,
+    originalPrice: undefined,
+    promotionLabel: undefined,
+    promotionNote: undefined,
+    promotionEndsAt: undefined,
+    promotionEnabled: false,
     duration: row.duration || fallback.duration,
     details: row.features?.length ? row.features : fallback.details,
     checkoutPackages: [
@@ -120,12 +120,8 @@ export function mapCoachingPlanRow(row: CoachingPlanRow): CoachingPlan {
         duration: row.duration || fallback.duration,
         price: row.checkout_price || fallback.checkoutPackages[0].price,
         monthly: row.checkout_monthly_label || fallback.checkoutPackages[0].monthly,
-        originalPrice: row.promotion_enabled
-          ? row.promotion_original_price || fallback.checkoutPackages[0].originalPrice
-          : undefined,
-        badge: row.promotion_enabled
-          ? row.promotion_label || fallback.checkoutPackages[0].badge
-          : undefined,
+        originalPrice: undefined,
+        badge: undefined,
       },
     ],
     cta: row.cta_label || fallback.cta,

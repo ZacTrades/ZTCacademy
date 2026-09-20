@@ -5,7 +5,6 @@ import {
   Check,
   ClipboardCheck,
   Compass,
-  BadgePercent,
   GraduationCap,
   Radar,
   ShieldCheck,
@@ -146,7 +145,9 @@ function MentorshipPage() {
                 <span className="text-gradient-gold">Trading Process.</span>
               </h1>
               <p className="mt-6 max-w-2xl text-base leading-7 text-muted-foreground md:text-lg">
-                Learn how to read the market, build a trading plan, manage risk, and make your own decisions with confidence. My mentorship is built around real market conditions, practical training, and direct feedback, not endless theory.
+                Learn how to read the market, build a trading plan, manage risk, and make your own
+                decisions with confidence. My mentorship is built around real market conditions,
+                practical training, and direct feedback, not endless theory.
               </p>
               <div className="mt-8 grid gap-3 sm:grid-cols-2">
                 {pillars.map((pillar) => (
@@ -223,7 +224,8 @@ function MentorshipPage() {
                 From Learning To Independent Trading
               </h2>
               <p className="mt-4 text-muted-foreground">
-                A structured path designed to take you from understanding the basics to making your own informed trading decisions.
+                A structured path designed to take you from understanding the basics to making your
+                own informed trading decisions.
               </p>
             </motion.div>
 
@@ -299,7 +301,10 @@ function MentorshipPage() {
                 Coaching Built Around Your Trading.
               </h2>
               <p className="mt-5 text-sm leading-7 text-muted-foreground md:text-base">
-                You don't need more random trading information. You need to understand what you're doing, why you're doing it, and how to improve. We focus on your analysis, execution, risk management, and decision-making so you can build a process that is truly your own.
+                You don't need more random trading information. You need to understand what you're
+                doing, why you're doing it, and how to improve. We focus on your analysis,
+                execution, risk management, and decision-making so you can build a process that is
+                truly your own.
               </p>
             </motion.div>
 
@@ -330,16 +335,17 @@ function MentorshipPage() {
                     "Develop clear rules and a repeatable process so you can trade independently instead of depending on signals.",
                 },
               ].map((item) => (
-                <div key={item.title} className="rounded-2xl border border-border/50 bg-card/35 p-5">
+                <div
+                  key={item.title}
+                  className="rounded-2xl border border-border/50 bg-card/35 p-5"
+                >
                   <div className="grid h-9 w-9 place-items-center rounded-lg bg-bull/15 text-bull">
                     <Check className="h-4 w-4" strokeWidth={3} />
                   </div>
                   <h3 className="mt-4 font-display text-lg font-bold text-foreground">
                     {item.title}
                   </h3>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    {item.description}
-                  </p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.description}</p>
                 </div>
               ))}
             </motion.div>
@@ -356,7 +362,8 @@ function MentorshipPage() {
                 One-to-One Coaching or Group Mentoring
               </h2>
               <p className="mt-4 text-muted-foreground">
-                Choose the coaching format that fits your goals, experience, and the way you want to learn.
+                Choose the coaching format that fits your goals, experience, and the way you want to
+                learn.
               </p>
             </motion.div>
 
@@ -378,33 +385,6 @@ function MentorshipPage() {
                     }`}
                     aria-hidden
                   />
-                  {option.promotionEnabled && (
-                    <div className="relative mb-5 overflow-hidden rounded-2xl border border-gold/45 bg-gold/15 p-4 shadow-[0_20px_60px_-44px_hsl(var(--gold)/0.95)]">
-                      <div className="absolute inset-y-0 right-0 w-1/2 bg-gradient-to-l from-gold/20 to-transparent" />
-                      <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gold text-background">
-                            <BadgePercent className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-gold">
-                              Limited promotion
-                            </div>
-                            <div className="mt-1 font-display text-lg font-bold text-foreground">
-                              {option.promotionLabel || "Special coaching offer"}
-                            </div>
-                          </div>
-                        </div>
-                        {(option.promotionNote || option.promotionEndsAt) && (
-                          <div className="rounded-xl border border-gold/35 bg-background/55 px-4 py-3 text-xs font-semibold leading-5 text-gold sm:max-w-56 sm:text-right">
-                            {[option.promotionNote, option.promotionEndsAt]
-                              .filter(Boolean)
-                              .join(" · ")}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
                   <div className="relative flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <div
@@ -419,27 +399,11 @@ function MentorshipPage() {
                         {option.desc}
                       </p>
                     </div>
-                    <div
-                      className={`shrink-0 rounded-xl border p-4 sm:text-right ${
-                        option.promotionEnabled
-                          ? "border-gold/45 bg-gold/10"
-                          : "border-border/50 bg-background/55"
-                      }`}
-                    >
+                    <div className="shrink-0 rounded-xl border border-border/50 bg-background/55 p-4 sm:text-right">
                       <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                        {option.promotionEnabled ? "Promotion price" : "Starting at"}
+                        Starting at
                       </div>
-                      {option.promotionEnabled && option.originalPrice && (
-                        <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-border/50 bg-background/60 px-3 py-1 font-mono text-xs text-muted-foreground">
-                          <span>Was</span>
-                          <span className="line-through">{formatPrice(option.originalPrice)}</span>
-                        </div>
-                      )}
-                      <div
-                        className={`font-display text-4xl font-bold ${
-                          option.promotionEnabled ? "mt-2 text-gold" : "mt-1 text-primary"
-                        }`}
-                      >
+                      <div className="mt-1 font-display text-4xl font-bold text-primary">
                         {formatPrice(option.price)}
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">{option.duration}</div>
@@ -465,7 +429,7 @@ function MentorshipPage() {
 
                   {isStaff ? (
                     <div className="relative mt-8">
-                      <StaffCheckoutNotice description="Mentorship checkout is hidden for admin and moderator accounts. Staff can manage coaching prices and promotions from the admin page." />
+                      <StaffCheckoutNotice description="Mentorship checkout is hidden for admin and moderator accounts. Staff can manage coaching prices from the admin page and use discount codes for offers." />
                     </div>
                   ) : (
                     <Button
@@ -480,7 +444,7 @@ function MentorshipPage() {
                         setCheckoutOpen(true);
                       }}
                     >
-                      {option.promotionEnabled ? `Claim offer - ${option.cta}` : option.cta}
+                      {option.cta}
                       <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
                     </Button>
                   )}

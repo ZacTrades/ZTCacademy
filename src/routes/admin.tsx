@@ -6,6 +6,7 @@ import {
   BadgePercent,
   BookOpen,
   Check,
+  History,
   Loader2,
   Lock,
   MessageCircle,
@@ -216,6 +217,16 @@ type UserLiveTradingAccessRow = {
   updated_at?: string;
 };
 
+type LiveTradingAccessAdjustmentRow = {
+  id: string;
+  admin_user_id: string | null;
+  extra_days: number;
+  reason: string | null;
+  affected_user_ids: string[];
+  affected_count: number;
+  created_at: string;
+};
+
 type UserProfileRow = {
   id: string;
   full_name: string | null;
@@ -252,6 +263,7 @@ type AdminPanelKey =
   | "coaching"
   | "discounts"
   | "live"
+  | "liveHistory"
   | "indicators"
   | "tools";
 
@@ -293,6 +305,9 @@ function AdminPage() {
   const [discountCodes, setDiscountCodes] = useState<EditableDiscountCode[]>([]);
   const [memberReviews, setMemberReviews] = useState<MemberReviewRow[]>([]);
   const [profiles, setProfiles] = useState<UserProfileRow[]>([]);
+  const [liveAccessAdjustments, setLiveAccessAdjustments] = useState<
+    LiveTradingAccessAdjustmentRow[]
+  >([]);
   const [activePanel, setActivePanel] = useState<AdminPanelKey>("staff");
   const [liveExtensionDays, setLiveExtensionDays] = useState("7");
   const [indicatorDeleteTarget, setIndicatorDeleteTarget] = useState<IndicatorRow | null>(null);
@@ -339,6 +354,7 @@ function AdminPage() {
           membershipsResult,
           newsSubscriptionsResult,
           liveAccessResult,
+          liveAccessAdjustmentsResult,
         ] = await Promise.all([
           supabase
             .from("coaching_plans")
@@ -414,6 +430,13 @@ function AdminPage() {
               "user_id,package_slug,duration_label,status,payment_provider,provider_customer_id,provider_checkout_id,amount_label,paid_at,access_starts_at,access_expires_at,notes,created_at,updated_at",
             )
             .order("updated_at", { ascending: false }),
+          supabase
+            .from("live_trading_access_adjustments")
+            .select(
+              "id,admin_user_id,extra_days,reason,affected_user_ids,affected_count,created_at",
+            )
+            .order("created_at", { ascending: false })
+            .limit(6),
         ]);
 
         if (!mounted) return;
@@ -431,7 +454,8 @@ function AdminPage() {
           profilesResult.error ||
           membershipsResult.error ||
           newsSubscriptionsResult.error ||
-          liveAccessResult.error;
+          liveAccessResult.error ||
+          liveAccessAdjustmentsResult.error;
 
         if (firstError) {
           console.error(firstError);
@@ -479,6 +503,9 @@ function AdminPage() {
             : [],
         );
         setMemberReviews((memberReviewsResult.data as MemberReviewRow[]) ?? []);
+        setLiveAccessAdjustments(
+          (liveAccessAdjustmentsResult.data as LiveTradingAccessAdjustmentRow[]) ?? [],
+        );
         setProfiles(
           buildUserProfiles(
             (profilesResult.data as BasicProfileRow[]) ?? [],
@@ -500,6 +527,7 @@ function AdminPage() {
           setCommunitySocials(defaultCommunitySocials);
           setDiscountCodes([]);
           setMemberReviews([]);
+          setLiveAccessAdjustments([]);
           setProfiles([]);
         }
       } finally {
@@ -906,6 +934,21 @@ function AdminPage() {
         }),
       );
     }
+
+    setLiveAccessAdjustments((current) =>
+      [
+        {
+          id: `local-${Date.now()}`,
+          admin_user_id: user?.id ?? null,
+          extra_days: extraDays,
+          reason: null,
+          affected_user_ids: updatedRows.map((row) => row.user_id),
+          affected_count: updatedRows.length,
+          created_at: new Date().toISOString(),
+        },
+        ...current,
+      ].slice(0, 6),
+    );
 
     setMessage(
       `Success: Live Trading access extended by ${extraDays} day${
@@ -1658,6 +1701,13 @@ function AdminPage() {
       icon: Radio,
     },
     {
+      key: "liveHistory" as const,
+      title: "Extension History",
+      description: "Review Live Trading access extensions.",
+      count: liveAccessAdjustments.length,
+      icon: History,
+    },
+    {
       key: "indicators" as const,
       title: "Premium Indicators",
       description: "Edit indicator cards and links.",
@@ -2001,6 +2051,16 @@ function AdminPage() {
                             onSubmit={saveLivePackage}
                           />
                         ))}
+                      </AdminSection>
+                    )}
+
+                    {visibleActivePanel === "liveHistory" && (
+                      <AdminSection
+                        title="Live Trading Extension History"
+                        description="See every recent admin extension made to active paid Live Trading access."
+                        contentClassName="grid-cols-1"
+                      >
+                        <LiveAccessExtensionHistoryPanel adjustments={liveAccessAdjustments} />
                       </AdminSection>
                     )}
 
@@ -3307,6 +3367,92 @@ function LiveAccessExtensionTool({
         </div>
       </div>
     </form>
+  );
+}
+
+function LiveAccessExtensionHistoryPanel({
+  adjustments,
+}: {
+  adjustments: LiveTradingAccessAdjustmentRow[];
+}) {
+  const latestAdjustment = adjustments[0] ?? null;
+  const totalRecentDays = adjustments.reduce(
+    (total, adjustment) => total + adjustment.extra_days,
+    0,
+  );
+  const totalAffectedMembers = adjustments.reduce(
+    (total, adjustment) => total + adjustment.affected_count,
+    0,
+  );
+
+  return (
+    <div className="glass relative overflow-hidden rounded-2xl p-5 md:p-6">
+      <div className="absolute -right-20 -top-20 h-48 w-48 rounded-full bg-gold/15 blur-3xl" />
+      <div className="relative">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h3 className="font-display text-2xl font-bold">Extension History</h3>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+              Track the recent Live Trading access extensions already applied by the admin team.
+            </p>
+          </div>
+          {latestAdjustment && (
+            <div className="rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 lg:text-right">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-gold">
+                Last extension
+              </p>
+              <p className="mt-1 font-display text-2xl font-bold text-foreground">
+                +{latestAdjustment.extra_days} day
+                {latestAdjustment.extra_days === 1 ? "" : "s"}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {formatAdminDateTime(latestAdjustment.created_at)}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {adjustments.length ? (
+          <>
+            <div className="mt-6 grid gap-3 md:grid-cols-3">
+              <MiniMetric label="Extensions" value={String(adjustments.length)} />
+              <MiniMetric label="Days added" value={`+${totalRecentDays}`} />
+              <MiniMetric label="Affected users" value={String(totalAffectedMembers)} />
+            </div>
+
+            <div className="mt-6 space-y-3">
+              {adjustments.map((adjustment) => (
+                <div
+                  key={adjustment.id}
+                  className="rounded-2xl border border-border/45 bg-background/35 p-4"
+                >
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="rounded-full border border-gold/35 bg-gold/10 px-3 py-1 text-sm font-bold text-gold">
+                        +{adjustment.extra_days} day
+                        {adjustment.extra_days === 1 ? "" : "s"}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        {formatAdminDateTime(adjustment.created_at)}
+                      </span>
+                    </div>
+                    <span className="rounded-full border border-border/45 bg-card/40 px-3 py-1.5 text-xs font-semibold text-muted-foreground">
+                      {adjustment.affected_count} active paid user
+                      {adjustment.affected_count === 1 ? "" : "s"} affected
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="mt-6 rounded-2xl border border-dashed border-border/60 bg-background/25 p-6 text-sm leading-6 text-muted-foreground">
+            No extension has been recorded yet. After you extend active paid access, the historique
+            will appear here with the date, extra days, affected members, and admin details.
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -6176,6 +6322,17 @@ function AdminStat({ label, value }: { label: string; value: string }) {
   );
 }
 
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-border/45 bg-background/35 p-3">
+      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+        {label}
+      </div>
+      <div className="mt-1 font-display text-lg font-bold text-foreground">{value}</div>
+    </div>
+  );
+}
+
 function defaultEditablePlans(): EditablePlan[] {
   return defaultCoachingPlans.map((plan, index) => ({
     slug: plan.slug,
@@ -6429,5 +6586,19 @@ function formatAdminDate(value: string) {
     month: "short",
     day: "numeric",
     year: "numeric",
+  }).format(date);
+}
+
+function formatAdminDateTime(value: string) {
+  if (!value) return "Unknown";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Unknown";
+
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   }).format(date);
 }
