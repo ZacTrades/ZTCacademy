@@ -9,6 +9,7 @@ import {
   History,
   Loader2,
   Lock,
+  Megaphone,
   MessageCircle,
   Pencil,
   Save,
@@ -20,6 +21,7 @@ import {
   Radio,
   Star,
   UserCog,
+  UserPlus,
   Trash2,
   Upload,
   Wrench,
@@ -34,10 +36,13 @@ import {
 import {
   defaultCommunitySocials,
   defaultIndicators,
+  defaultOfferHeadlines,
   defaultPropFirms,
   defaultTradingTools,
   type CommunitySocialRow,
   type IndicatorRow,
+  type OfferHeadlineRow,
+  type OfferHeadlineTone,
   type PropFirmRow,
   type TradingToolRow,
 } from "@/components/site/editableContent";
@@ -118,6 +123,7 @@ type EditablePropFirm = PropFirmRow & {
 };
 
 type EditableCommunitySocial = CommunitySocialRow;
+type EditableOfferHeadline = OfferHeadlineRow;
 
 type EditableEducationArticle = EducationArticleRow;
 
@@ -165,6 +171,7 @@ type EditableDiscountCode = DiscountCodeRow & {
 };
 
 type ProfileRole = "member" | "moderator" | "admin";
+type StaffPromoteRole = Exclude<ProfileRole, "member">;
 type MembershipStatus = "unpaid" | "pending" | "paid" | "expired" | "cancelled";
 
 type UserMembershipRow = {
@@ -255,8 +262,10 @@ type BasicProfileRow = Omit<
 
 type AdminPanelKey =
   | "education"
+  | "offers"
   | "staff"
   | "communityMembers"
+  | "registeredAccounts"
   | "memberReviews"
   | "community"
   | "propfirms"
@@ -287,7 +296,7 @@ const educationCategoryOptions: Array<{ value: EducationArticleCategory; label: 
   { value: "premium", label: "Premium" },
 ];
 
-const staffVisiblePanelKeys: AdminPanelKey[] = ["communityMembers"];
+const staffVisiblePanelKeys: AdminPanelKey[] = ["communityMembers", "registeredAccounts"];
 
 function AdminPage() {
   const { user, loading, isConfigured, isAdmin, isStaff, role } = useAuth();
@@ -301,6 +310,8 @@ function AdminPage() {
   const [educationArticles, setEducationArticles] = useState<EditableEducationArticle[]>(
     defaultEducationArticleRows,
   );
+  const [offerHeadlines, setOfferHeadlines] =
+    useState<EditableOfferHeadline[]>(defaultOfferHeadlines);
   const [communitySocials, setCommunitySocials] = useState<EditableCommunitySocial[]>([]);
   const [discountCodes, setDiscountCodes] = useState<EditableDiscountCode[]>([]);
   const [memberReviews, setMemberReviews] = useState<MemberReviewRow[]>([]);
@@ -314,6 +325,8 @@ function AdminPage() {
   const [toolDeleteTarget, setToolDeleteTarget] = useState<EditableTool | null>(null);
   const [communitySocialDeleteTarget, setCommunitySocialDeleteTarget] =
     useState<EditableCommunitySocial | null>(null);
+  const [offerHeadlineDeleteTarget, setOfferHeadlineDeleteTarget] =
+    useState<EditableOfferHeadline | null>(null);
   const [educationDeleteTarget, setEducationDeleteTarget] =
     useState<EditableEducationArticle | null>(null);
   const [discountDeleteTarget, setDiscountDeleteTarget] = useState<EditableDiscountCode | null>(
@@ -347,6 +360,7 @@ function AdminPage() {
           toolsResult,
           educationResult,
           firmsResult,
+          offerHeadlinesResult,
           communityResult,
           discountResult,
           memberReviewsResult,
@@ -388,6 +402,12 @@ function AdminPage() {
             .from("prop_firms")
             .select(
               "slug,name,description,logo,logo_url,discount,promo_code,color,rating,reviews,max_capital,profit_split,payout,features,url,is_featured,is_active,display_order",
+            )
+            .order("display_order", { ascending: true }),
+          supabase
+            .from("offer_headlines")
+            .select(
+              "slug,eyebrow,headline,subheadline,cta_label,cta_url,tone,is_active,starts_at,expires_at,display_order",
             )
             .order("display_order", { ascending: true }),
           supabase
@@ -448,6 +468,7 @@ function AdminPage() {
           toolsResult.error ||
           educationResult.error ||
           firmsResult.error ||
+          offerHeadlinesResult.error ||
           communityResult.error ||
           discountResult.error ||
           memberReviewsResult.error ||
@@ -491,6 +512,11 @@ function AdminPage() {
           firmsResult.data?.length
             ? (firmsResult.data as PropFirmRow[]).map(toEditablePropFirm)
             : defaultPropFirms.map(toEditablePropFirm),
+        );
+        setOfferHeadlines(
+          offerHeadlinesResult.data?.length
+            ? (offerHeadlinesResult.data as OfferHeadlineRow[])
+            : defaultOfferHeadlines,
         );
         setCommunitySocials(
           communityResult.data?.length
@@ -600,6 +626,14 @@ function AdminPage() {
     setErrorMessage("");
   };
 
+  const updateOfferHeadline = (slug: string, patch: Partial<EditableOfferHeadline>) => {
+    setOfferHeadlines((current) =>
+      current.map((item) => (item.slug === slug ? { ...item, ...patch } : item)),
+    );
+    setMessage("");
+    setErrorMessage("");
+  };
+
   const updateDiscountCode = (id: string, patch: Partial<EditableDiscountCode>) => {
     setDiscountCodes((current) =>
       current.map((item) => (item.id === id ? { ...item, ...patch } : item)),
@@ -665,6 +699,43 @@ function AdminPage() {
     });
     setActivePanel("community");
     setMessage("New social link added. Fill the details, then save it.");
+    setErrorMessage("");
+  };
+
+  const addOfferHeadline = () => {
+    setOfferHeadlines((current) => {
+      const existingSlugs = new Set(current.map((item) => item.slug));
+      const baseSlug = slugify("new-offer-headline");
+      let slug = baseSlug;
+      let suffix = 2;
+
+      while (existingSlugs.has(slug)) {
+        slug = `${baseSlug}-${suffix}`;
+        suffix += 1;
+      }
+
+      const nextOrder = current.length
+        ? Math.max(...current.map((item) => item.display_order)) + 1
+        : 1;
+
+      const newOffer: EditableOfferHeadline = {
+        slug,
+        eyebrow: "Limited offer",
+        headline: "Add a sharp offer headline here.",
+        subheadline: "Use this line to explain the value in one clean sentence.",
+        cta_label: "View offer",
+        cta_url: "/live-trading",
+        tone: "gold",
+        is_active: true,
+        starts_at: null,
+        expires_at: null,
+        display_order: nextOrder,
+      };
+
+      return [newOffer, ...current];
+    });
+    setActivePanel("offers");
+    setMessage("New offer headline added. Fill the details, then save it.");
     setErrorMessage("");
   };
 
@@ -1419,6 +1490,80 @@ function AdminPage() {
     setSavingKey(null);
   };
 
+  const saveOfferHeadline = async (
+    event: FormEvent<HTMLFormElement>,
+    item: EditableOfferHeadline,
+  ) => {
+    event.preventDefault();
+    if (!supabase) return;
+
+    const previousSlug = item.slug;
+    const nextSlug = slugify(item.slug || item.headline);
+
+    setSavingKey(`offer:${previousSlug}`);
+    setMessage("");
+    setErrorMessage("");
+
+    const payload: OfferHeadlineRow = {
+      ...item,
+      slug: nextSlug,
+      eyebrow: item.eyebrow.trim(),
+      headline: item.headline.trim(),
+      subheadline: item.subheadline.trim(),
+      cta_label: item.cta_label.trim(),
+      cta_url: item.cta_url.trim() || "/",
+      tone: item.tone,
+      starts_at: item.starts_at?.trim() || null,
+      expires_at: item.expires_at?.trim() || null,
+      display_order: Number(item.display_order) || 0,
+    };
+
+    const { data, error } = await supabase
+      .from("offer_headlines")
+      .upsert(payload, { onConflict: "slug" })
+      .select(
+        "slug,eyebrow,headline,subheadline,cta_label,cta_url,tone,is_active,starts_at,expires_at,display_order",
+      )
+      .single();
+
+    if (error) {
+      console.error(error);
+      setErrorMessage(error.message);
+    } else if (data) {
+      setOfferHeadlines((current) =>
+        current.map((currentItem) =>
+          currentItem.slug === previousSlug ? (data as OfferHeadlineRow) : currentItem,
+        ),
+      );
+      setMessage(`${payload.headline} offer headline updated.`);
+    }
+
+    setSavingKey(null);
+  };
+
+  const deleteOfferHeadline = async (item: EditableOfferHeadline) => {
+    if (!supabase) return;
+
+    setSavingKey(`offer:delete:${item.slug}`);
+    setMessage("");
+    setErrorMessage("");
+
+    const { error } = await supabase.from("offer_headlines").delete().eq("slug", item.slug);
+
+    if (error) {
+      console.error(error);
+      setErrorMessage(error.message);
+    } else {
+      setOfferHeadlines((current) =>
+        current.filter((currentItem) => currentItem.slug !== item.slug),
+      );
+      setMessage(`${item.headline} offer headline deleted.`);
+    }
+
+    setOfferHeadlineDeleteTarget(null);
+    setSavingKey(null);
+  };
+
   const deleteCommunitySocial = async (item: EditableCommunitySocial) => {
     if (!supabase) return;
 
@@ -1624,6 +1769,52 @@ function AdminPage() {
     setSavingKey(null);
   };
 
+  const promoteProfileRole = async (
+    profile: UserProfileRow,
+    nextRole: Exclude<ProfileRole, "member">,
+  ) => {
+    if (!supabase) return false;
+
+    setSavingKey(`profile:${profile.id}`);
+    setMessage("");
+    setErrorMessage("");
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .update({ role: nextRole })
+      .eq("id", profile.id)
+      .select(
+        "id,full_name,email,phone_number,discord_username,discord_user_id,discord_avatar_url,discord_connected_at,discord_guild_joined_at,discord_last_role_sync_at,discord_role_sync_status,discord_role_sync_error,role,created_at,updated_at",
+      )
+      .single();
+
+    if (error) {
+      console.error(error);
+      setErrorMessage(error.message);
+      setSavingKey(null);
+      return false;
+    }
+
+    if (data) {
+      setProfiles((current) =>
+        current.map((currentProfile) =>
+          currentProfile.id === profile.id
+            ? {
+                ...currentProfile,
+                ...(data as BasicProfileRow),
+              }
+            : currentProfile,
+        ),
+      );
+      setMessage(
+        `${profile.full_name || profile.email || "Member"} promoted to ${profileRoleLabel(nextRole)}.`,
+      );
+    }
+
+    setSavingKey(null);
+    return true;
+  };
+
   const openAuth = () => {
     setAuthMode("signin");
     setAuthOpen(true);
@@ -1631,10 +1822,10 @@ function AdminPage() {
 
   const teamProfiles = profiles.filter((profile) => profile.role !== "member");
   const memberProfiles = profiles.filter((profile) => profile.role === "member");
-  const paidMemberProfiles = memberProfiles.filter(hasPaidMentorship);
+  const paidMemberProfiles = memberProfiles.filter(hasAnyPaidAccess);
   const paidNewsProfiles = memberProfiles.filter(hasPaidNewsSubscription);
   const extendableLiveTradingProfiles = memberProfiles.filter(hasExtendableLiveTradingAccess);
-  const registeredMemberProfiles = memberProfiles.filter((profile) => !hasPaidMentorship(profile));
+  const registeredMemberProfiles = memberProfiles.filter((profile) => !hasAnyPaidAccess(profile));
 
   const adminPanels = [
     {
@@ -1645,11 +1836,25 @@ function AdminPage() {
       icon: ShieldCheck,
     },
     {
+      key: "offers" as const,
+      title: "Offer Headlines",
+      description: "Show sharp offer banners below the site header.",
+      count: offerHeadlines.length,
+      icon: Megaphone,
+    },
+    {
       key: "communityMembers" as const,
       title: "Community Members",
-      description: "Registered, paid, and news members in one place.",
-      count: memberProfiles.length,
+      description: "Only members with paid access.",
+      count: paidMemberProfiles.length,
       icon: UserCog,
+    },
+    {
+      key: "registeredAccounts" as const,
+      title: "Registered Accounts",
+      description: "Users who signed up but have not paid yet.",
+      count: registeredMemberProfiles.length,
+      icon: UserPlus,
     },
     {
       key: "memberReviews" as const,
@@ -1809,6 +2014,7 @@ function AdminPage() {
                       tools.length +
                       educationArticles.length +
                       propFirms.length +
+                      offerHeadlines.length +
                       communitySocials.length +
                       profiles.length +
                       extendableLiveTradingProfiles.length +
@@ -1929,6 +2135,44 @@ function AdminPage() {
                       </AdminSection>
                     )}
 
+                    {visibleActivePanel === "offers" && (
+                      <AdminSection
+                        title="Offer Headlines"
+                        description="Create the compact offer banners shown below the public site header."
+                        contentClassName="grid-cols-1"
+                        action={
+                          <Button
+                            type="button"
+                            onClick={addOfferHeadline}
+                            className="text-primary-foreground glow-primary hover:opacity-90"
+                            style={{ background: "var(--gradient-primary)" }}
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add Offer Headline
+                          </Button>
+                        }
+                      >
+                        {offerHeadlines.length ? (
+                          offerHeadlines.map((item) => (
+                            <OfferHeadlineEditor
+                              key={item.slug}
+                              item={item}
+                              saving={savingKey === `offer:${item.slug}`}
+                              deleting={savingKey === `offer:delete:${item.slug}`}
+                              onChange={updateOfferHeadline}
+                              onSubmit={saveOfferHeadline}
+                              onDelete={setOfferHeadlineDeleteTarget}
+                            />
+                          ))
+                        ) : (
+                          <div className="glass rounded-2xl p-6 text-sm text-muted-foreground">
+                            No offer headlines yet. Add one to show a compact campaign banner below
+                            the public header.
+                          </div>
+                        )}
+                      </AdminSection>
+                    )}
+
                     {visibleActivePanel === "staff" && (
                       <AdminSection
                         title="Staff Members"
@@ -1941,6 +2185,7 @@ function AdminPage() {
                           savingKey={savingKey}
                           onChange={updateProfile}
                           onSubmit={saveProfile}
+                          onPromote={promoteProfileRole}
                         />
                       </AdminSection>
                     )}
@@ -1948,10 +2193,20 @@ function AdminPage() {
                     {visibleActivePanel === "communityMembers" && (
                       <AdminSection
                         title="Community Members"
-                        description="All registered members, paid mentorship members, and News Desk subscribers in one tab."
+                        description="Only users with verified paid access appear here."
                         contentClassName="grid-cols-1"
                       >
                         <CommunityMembersPanel memberProfiles={memberProfiles} />
+                      </AdminSection>
+                    )}
+
+                    {visibleActivePanel === "registeredAccounts" && (
+                      <AdminSection
+                        title="Registered Accounts"
+                        description="Users who created an account but do not have paid access yet."
+                        contentClassName="grid-cols-1"
+                      >
+                        <RegisteredAccountsPanel memberProfiles={memberProfiles} />
                       </AdminSection>
                     )}
 
@@ -2333,6 +2588,61 @@ function AdminPage() {
                     <Trash2 className="h-4 w-4" />
                   )}
                   Delete discount code
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </div>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={Boolean(offerHeadlineDeleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setOfferHeadlineDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent className="glass-strong max-w-md border-border/60 p-0 shadow-2xl">
+          <div className="relative overflow-hidden rounded-2xl">
+            <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-bear/20 blur-3xl" />
+            <div className="relative p-6">
+              <AlertDialogHeader>
+                <div className="mb-2 grid h-12 w-12 place-items-center rounded-xl bg-bear/10 text-bear ring-1 ring-bear/30">
+                  <AlertCircle className="h-5 w-5" />
+                </div>
+                <AlertDialogTitle className="font-display text-2xl">
+                  Delete offer headline?
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-sm leading-6 text-muted-foreground">
+                  This will remove{" "}
+                  <span className="font-semibold text-foreground">
+                    {offerHeadlineDeleteTarget?.headline ?? "this offer headline"}
+                  </span>{" "}
+                  from the public header offers. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+
+              <AlertDialogFooter className="mt-6 gap-3 sm:space-x-0">
+                <AlertDialogCancel
+                  disabled={savingKey?.startsWith("offer:delete")}
+                  className="mt-0 border-border/60 bg-background/45"
+                >
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={!offerHeadlineDeleteTarget || savingKey?.startsWith("offer:delete")}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    if (offerHeadlineDeleteTarget) {
+                      void deleteOfferHeadline(offerHeadlineDeleteTarget);
+                    }
+                  }}
+                  className="bg-bear text-white hover:bg-bear/90"
+                >
+                  {savingKey?.startsWith("offer:delete") ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  Delete offer headline
                 </AlertDialogAction>
               </AlertDialogFooter>
             </div>
@@ -4122,6 +4432,197 @@ function DiscountCodeEditor({
   );
 }
 
+function OfferHeadlineEditor({
+  item,
+  saving,
+  deleting,
+  onChange,
+  onSubmit,
+  onDelete,
+}: {
+  item: EditableOfferHeadline;
+  saving: boolean;
+  deleting: boolean;
+  onChange: (slug: string, patch: Partial<EditableOfferHeadline>) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>, item: EditableOfferHeadline) => void;
+  onDelete: (item: EditableOfferHeadline) => void;
+}) {
+  const toneClass = offerToneClassName(item.tone);
+
+  return (
+    <form
+      onSubmit={(event) => onSubmit(event, item)}
+      className="glass relative overflow-hidden rounded-2xl p-5 md:p-6"
+    >
+      <div
+        className={`absolute -right-16 -top-16 h-44 w-44 rounded-full blur-3xl ${toneClass.glow}`}
+      />
+      <div className="relative">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(420px,1.1fr)] xl:items-start">
+          <div className="min-w-0">
+            <Badge variant="outline" className={`mb-4 text-xs ${toneClass.badge}`}>
+              Header offer
+            </Badge>
+            <h3 className="max-w-3xl text-wrap font-display text-2xl font-bold leading-tight sm:text-3xl">
+              {item.headline || "New offer headline"}
+            </h3>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+              This appears below the public site header for visitors. Keep it sharp, useful, and
+              linked to the right checkout or page.
+            </p>
+          </div>
+
+          <div className={`w-full rounded-2xl border p-3 sm:p-4 ${toneClass.preview}`}>
+            <div className="flex min-w-0 items-center gap-3">
+              <span
+                className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl sm:h-11 sm:w-11 ${toneClass.icon}`}
+              >
+                <Megaphone className="h-4.5 w-4.5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div
+                  className={`text-[10px] font-black uppercase tracking-[0.2em] ${toneClass.text}`}
+                >
+                  {item.eyebrow || "Limited offer"}
+                </div>
+                <p className="truncate text-sm font-bold text-foreground sm:text-base">
+                  {item.headline || "Offer headline preview"}
+                </p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {item.subheadline || "Offer subheadline preview"}
+                </p>
+              </div>
+              <span
+                className={`hidden max-w-40 shrink-0 truncate rounded-full border border-current/25 px-3 py-1.5 text-xs font-black uppercase tracking-[0.12em] md:inline-block ${toneClass.text}`}
+              >
+                {item.cta_label || "View offer"}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              id={`${item.slug}-offer-slug`}
+              label="Slug"
+              value={item.slug}
+              onChange={(value) => onChange(item.slug, { slug: slugify(value) })}
+              placeholder="black-friday-live-room"
+            />
+            <Field
+              id={`${item.slug}-offer-eyebrow`}
+              label="Small label"
+              value={item.eyebrow}
+              onChange={(value) => onChange(item.slug, { eyebrow: value })}
+              placeholder="Limited offer"
+            />
+          </div>
+
+          <Field
+            id={`${item.slug}-offer-headline`}
+            label="Headline"
+            value={item.headline}
+            onChange={(value) => onChange(item.slug, { headline: value })}
+            placeholder="Join before the next live-room cycle starts."
+          />
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Field
+              id={`${item.slug}-offer-cta-label`}
+              label="Button label"
+              value={item.cta_label}
+              onChange={(value) => onChange(item.slug, { cta_label: value })}
+              placeholder="Get access"
+            />
+            <Field
+              id={`${item.slug}-offer-cta-url`}
+              label="Button URL"
+              value={item.cta_url}
+              onChange={(value) => onChange(item.slug, { cta_url: value })}
+              placeholder="/live-trading"
+            />
+            <div>
+              <Label htmlFor={`${item.slug}-offer-tone`} className="text-xs">
+                Tone
+              </Label>
+              <select
+                id={`${item.slug}-offer-tone`}
+                value={item.tone}
+                onChange={(event) =>
+                  onChange(item.slug, { tone: event.target.value as OfferHeadlineTone })
+                }
+                className="mt-1 h-10 w-full rounded-md border border-border/60 bg-background/45 px-3 text-sm text-foreground outline-none transition-colors focus:border-primary"
+              >
+                <option value="gold">Gold</option>
+                <option value="electric">Electric blue</option>
+                <option value="bull">Green</option>
+                <option value="violet">Violet</option>
+              </select>
+            </div>
+            <Field
+              id={`${item.slug}-offer-order`}
+              label="Order"
+              value={`${item.display_order}`}
+              onChange={(value) => onChange(item.slug, { display_order: Number(value) || 0 })}
+              placeholder="1"
+            />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <DateField
+              id={`${item.slug}-offer-starts`}
+              label="Starts at"
+              value={dateInputValue(item.starts_at)}
+              onChange={(value) => onChange(item.slug, { starts_at: value || null })}
+            />
+            <DateField
+              id={`${item.slug}-offer-expires`}
+              label="Expires at"
+              value={dateInputValue(item.expires_at)}
+              onChange={(value) => onChange(item.slug, { expires_at: value || null })}
+            />
+          </div>
+
+          <ToggleButton
+            active={item.is_active}
+            label="Visible"
+            onClick={() => onChange(item.slug, { is_active: !item.is_active })}
+          />
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto]">
+          <Button
+            type="submit"
+            size="lg"
+            disabled={saving || deleting}
+            className="w-full text-primary-foreground glow-primary hover:opacity-90"
+            style={{ background: "var(--gradient-primary)" }}
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Save offer headline
+          </Button>
+          <Button
+            type="button"
+            size="lg"
+            variant="outline"
+            disabled={saving || deleting}
+            onClick={() => onDelete(item)}
+            className="border-bear/45 bg-bear/10 text-bear hover:bg-bear/15"
+          >
+            {deleting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+            Delete
+          </Button>
+        </div>
+      </div>
+    </form>
+  );
+}
+
 function CommunitySocialEditor({
   item,
   saving,
@@ -4260,17 +4761,61 @@ function StaffMembersPanel({
   savingKey,
   onChange,
   onSubmit,
+  onPromote,
 }: {
   profiles: UserProfileRow[];
   currentUserId: string;
   savingKey: string | null;
   onChange: (id: string, patch: Partial<UserProfileRow>) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>, profile: UserProfileRow) => void;
+  onPromote: (profile: UserProfileRow, role: StaffPromoteRole) => Promise<boolean>;
 }) {
-  const adminCount = profiles.filter((profile) => profile.role === "admin").length;
-  const moderatorCount = profiles.filter((profile) => profile.role === "moderator").length;
+  const [promoteOpen, setPromoteOpen] = useState(false);
+  const [promoteSearch, setPromoteSearch] = useState("");
+  const [selectedProfileId, setSelectedProfileId] = useState("");
+  const [selectedRole, setSelectedRole] = useState<StaffPromoteRole>("moderator");
+  const visibleStaffProfiles = profiles.filter(
+    (profile) => profile.role !== "member" && profile.id !== currentUserId,
+  );
+  const adminCount = visibleStaffProfiles.filter((profile) => profile.role === "admin").length;
+  const moderatorCount = visibleStaffProfiles.filter(
+    (profile) => profile.role === "moderator",
+  ).length;
   const memberProfiles = profiles.filter((profile) => profile.role === "member");
-  const staffProfiles = profiles.filter((profile) => profile.role !== "member");
+  const normalizedSearch = promoteSearch.trim().toLowerCase();
+  const filteredMemberProfiles = normalizedSearch
+    ? memberProfiles.filter((profile) =>
+        [
+          profile.full_name,
+          profile.email,
+          profile.phone_number,
+          profile.discord_username,
+          profile.discord_user_id,
+        ]
+          .filter(Boolean)
+          .some((value) => value!.toLowerCase().includes(normalizedSearch)),
+      )
+    : memberProfiles.slice(0, 8);
+  const selectedProfile =
+    memberProfiles.find((profile) => profile.id === selectedProfileId) ?? filteredMemberProfiles[0];
+
+  const resetPromoteDialog = () => {
+    setPromoteSearch("");
+    setSelectedProfileId("");
+    setSelectedRole("moderator");
+  };
+
+  const handlePromoteSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedProfile) return;
+
+    const promoted = await onPromote(selectedProfile, selectedRole);
+
+    if (promoted) {
+      setPromoteOpen(false);
+      resetPromoteDialog();
+    }
+  };
 
   if (!profiles.length) {
     return (
@@ -4288,35 +4833,170 @@ function StaffMembersPanel({
   }
 
   return (
-    <div className="grid gap-5">
-      <div className="grid gap-3 sm:grid-cols-4">
-        <AdminStat label="Admins" value={`${adminCount}`} />
-        <AdminStat label="Moderators" value={`${moderatorCount}`} />
-        <AdminStat label="Member candidates" value={`${memberProfiles.length}`} />
-        <AdminStat label="Total profiles" value={`${profiles.length}`} />
+    <div className="grid gap-6">
+      <div className="overflow-hidden rounded-[2rem] border border-primary/20 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.16),transparent_34%),linear-gradient(135deg,rgba(15,23,42,0.92),rgba(2,6,23,0.96))] p-5 shadow-[0_22px_70px_rgba(0,0,0,0.28)] sm:p-6">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Badge variant="outline" className="border-primary/45 bg-primary/10 text-electric">
+              Staff control center
+            </Badge>
+            <Button
+              type="button"
+              onClick={() => setPromoteOpen(true)}
+              className="w-fit text-primary-foreground glow-primary hover:opacity-90"
+              style={{ background: "var(--gradient-primary)" }}
+            >
+              <UserPlus className="h-4 w-4" />
+              Promote Member
+            </Button>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[280px]">
+            <StaffMetric label="Admins" value={`${adminCount}`} tone="gold" />
+            <StaffMetric label="Moderators" value={`${moderatorCount}`} tone="green" />
+          </div>
+        </div>
       </div>
 
       <StaffRoleGroup
         title="Current Staff"
         description="Admins and moderators who can help operate the platform."
-        emptyMessage="No moderators yet. Promote a trusted member below."
-        profiles={staffProfiles}
+        emptyMessage="No other staff members yet. Promote a trusted member below."
+        profiles={visibleStaffProfiles}
+        icon="staff"
         currentUserId={currentUserId}
         savingKey={savingKey}
         onChange={onChange}
         onSubmit={onSubmit}
       />
 
-      <StaffRoleGroup
-        title="Member Candidates"
-        description="Choose a registered member and change their role to moderator or admin."
-        emptyMessage="No regular members available to promote."
-        profiles={memberProfiles}
-        currentUserId={currentUserId}
-        savingKey={savingKey}
-        onChange={onChange}
-        onSubmit={onSubmit}
-      />
+      <Dialog
+        open={promoteOpen}
+        onOpenChange={(open) => {
+          setPromoteOpen(open);
+          if (!open) resetPromoteDialog();
+        }}
+      >
+        <DialogContent className="glass-strong max-w-3xl border-border/60 p-0">
+          <div className="relative overflow-hidden rounded-2xl">
+            <div className="absolute -right-20 -top-20 h-48 w-48 rounded-full bg-primary/20 blur-3xl" />
+            <div className="relative p-6">
+              <DialogHeader>
+                <div className="mb-3 grid h-12 w-12 place-items-center rounded-2xl border border-primary/35 bg-primary/10 text-electric">
+                  <UserPlus className="h-5 w-5" />
+                </div>
+                <DialogTitle className="font-display text-3xl">Promote Member</DialogTitle>
+                <DialogDescription>
+                  Search a registered member, choose the staff role, and confirm the promotion.
+                </DialogDescription>
+              </DialogHeader>
+
+              <form onSubmit={handlePromoteSubmit} className="mt-6 grid gap-5">
+                <div className="grid gap-2">
+                  <Label htmlFor="staff-promote-search">Search member</Label>
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="staff-promote-search"
+                      value={promoteSearch}
+                      onChange={(event) => setPromoteSearch(event.target.value)}
+                      placeholder="Search name, email, phone, Discord..."
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid max-h-[340px] gap-2 overflow-y-auto pr-1">
+                  {filteredMemberProfiles.length ? (
+                    filteredMemberProfiles.map((profile) => {
+                      const selected = selectedProfile?.id === profile.id;
+
+                      return (
+                        <button
+                          key={profile.id}
+                          type="button"
+                          onClick={() => setSelectedProfileId(profile.id)}
+                          className={`rounded-2xl border p-4 text-left transition-colors ${
+                            selected
+                              ? "border-primary/50 bg-primary/10"
+                              : "border-border/45 bg-background/45 hover:border-primary/25"
+                          }`}
+                        >
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-primary/25 bg-primary/10 font-display font-bold text-electric">
+                              {getProfileInitials(profile)}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate font-display text-lg font-bold text-foreground">
+                                {profile.full_name || "No name"}
+                              </div>
+                              <div className="truncate text-sm text-muted-foreground">
+                                {profile.email || "No email recorded"}
+                              </div>
+                            </div>
+                            {selected && (
+                              <Badge
+                                variant="outline"
+                                className="border-primary/40 bg-primary/10 text-electric"
+                              >
+                                Selected
+                              </Badge>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-border/55 bg-background/35 p-6 text-sm text-muted-foreground">
+                      No registered member matches this search.
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="staff-promote-role">Role to assign</Label>
+                  <select
+                    id="staff-promote-role"
+                    value={selectedRole}
+                    onChange={(event) => setSelectedRole(event.target.value as StaffPromoteRole)}
+                    className="h-11 w-full rounded-md border border-border/60 bg-card/45 px-3 text-sm text-foreground outline-none transition-colors focus:border-primary"
+                  >
+                    <option value="moderator">Moderator</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setPromoteOpen(false);
+                      resetPromoteDialog();
+                    }}
+                    className="border-border/60 bg-background/45"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={!selectedProfile || savingKey === `profile:${selectedProfile.id}`}
+                    className="text-primary-foreground glow-primary hover:opacity-90"
+                    style={{ background: "var(--gradient-primary)" }}
+                  >
+                    {selectedProfile && savingKey === `profile:${selectedProfile.id}` ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <UserPlus className="h-4 w-4" />
+                    )}
+                    Promote to {profileRoleLabel(selectedRole)}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -4326,6 +5006,7 @@ function StaffRoleGroup({
   description,
   emptyMessage,
   profiles,
+  icon,
   currentUserId,
   savingKey,
   onChange,
@@ -4335,19 +5016,27 @@ function StaffRoleGroup({
   description: string;
   emptyMessage: string;
   profiles: UserProfileRow[];
+  icon: "staff" | "candidate";
   currentUserId: string;
   savingKey: string | null;
   onChange: (id: string, patch: Partial<UserProfileRow>) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>, profile: UserProfileRow) => void;
 }) {
+  const GroupIcon = icon === "staff" ? ShieldCheck : UserPlus;
+
   return (
-    <section className="rounded-2xl border border-border/50 bg-card/20 p-4">
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h3 className="font-display text-xl font-bold sm:text-2xl">{title}</h3>
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+    <section className="rounded-[1.75rem] border border-border/50 bg-card/25 p-4 shadow-[0_18px_55px_rgba(0,0,0,0.18)] sm:p-5">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-primary/30 bg-primary/10 text-electric">
+            <GroupIcon className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className="font-display text-xl font-bold tracking-tight sm:text-2xl">{title}</h3>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
+          </div>
         </div>
-        <Badge variant="outline" className="w-fit border-primary/35 text-electric">
+        <Badge variant="outline" className="w-fit border-primary/35 bg-primary/10 text-electric">
           {profiles.length} users
         </Badge>
       </div>
@@ -4366,8 +5055,13 @@ function StaffRoleGroup({
           ))}
         </div>
       ) : (
-        <div className="rounded-xl border border-border/45 bg-background/35 p-5 text-sm text-muted-foreground">
-          {emptyMessage}
+        <div className="rounded-2xl border border-dashed border-border/55 bg-background/35 p-6 text-sm text-muted-foreground">
+          <div className="flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-muted/10 text-muted-foreground">
+              <UserCog className="h-4 w-4" />
+            </div>
+            {emptyMessage}
+          </div>
         </div>
       )}
     </section>
@@ -4388,41 +5082,70 @@ function StaffRoleCard({
   onSubmit: (event: FormEvent<HTMLFormElement>, profile: UserProfileRow) => void;
 }) {
   const isCurrentUser = profile.id === currentUserId;
+  const initials = getProfileInitials(profile);
 
   return (
     <form
       onSubmit={(event) => onSubmit(event, profile)}
-      className="rounded-2xl border border-border/50 bg-background/35 p-4"
+      className="rounded-2xl border border-border/45 bg-background/45 p-4 transition-colors hover:border-primary/25 hover:bg-background/60"
     >
-      <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr_auto] lg:items-center">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(220px,0.65fr)_auto] xl:items-center">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className={profileRoleClassName(profile.role)}>
-              {profileRoleLabel(profile.role)}
-            </Badge>
-            {isCurrentUser && (
-              <span className="text-[11px] font-semibold text-muted-foreground">Current admin</span>
-            )}
-          </div>
-          <div className="mt-3 min-w-0">
-            <div className="truncate font-display text-xl font-bold text-foreground">
-              {profile.full_name || "No name"}
+          <div className="flex min-w-0 gap-4">
+            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-primary/30 bg-primary/15 font-display text-lg font-bold text-electric">
+              {initials}
             </div>
-            <div className="mt-1 truncate text-sm text-muted-foreground">
-              {profile.email || "No email recorded"}
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className={profileRoleClassName(profile.role)}>
+                  {profileRoleLabel(profile.role)}
+                </Badge>
+                {isCurrentUser && (
+                  <span className="rounded-full border border-gold/30 bg-gold/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-gold">
+                    You
+                  </span>
+                )}
+              </div>
+              <div className="mt-2 truncate font-display text-xl font-bold text-foreground">
+                {profile.full_name || "No name"}
+              </div>
+              <div className="mt-1 truncate text-sm text-muted-foreground">
+                {profile.email || "No email recorded"}
+              </div>
             </div>
           </div>
-          <div className="mt-3 grid gap-3 text-xs sm:grid-cols-3">
-            <span className="truncate">Phone: {profile.phone_number || "Not provided"}</span>
-            <div className="min-w-0">
+
+          <div className="mt-4 grid gap-2 text-xs text-muted-foreground md:grid-cols-3">
+            <div className="rounded-xl border border-border/40 bg-card/25 px-3 py-2">
+              <div className="font-bold uppercase tracking-[0.16em] text-muted-foreground/80">
+                Phone
+              </div>
+              <div className="mt-1 truncate text-sm text-foreground/90">
+                {profile.phone_number || "Not provided"}
+              </div>
+            </div>
+            <div className="min-w-0 rounded-xl border border-border/40 bg-card/25 px-3 py-2">
+              <div className="font-bold uppercase tracking-[0.16em] text-muted-foreground/80">
+                Discord
+              </div>
               <DiscordIdentityCell profile={profile} />
             </div>
-            <span className="truncate">Joined {formatAdminDate(profile.created_at)}</span>
+            <div className="rounded-xl border border-border/40 bg-card/25 px-3 py-2">
+              <div className="font-bold uppercase tracking-[0.16em] text-muted-foreground/80">
+                Joined
+              </div>
+              <div className="mt-1 truncate text-sm text-foreground/90">
+                {formatAdminDate(profile.created_at)}
+              </div>
+            </div>
           </div>
         </div>
 
-        <div>
-          <Label htmlFor={`${profile.id}-staff-role`} className="text-xs">
+        <div className="rounded-2xl border border-border/40 bg-card/25 p-3">
+          <Label
+            htmlFor={`${profile.id}-staff-role`}
+            className="text-xs uppercase tracking-[0.16em]"
+          >
             Staff role
           </Label>
           <select
@@ -4446,7 +5169,7 @@ function StaffRoleCard({
         <Button
           type="submit"
           disabled={saving || isCurrentUser}
-          className="text-primary-foreground glow-primary hover:opacity-90"
+          className="h-12 min-w-[150px] text-primary-foreground glow-primary hover:opacity-90 xl:justify-center"
           style={{ background: "var(--gradient-primary)" }}
         >
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
@@ -4457,35 +5180,96 @@ function StaffRoleCard({
   );
 }
 
+function StaffMetric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "gold" | "green" | "blue" | "neutral";
+}) {
+  const toneClassName =
+    tone === "gold"
+      ? "border-gold/35 bg-gold/10 text-gold"
+      : tone === "green"
+        ? "border-bull/35 bg-bull/10 text-bull"
+        : tone === "blue"
+          ? "border-primary/35 bg-primary/10 text-electric"
+          : "border-border/50 bg-background/35 text-foreground";
+
+  return (
+    <div className={`rounded-2xl border p-4 ${toneClassName}`}>
+      <div className="text-[10px] font-bold uppercase tracking-[0.18em] opacity-80">{label}</div>
+      <div className="mt-2 font-display text-3xl font-bold">{value}</div>
+    </div>
+  );
+}
+
 function CommunityMembersPanel({ memberProfiles }: { memberProfiles: UserProfileRow[] }) {
   const [searchQuery, setSearchQuery] = useState("");
-  const paidMemberProfiles = memberProfiles.filter(hasPaidMentorship);
+  const paidMemberProfiles = memberProfiles.filter(hasAnyPaidAccess);
+  const paidMentorshipProfiles = memberProfiles.filter(hasPaidMentorship);
   const paidNewsProfiles = memberProfiles.filter(hasPaidNewsSubscription);
-  const filteredMemberProfiles = memberProfiles.filter((profile) =>
+  const paidLiveTradingProfiles = memberProfiles.filter(hasPaidLiveTradingAccess);
+  const filteredPaidProfiles = paidMemberProfiles.filter((profile) =>
     memberMatchesSearch(profile, searchQuery),
   );
 
   return (
     <div className="grid gap-6">
       <div className="grid gap-3 sm:grid-cols-4">
-        <AdminStat label="All members" value={String(memberProfiles.length)} />
         <AdminStat label="Paid members" value={String(paidMemberProfiles.length)} />
-        <AdminStat
-          label="Live trading"
-          value={String(memberProfiles.filter(hasPaidLiveTradingAccess).length)}
-        />
-        <AdminStat label="News subscribers" value={String(paidNewsProfiles.length)} />
+        <AdminStat label="Mentorship" value={String(paidMentorshipProfiles.length)} />
+        <AdminStat label="Live trading" value={String(paidLiveTradingProfiles.length)} />
+        <AdminStat label="Premium" value={String(paidNewsProfiles.length)} />
       </div>
 
       <CommunityMembersTable
-        profiles={filteredMemberProfiles}
-        totalCount={memberProfiles.length}
+        title="Paid Community Members"
+        description="Members with an active paid plan, Live Trading access, or Premium access."
+        profiles={filteredPaidProfiles}
+        totalCount={paidMemberProfiles.length}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         emptyMessage={
           searchQuery.trim()
-            ? "No members match this search."
-            : "No community members right now. Members will appear here after signup."
+            ? "No paid members match this search."
+            : "No paid community members yet. They will appear here after a verified payment."
+        }
+      />
+    </div>
+  );
+}
+
+function RegisteredAccountsPanel({ memberProfiles }: { memberProfiles: UserProfileRow[] }) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const registeredMemberProfiles = memberProfiles.filter((profile) => !hasAnyPaidAccess(profile));
+  const filteredRegisteredProfiles = registeredMemberProfiles.filter((profile) =>
+    memberMatchesSearch(profile, searchQuery),
+  );
+
+  return (
+    <div className="grid gap-6">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <AdminStat label="Registered only" value={String(registeredMemberProfiles.length)} />
+        <AdminStat label="All members" value={String(memberProfiles.length)} />
+        <AdminStat
+          label="Paid members"
+          value={String(memberProfiles.filter(hasAnyPaidAccess).length)}
+        />
+      </div>
+      <CommunityMembersTable
+        title="Registered Accounts - Not Paid Yet"
+        description="Members who created an account but do not have paid access yet."
+        profiles={filteredRegisteredProfiles}
+        totalCount={registeredMemberProfiles.length}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        emptyMessage={
+          searchQuery.trim()
+            ? "No unpaid registered accounts match this search."
+            : "No unpaid registered accounts right now."
         }
       />
     </div>
@@ -4493,38 +5277,44 @@ function CommunityMembersPanel({ memberProfiles }: { memberProfiles: UserProfile
 }
 
 function CommunityMembersTable({
+  title,
+  description,
   profiles,
   totalCount,
   searchQuery,
   onSearchChange,
+  showSearch = true,
   emptyMessage,
 }: {
+  title: string;
+  description: string;
   profiles: UserProfileRow[];
   totalCount: number;
   searchQuery: string;
   onSearchChange: (value: string) => void;
+  showSearch?: boolean;
   emptyMessage: string;
 }) {
   return (
     <section className="rounded-2xl border border-border/50 bg-card/20 p-4">
       <div className="mb-4 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <h3 className="font-display text-xl font-bold sm:text-2xl">All Community Members</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Registered members, paid mentorship members, and News Desk subscribers in one table.
-          </p>
+          <h3 className="font-display text-xl font-bold sm:text-2xl">{title}</h3>
+          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative w-full sm:w-80">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
-              value={searchQuery}
-              onChange={(event) => onSearchChange(event.target.value)}
-              placeholder="Search name, email, phone, plan..."
-              className="h-11 bg-background/45 pl-10"
-            />
-          </div>
+          {showSearch && (
+            <div className="relative w-full sm:w-80">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                value={searchQuery}
+                onChange={(event) => onSearchChange(event.target.value)}
+                placeholder="Search name, email, phone, plan..."
+                className="h-11 bg-background/45 pl-10"
+              />
+            </div>
+          )}
           <Badge variant="outline" className="w-fit border-primary/35 text-electric">
             {profiles.length === totalCount
               ? `${profiles.length} users`
@@ -4540,17 +5330,17 @@ function CommunityMembersTable({
               <CommunityMemberMobileCard key={profile.id} profile={profile} />
             ))}
           </div>
-          <div className="hidden overflow-hidden rounded-xl border border-border/50 bg-background/35 md:block">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1180px] text-left text-sm">
+          <div className="hidden rounded-xl border border-border/50 bg-background/35 md:block">
+            <div className="max-w-full overflow-x-auto pb-2">
+              <table className="w-full min-w-[1280px] text-left text-sm">
                 <thead className="border-b border-border/60 bg-card/45 text-xs uppercase tracking-[0.18em] text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3 font-semibold">Full name</th>
                     <th className="px-4 py-3 font-semibold">Email</th>
                     <th className="px-4 py-3 font-semibold">Phone</th>
                     <th className="px-4 py-3 font-semibold">Discord user / ID</th>
-                    <th className="px-4 py-3 font-semibold">Role</th>
                     <th className="px-4 py-3 font-semibold">Plan</th>
+                    <th className="px-4 py-3 font-semibold">Access</th>
                     <th className="px-4 py-3 font-semibold">Joined</th>
                     <th className="px-4 py-3 text-right font-semibold">Invoice</th>
                   </tr>
@@ -4576,12 +5366,7 @@ function CommunityMembersTable({
 function CommunityMemberMobileCard({ profile }: { profile: UserProfileRow }) {
   const paidPlans = paidPlanItems(profile);
   const whatsappUrl = whatsAppMessageUrl(profile.phone_number);
-  const paidMemberships = mentorshipMembershipPlans
-    .map(({ slug, label }) => ({
-      label,
-      membership: profile.memberships[slug],
-    }))
-    .filter(({ membership }) => membership.status === "paid");
+  const invoiceItems = paidInvoiceItems(profile);
 
   return (
     <article className="rounded-2xl border border-border/50 bg-background/35 p-4">
@@ -4649,9 +5434,7 @@ function CommunityMemberMobileCard({ profile }: { profile: UserProfileRow }) {
                   <Badge variant="outline" className={plan.className}>
                     {plan.label}
                   </Badge>
-                  {plan.detail && (
-                    <span className="text-xs text-muted-foreground">{plan.detail}</span>
-                  )}
+                  <PaidPlanDetails plan={plan} />
                 </div>
               ))}
             </div>
@@ -4664,24 +5447,19 @@ function CommunityMemberMobileCard({ profile }: { profile: UserProfileRow }) {
             </Badge>
           )}
         </div>
+
+        <div className="rounded-xl border border-border/40 bg-card/25 p-3">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Access
+          </div>
+          <PaidPlanAccessList plans={paidPlans} />
+        </div>
       </div>
 
       <div className="mt-4 flex flex-col gap-3 border-t border-border/50 pt-4 text-xs text-muted-foreground">
         <span>Joined {formatAdminDate(profile.created_at)}</span>
-        {paidMemberships.length ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="w-full border-gold/35 text-gold hover:bg-gold/10"
-            aria-label={
-              "Print invoice for " + (profile.full_name || profile.email || "paid member")
-            }
-            onClick={() => printPaidMemberInvoice(profile, paidMemberships)}
-          >
-            <Printer className="h-3.5 w-3.5" />
-            Invoice
-          </Button>
+        {invoiceItems.length ? (
+          <InvoicePrintActions profile={profile} paidMemberships={invoiceItems} fullWidth />
         ) : (
           <span>No invoice</span>
         )}
@@ -4693,12 +5471,7 @@ function CommunityMemberMobileCard({ profile }: { profile: UserProfileRow }) {
 function CommunityMembersTableRow({ profile }: { profile: UserProfileRow }) {
   const paidPlans = paidPlanItems(profile);
   const whatsappUrl = whatsAppMessageUrl(profile.phone_number);
-  const paidMemberships = mentorshipMembershipPlans
-    .map(({ slug, label }) => ({
-      label,
-      membership: profile.memberships[slug],
-    }))
-    .filter(({ membership }) => membership.status === "paid");
+  const invoiceItems = paidInvoiceItems(profile);
 
   return (
     <tr className="transition-colors hover:bg-card/35">
@@ -4735,11 +5508,6 @@ function CommunityMembersTableRow({ profile }: { profile: UserProfileRow }) {
         <DiscordIdentityCell profile={profile} />
       </td>
       <td className="px-4 py-4">
-        <Badge variant="outline" className={profileRoleClassName(profile.role)}>
-          {profileRoleLabel(profile.role)}
-        </Badge>
-      </td>
-      <td className="px-4 py-4">
         {paidPlans.length ? (
           <div className="grid gap-1.5">
             {paidPlans.map((plan) => (
@@ -4747,9 +5515,7 @@ function CommunityMembersTableRow({ profile }: { profile: UserProfileRow }) {
                 <Badge variant="outline" className={plan.className}>
                   {plan.label}
                 </Badge>
-                {plan.detail && (
-                  <span className="text-xs text-muted-foreground">{plan.detail}</span>
-                )}
+                <PaidPlanDetails plan={plan} />
               </div>
             ))}
           </div>
@@ -4759,22 +5525,13 @@ function CommunityMembersTableRow({ profile }: { profile: UserProfileRow }) {
           </Badge>
         )}
       </td>
+      <td className="px-4 py-4">
+        <PaidPlanAccessList plans={paidPlans} />
+      </td>
       <td className="px-4 py-4 text-muted-foreground">{formatAdminDate(profile.created_at)}</td>
       <td className="px-4 py-4 text-right">
-        {paidMemberships.length ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="border-gold/35 text-gold hover:bg-gold/10"
-            aria-label={
-              "Print invoice for " + (profile.full_name || profile.email || "paid member")
-            }
-            onClick={() => printPaidMemberInvoice(profile, paidMemberships)}
-          >
-            <Printer className="h-3.5 w-3.5" />
-            Invoice
-          </Button>
+        {invoiceItems.length ? (
+          <InvoicePrintActions profile={profile} paidMemberships={invoiceItems} />
         ) : (
           <span className="text-xs text-muted-foreground">No invoice</span>
         )}
@@ -4827,7 +5584,12 @@ function memberMatchesSearch(profile: UserProfileRow, query: string) {
     profileRoleLabel(profile.role),
     profile.created_at,
     formatAdminDate(profile.created_at),
-    ...planItems.flatMap((plan) => [plan.label, plan.detail]),
+    ...planItems.flatMap((plan) => [
+      plan.label,
+      plan.detail,
+      plan.accessStartsAt,
+      plan.accessExpiresAt,
+    ]),
     ...membershipFields,
     newsSubscription.status,
     newsSubscription.payment_provider,
@@ -4861,6 +5623,98 @@ function normalizeMemberSearch(value: string) {
   return value.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
+type PaidPlanItem = ReturnType<typeof paidPlanItems>[number];
+
+function PaidPlanDetails({ plan }: { plan: PaidPlanItem }) {
+  return (
+    <div className="grid gap-1 text-xs text-muted-foreground">
+      {plan.detail && <span>{plan.detail}</span>}
+    </div>
+  );
+}
+
+function PaidPlanAccessList({ plans }: { plans: PaidPlanItem[] }) {
+  if (!plans.length) {
+    return <span className="mt-2 block text-sm text-muted-foreground">No paid access</span>;
+  }
+
+  return (
+    <div className="mt-2 grid min-w-[260px] gap-2">
+      {plans.map((plan) => {
+        const remaining = accessRemainingMeta(plan.accessExpiresAt);
+
+        return (
+          <div
+            key={plan.key}
+            className="grid gap-2 rounded-xl border border-border/35 bg-background/30 p-3 text-xs"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Badge variant="outline" className={plan.className}>
+                {plan.label}
+              </Badge>
+              <span className={remaining.className}>{remaining.label}</span>
+            </div>
+            <div className="grid gap-1 text-muted-foreground">
+              <span>
+                <span className="font-mono text-[10px] text-muted-foreground/80">
+                  access_starts_at
+                </span>
+                {": "}
+                <span className="text-foreground">
+                  {formatOptionalAdminDateTime(plan.accessStartsAt)}
+                </span>
+              </span>
+              <span>
+                <span className="font-mono text-[10px] text-muted-foreground/80">
+                  access_expires_at
+                </span>
+                {": "}
+                <span className="text-foreground">
+                  {formatOptionalAdminDateTime(plan.accessExpiresAt, "No expiry")}
+                </span>
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function accessRemainingMeta(expiresAt: string | null) {
+  if (!expiresAt) {
+    return {
+      label: "No expiry",
+      className: "font-semibold text-muted-foreground",
+    };
+  }
+
+  const expiry = new Date(expiresAt);
+  if (Number.isNaN(expiry.getTime())) {
+    return {
+      label: "Unknown",
+      className: "font-semibold text-muted-foreground",
+    };
+  }
+
+  const millisecondsPerDay = 24 * 60 * 60 * 1000;
+  const rawDays = (expiry.getTime() - Date.now()) / millisecondsPerDay;
+
+  if (rawDays < 0) {
+    const expiredDays = Math.max(1, Math.ceil(Math.abs(rawDays)));
+    return {
+      label: `${expiredDays} day${expiredDays === 1 ? "" : "s"} expired`,
+      className: "font-semibold text-bear",
+    };
+  }
+
+  const remainingDays = Math.max(1, Math.ceil(rawDays));
+  return {
+    label: `${remainingDays} day${remainingDays === 1 ? "" : "s"} left`,
+    className: remainingDays <= 7 ? "font-semibold text-gold" : "font-semibold text-bull",
+  };
+}
+
 function paidPlanItems(profile: UserProfileRow) {
   const plans = mentorshipMembershipPlans
     .map(({ slug, label }) => {
@@ -4878,6 +5732,8 @@ function paidPlanItems(profile: UserProfileRow) {
         ]
           .filter(Boolean)
           .join(" - "),
+        accessStartsAt: membership.access_starts_at,
+        accessExpiresAt: membership.access_expires_at,
       };
     })
     .filter((plan): plan is NonNullable<typeof plan> => Boolean(plan));
@@ -4895,6 +5751,8 @@ function paidPlanItems(profile: UserProfileRow) {
       ]
         .filter(Boolean)
         .join(" - "),
+      accessStartsAt: liveAccess.access_starts_at,
+      accessExpiresAt: liveAccess.access_expires_at,
     });
   }
 
@@ -4910,6 +5768,8 @@ function paidPlanItems(profile: UserProfileRow) {
       ]
         .filter(Boolean)
         .join(" - "),
+      accessStartsAt: newsSubscription.access_starts_at,
+      accessExpiresAt: newsSubscription.access_expires_at,
     });
   }
 
@@ -5191,18 +6051,135 @@ function NewsSubscribersTableRow({ profile }: { profile: UserProfileRow }) {
   );
 }
 
-type PaidMembershipInvoiceItem = {
+type PaidInvoiceItem = {
   label: string;
-  membership: UserMembershipRow;
+  accessType: string;
+  amountLabel: string | null;
+  paidAt: string | null;
+  accessStartsAt: string | null;
+  accessExpiresAt: string | null;
+  paymentProvider: string | null;
+  providerCustomerId: string | null;
+  providerCheckoutId: string | null;
+  providerSubscriptionId: string | null;
+  notes: string | null;
 };
 
+type InvoiceModel = "admin" | "member";
+
+function paidInvoiceItems(profile: UserProfileRow) {
+  const items: PaidInvoiceItem[] = mentorshipMembershipPlans
+    .map(({ slug, label }) => {
+      const membership = profile.memberships[slug];
+      if (membership.status !== "paid") return null;
+
+      return {
+        label,
+        accessType: "Mentorship access",
+        amountLabel: membership.amount_label,
+        paidAt: membership.paid_at,
+        accessStartsAt: membership.access_starts_at,
+        accessExpiresAt: membership.access_expires_at,
+        paymentProvider: membership.payment_provider,
+        providerCustomerId: membership.provider_customer_id,
+        providerCheckoutId: membership.provider_checkout_id,
+        providerSubscriptionId: membership.provider_subscription_id,
+        notes: membership.notes,
+      };
+    })
+    .filter((item): item is PaidInvoiceItem => Boolean(item));
+
+  const liveAccess = profile.liveTradingAccess;
+  if (hasPaidLiveTradingAccess(profile)) {
+    items.push({
+      label: "Live Trading",
+      accessType: liveAccess.duration_label || "Live Trading access",
+      amountLabel: liveAccess.amount_label,
+      paidAt: liveAccess.paid_at,
+      accessStartsAt: liveAccess.access_starts_at,
+      accessExpiresAt: liveAccess.access_expires_at,
+      paymentProvider: liveAccess.payment_provider,
+      providerCustomerId: liveAccess.provider_customer_id,
+      providerCheckoutId: liveAccess.provider_checkout_id,
+      providerSubscriptionId: null,
+      notes: liveAccess.notes,
+    });
+  }
+
+  const newsSubscription = profile.newsSubscription;
+  if (hasPaidNewsSubscription(profile)) {
+    items.push({
+      label: "Premium Access",
+      accessType: "Premium education/news access",
+      amountLabel: newsSubscription.amount_label || "$5/mo",
+      paidAt: newsSubscription.paid_at,
+      accessStartsAt: newsSubscription.access_starts_at,
+      accessExpiresAt: newsSubscription.access_expires_at,
+      paymentProvider: newsSubscription.payment_provider,
+      providerCustomerId: newsSubscription.provider_customer_id,
+      providerCheckoutId: newsSubscription.provider_checkout_id,
+      providerSubscriptionId: newsSubscription.provider_subscription_id,
+      notes: newsSubscription.notes,
+    });
+  }
+
+  return items;
+}
+
+function InvoicePrintActions({
+  profile,
+  paidMemberships,
+  fullWidth = false,
+}: {
+  profile: UserProfileRow;
+  paidMemberships: PaidInvoiceItem[];
+  fullWidth?: boolean;
+}) {
+  const memberLabel = profile.full_name || profile.email || "paid member";
+  const wrapperClassName = fullWidth
+    ? "grid grid-cols-2 gap-2"
+    : "flex flex-wrap justify-end gap-2";
+
+  return (
+    <div className={wrapperClassName}>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className={
+          fullWidth
+            ? "w-full border-primary/35 text-electric hover:bg-primary/10"
+            : "border-primary/35 text-electric hover:bg-primary/10"
+        }
+        aria-label={`Print admin invoice for ${memberLabel}`}
+        onClick={() => printPaidMemberInvoice(profile, paidMemberships, "admin")}
+      >
+        <Printer className="h-3.5 w-3.5" />
+        Admin
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className={
+          fullWidth
+            ? "w-full border-gold/35 text-gold hover:bg-gold/10"
+            : "border-gold/35 text-gold hover:bg-gold/10"
+        }
+        aria-label={`Print member invoice for ${memberLabel}`}
+        onClick={() => printPaidMemberInvoice(profile, paidMemberships, "member")}
+      >
+        <Printer className="h-3.5 w-3.5" />
+        Member
+      </Button>
+    </div>
+  );
+}
+
 function PaidMembersTableRow({ profile }: { profile: UserProfileRow }) {
-  const paidMemberships = mentorshipMembershipPlans
-    .map(({ slug, label }) => ({
-      label,
-      membership: profile.memberships[slug],
-    }))
-    .filter(({ membership }) => membership.status === "paid");
+  const paidMemberships = paidInvoiceItems(profile).filter(
+    (item) => item.accessType === "Mentorship access",
+  );
 
   return (
     <tr className="transition-colors hover:bg-card/35">
@@ -5226,24 +6203,13 @@ function PaidMembersTableRow({ profile }: { profile: UserProfileRow }) {
       <td className="px-4 py-4 text-muted-foreground">{formatAdminDate(profile.created_at)}</td>
       <td className="px-4 py-4 text-muted-foreground">
         <div className="grid gap-1">
-          {paidMemberships.map(({ label, membership }) => (
-            <div key={label}>
-              {membership.paid_at ? formatAdminDate(membership.paid_at) : "Paid date missing"}
-            </div>
+          {paidMemberships.map(({ label, paidAt }) => (
+            <div key={label}>{paidAt ? formatAdminDate(paidAt) : "Paid date missing"}</div>
           ))}
         </div>
       </td>
       <td className="px-4 py-4 text-right">
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          className="border-primary/35 bg-primary/10 text-electric hover:bg-primary/15"
-          aria-label={`Print invoice for ${profile.full_name || profile.email || "paid member"}`}
-          onClick={() => printPaidMemberInvoice(profile, paidMemberships)}
-        >
-          <Printer className="h-4 w-4" />
-        </Button>
+        <InvoicePrintActions profile={profile} paidMemberships={paidMemberships} />
       </td>
     </tr>
   );
@@ -5251,7 +6217,8 @@ function PaidMembersTableRow({ profile }: { profile: UserProfileRow }) {
 
 function printPaidMemberInvoice(
   profile: UserProfileRow,
-  paidMemberships: PaidMembershipInvoiceItem[],
+  paidMemberships: PaidInvoiceItem[],
+  model: InvoiceModel,
 ) {
   const invoiceWindow = window.open("", "_blank", "width=900,height=1100");
 
@@ -5260,13 +6227,19 @@ function printPaidMemberInvoice(
   }
 
   invoiceWindow.document.open();
-  invoiceWindow.document.write(buildInvoiceHtml(profile, paidMemberships));
+  invoiceWindow.document.write(buildInvoiceHtml(profile, paidMemberships, model));
   invoiceWindow.document.close();
 }
 
-function buildInvoiceHtml(profile: UserProfileRow, paidMemberships: PaidMembershipInvoiceItem[]) {
+function buildInvoiceHtml(
+  profile: UserProfileRow,
+  paidMemberships: PaidInvoiceItem[],
+  model: InvoiceModel,
+) {
+  const isAdminCopy = model === "admin";
   const memberName = profile.full_name || "Member";
   const invoiceNumber = `ZT-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`;
+  const copyLabel = isAdminCopy ? "Admin copy" : "Member copy";
   const generatedAt = new Intl.DateTimeFormat("en", {
     month: "short",
     day: "numeric",
@@ -5276,17 +6249,29 @@ function buildInvoiceHtml(profile: UserProfileRow, paidMemberships: PaidMembersh
   }).format(new Date());
 
   const lineItems = paidMemberships
-    .map(({ label, membership }) => {
-      const amount = membership.amount_label || "Recorded payment";
-      const paidDate = membership.paid_at
-        ? formatAdminDate(membership.paid_at)
-        : "Paid date missing";
+    .map((item) => {
+      const amount = item.amountLabel || "Recorded payment";
+      const paidDate = item.paidAt ? formatAdminDate(item.paidAt) : "Paid date missing";
+      const accessStart = formatOptionalAdminDateTime(item.accessStartsAt);
+      const accessExpiry = formatOptionalAdminDateTime(item.accessExpiresAt, "No expiry");
+      const internalDetails = isAdminCopy
+        ? `
+            <span>Provider: ${escapeHtml(item.paymentProvider || "Not recorded")}</span>
+            <span>Customer ID: ${escapeHtml(item.providerCustomerId || "Not recorded")}</span>
+            <span>Checkout ID: ${escapeHtml(item.providerCheckoutId || "Not recorded")}</span>
+            <span>Subscription / order: ${escapeHtml(item.providerSubscriptionId || "Not recorded")}</span>
+            <span>Admin notes: ${escapeHtml(item.notes || "No notes")}</span>
+          `
+        : "";
 
       return `
         <tr>
           <td>
-            <strong>${escapeHtml(label)}</strong>
-            <span>Mentorship access</span>
+            <strong>${escapeHtml(item.label)}</strong>
+            <span>${escapeHtml(item.accessType)}</span>
+            <span>access_starts_at: ${escapeHtml(accessStart)}</span>
+            <span>access_expires_at: ${escapeHtml(accessExpiry)}</span>
+            ${internalDetails}
           </td>
           <td>${escapeHtml(amount)}</td>
           <td>${escapeHtml(paidDate)}</td>
@@ -5301,7 +6286,7 @@ function buildInvoiceHtml(profile: UserProfileRow, paidMemberships: PaidMembersh
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ZacTrades Invoice - ${escapeHtml(memberName)}</title>
+    <title>ZacTrades ${escapeHtml(copyLabel)} Invoice - ${escapeHtml(memberName)}</title>
     <style>
       * { box-sizing: border-box; }
       body {
@@ -5360,6 +6345,18 @@ function buildInvoiceHtml(profile: UserProfileRow, paidMemberships: PaidMembersh
         margin: 8px 0 0;
         color: #9aa8ba;
         font-size: 13px;
+      }
+      .copy-badge {
+        display: inline-flex;
+        margin-top: 12px;
+        border: 1px solid ${isAdminCopy ? "#38bdf8" : "#f5c542"};
+        border-radius: 999px;
+        padding: 6px 12px;
+        color: ${isAdminCopy ? "#38bdf8" : "#f5c542"};
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
       }
       main {
         padding: 34px;
@@ -5452,12 +6449,13 @@ function buildInvoiceHtml(profile: UserProfileRow, paidMemberships: PaidMembersh
           <img src="${escapeHtml(logoUrl)}" alt="ZacTrades logo" />
           <div>
             <strong>ZacTrades</strong>
-            <span>Mentorship invoice</span>
+            <span>${escapeHtml(copyLabel)} paid access invoice</span>
           </div>
         </div>
         <div class="invoice-label">
           <h1>Invoice</h1>
           <p>${escapeHtml(invoiceNumber)}</p>
+          <span class="copy-badge">${escapeHtml(copyLabel)}</span>
         </div>
       </header>
       <main>
@@ -5468,18 +6466,21 @@ function buildInvoiceHtml(profile: UserProfileRow, paidMemberships: PaidMembersh
             <p class="line">${escapeHtml(profile.email || "No email recorded")}</p>
             <p class="line">Phone: ${escapeHtml(profile.phone_number || "Not provided")}</p>
             <p class="line">Discord: ${escapeHtml(profile.discord_username || "Not provided")}</p>
+            ${isAdminCopy ? `<p class="line">Discord ID: ${escapeHtml(profile.discord_user_id || "Not recorded")}</p>` : ""}
           </div>
           <div class="box">
             <p class="eyebrow">Invoice details</p>
             <p class="line"><strong>Generated:</strong> ${escapeHtml(generatedAt)}</p>
             <p class="line"><strong>Joined:</strong> ${escapeHtml(formatAdminDate(profile.created_at))}</p>
             <p class="line"><strong>Status:</strong> Paid</p>
+            ${isAdminCopy ? `<p class="line"><strong>Member ID:</strong> ${escapeHtml(profile.id)}</p>` : ""}
+            ${isAdminCopy ? `<p class="line"><strong>Admin role:</strong> ${escapeHtml(profileRoleLabel(profile.role))}</p>` : ""}
           </div>
         </section>
         <table>
           <thead>
             <tr>
-              <th>Mentorship</th>
+              <th>Access</th>
               <th>Amount</th>
               <th>Paid date</th>
               <th>Status</th>
@@ -5487,11 +6488,19 @@ function buildInvoiceHtml(profile: UserProfileRow, paidMemberships: PaidMembersh
           </thead>
           <tbody>${lineItems}</tbody>
         </table>
-        <div class="paid">Payment confirmed - mentorship access granted.</div>
+        <div class="paid">${
+          isAdminCopy
+            ? "Internal copy - payment confirmed and paid access recorded."
+            : "Payment confirmed - paid access granted."
+        }</div>
       </main>
       <footer>
-        This invoice confirms the recorded mentorship payment status inside ZacTrades admin.
-        Trading education and mentorship services are subject to the site terms and policies.
+        ${
+          isAdminCopy
+            ? "Admin copy: this document includes internal payment references and should be kept for ZacTrades records."
+            : "Member copy: this invoice confirms your recorded payment with ZacTrades."
+        }
+        Trading education, mentorship, and community access services are subject to the site terms and policies.
       </footer>
     </article>
     <script>
@@ -5999,8 +7008,54 @@ function membershipStatusClassName(status: MembershipStatus) {
   }
 }
 
+function offerToneClassName(tone: OfferHeadlineTone) {
+  switch (tone) {
+    case "electric":
+      return {
+        badge: "border-primary/40 bg-primary/10 text-electric",
+        glow: "bg-primary/25",
+        preview: "border-primary/35 bg-primary/10",
+        icon: "border border-primary/35 bg-primary/15 text-electric",
+        text: "text-electric",
+      };
+    case "bull":
+      return {
+        badge: "border-bull/40 bg-bull/10 text-bull",
+        glow: "bg-bull/25",
+        preview: "border-bull/35 bg-bull/10",
+        icon: "border border-bull/35 bg-bull/15 text-bull",
+        text: "text-bull",
+      };
+    case "violet":
+      return {
+        badge: "border-violet-300/40 bg-violet-500/10 text-violet-200",
+        glow: "bg-violet-400/25",
+        preview: "border-violet-300/35 bg-violet-500/10",
+        icon: "border border-violet-300/35 bg-violet-400/15 text-violet-200",
+        text: "text-violet-200",
+      };
+    case "gold":
+    default:
+      return {
+        badge: "border-gold/40 bg-gold/10 text-gold",
+        glow: "bg-gold/25",
+        preview: "border-gold/35 bg-gold/10",
+        icon: "border border-gold/35 bg-gold/15 text-gold",
+        text: "text-gold",
+      };
+  }
+}
+
 function hasPaidMentorship(profile: UserProfileRow) {
   return mentorshipMembershipPlans.some(({ slug }) => profile.memberships[slug].status === "paid");
+}
+
+function hasAnyPaidAccess(profile: UserProfileRow) {
+  return (
+    hasPaidMentorship(profile) ||
+    hasPaidLiveTradingAccess(profile) ||
+    hasPaidNewsSubscription(profile)
+  );
 }
 
 function hasPaidNewsSubscription(profile: UserProfileRow) {
@@ -6056,6 +7111,17 @@ function profileRoleClassName(role: ProfileRole) {
     default:
       return "border-primary/40 text-electric";
   }
+}
+
+function getProfileInitials(profile: UserProfileRow) {
+  const source = profile.full_name || profile.email || "Member";
+  const words = source.replace(/@.*/, "").split(/\s+/).filter(Boolean);
+  const initials = words
+    .slice(0, 2)
+    .map((word) => word.charAt(0).toUpperCase())
+    .join("");
+
+  return initials || "M";
 }
 
 function Field({
@@ -6589,6 +7655,18 @@ function formatAdminDate(value: string) {
   }).format(date);
 }
 
+function formatOptionalAdminDate(value: string | null | undefined, fallback = "Not recorded") {
+  if (!value) return fallback;
+
+  return formatAdminDate(value);
+}
+
+function formatOptionalAdminDateTime(value: string | null | undefined, fallback = "Not recorded") {
+  if (!value) return fallback;
+
+  return formatAdminDateTime(value);
+}
+
 function formatAdminDateTime(value: string) {
   if (!value) return "Unknown";
 
@@ -6598,6 +7676,7 @@ function formatAdminDateTime(value: string) {
   return new Intl.DateTimeFormat("en", {
     month: "short",
     day: "numeric",
+    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);

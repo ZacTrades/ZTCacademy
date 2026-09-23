@@ -36,10 +36,6 @@ function PaymentSuccessPage() {
             <h1 className="mt-3 font-display text-3xl font-bold sm:text-4xl">
               Your payment was received.
             </h1>
-            <p className="mx-auto mt-4 max-w-lg text-sm leading-6 text-muted-foreground">
-              Payzone has sent you back to ZacTrades. Your access is activated after the verified
-              Payzone callback reaches our server, which usually happens quickly.
-            </p>
             <Button
               asChild
               className="mt-7 text-primary-foreground glow-primary hover:opacity-90"

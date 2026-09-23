@@ -725,7 +725,9 @@ function paidAccessExpiresAt(product: Pick<PaymentProduct, "kind" | "slug">) {
   if (product.kind === "mentorship") {
     if (product.slug === "one_to_one")
       return new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
-    return new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString();
+    const expiresAt = new Date();
+    expiresAt.setMonth(expiresAt.getMonth() + 4);
+    return expiresAt.toISOString();
   }
 
   const monthsBySlug: Record<string, number> = {

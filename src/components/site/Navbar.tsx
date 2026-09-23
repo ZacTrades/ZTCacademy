@@ -11,6 +11,7 @@ import { AnimatePresence, motion, useScroll, useSpring } from "framer-motion";
 import { useEffect, useState } from "react";
 import { AuthDialog } from "@/components/site/AuthDialog";
 import { BrandLogo } from "@/components/site/BrandLogo";
+import { OfferHeadlineStrip } from "@/components/site/OfferHeadlineStrip";
 import { useCurrency, type Currency } from "@/lib/currency";
 import { useLanguage, type TranslationKey } from "@/lib/language";
 import { mobileMenuVariants, quickSpring } from "@/lib/motion";
@@ -81,7 +82,10 @@ function NavLinkLabel({ label, comingSoon = false }: { label: string; comingSoon
   if (!comingSoon) return <span>{label}</span>;
 
   return (
-    <span className="relative inline-flex h-6 items-center align-middle" aria-label={label + " soon"}>
+    <span
+      className="relative inline-flex h-6 items-center align-middle"
+      aria-label={label + " soon"}
+    >
       <span className="whitespace-nowrap text-sm font-semibold text-muted-foreground transition-colors group-hover:text-foreground">
         {label}
       </span>
@@ -116,7 +120,8 @@ export function Navbar() {
   useEffect(() => {
     if (loading || !isAdmin) return;
 
-    const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/") || pathname.startsWith("/admin_");
+    const isAdminRoute =
+      pathname === "/admin" || pathname.startsWith("/admin/") || pathname.startsWith("/admin_");
     if (!isAdminRoute) {
       void navigate({ to: "/admin", replace: true });
     }
@@ -188,6 +193,8 @@ export function Navbar() {
   };
 
   const userLabel = user?.user_metadata?.full_name ?? user?.email ?? "Member";
+  const isAdminRoute =
+    pathname === "/admin" || pathname.startsWith("/admin/") || pathname.startsWith("/admin_");
 
   return (
     <>
@@ -354,6 +361,8 @@ export function Navbar() {
               {discordError}
             </div>
           )}
+
+          <OfferHeadlineStrip hidden={isAdminRoute || isStaff} />
 
           <AnimatePresence>
             {open && (

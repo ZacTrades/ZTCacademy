@@ -76,6 +76,9 @@ import {
   liveTradingPackages,
 } from "@/components/site/liveTradingPackages";
 import hero from "@/assets/hero-trading.jpg";
+import abdellatifReviewCertificate from "@/assets/member-review-abdellatif-ouard-fundednext.png";
+import bouma3zaReviewCertificate from "@/assets/member-review-bouma3za-myfundedfutures.png";
+import nizarReviewReward from "@/assets/member-review-nizar-fundednext-reward.jpg";
 import tradingViewPreview from "@/assets/zactrades-tradingview-preview.jpeg";
 import { useCurrency } from "@/lib/currency";
 import { supabase } from "@/lib/supabase";
@@ -1123,7 +1126,9 @@ function TradingTools() {
         <div className="mt-8 grid gap-4 sm:gap-5 md:mt-12 lg:grid-cols-3">
           {tools.map((tool, i) => {
             const theme = toolThemes[i % toolThemes.length];
-            const hasCode = tool.promo_code && tool.promo_code.toLowerCase() !== "none";
+            const isTradingViewTool = tool.name.trim().toLowerCase() === "tradingview";
+            const hasCode =
+              !isTradingViewTool && tool.promo_code && tool.promo_code.toLowerCase() !== "none";
             const isCopied = copiedToolName === tool.name;
 
             return (
@@ -1390,74 +1395,62 @@ function Testimonials() {
 
   const discordReviews: TestimonialReview[] = [
     {
-      name: "Mimi",
-      badges: ["ZTC", "🎓"],
+      name: "Abdellatif",
+      badges: [],
+      planLabel: "Live Trading",
+      rating: 5,
       quote:
-        "Je tiens à remercier Zakaria pour la qualité de sa formation et de son accompagnement en trading. Sa pédagogie, sa rigueur et sa capacité à simplifier des notions complexes m’ont permis de faire de réels progrès.\nGrâce à son coaching personnalisé, j’ai acquis une méthode claire, une meilleure gestion des émotions et une vision plus structurée des marchés. Je recommande vivement sa formation à toute personne souhaitant progresser sérieusement dans le trading.",
-      reactions: [{ emoji: "❤️", count: 10 }],
-      time: "12/10/2025, 20:25",
-      tone: "text-bull",
-    },
-    {
-      name: "MOAD",
-      badges: ["ZTC", "🎓"],
-      quote:
-        "Slm alikom\n\n2 mois de formation m3a Zac Kent kangol 3andi des bases bach nkon profitable Trader ( presque 1 an et demi dial 9raya bou7di ) + had la formation li O9sim bilah hta had siyed awal 7aja wold nas w mrabi w baghi l khir layi wa7d baghi it3alm fahmo had kelma dial T3ALM 7aydo alikom l3gaz w ba3do 3la les groupes signaux b tajriba ba3do 3la s7ab affiliate b khosos ( li kigol likom dakhlo w 3andkom bonus ) had siyed macheft m3ah ghir khir O9sim bilah staghl o forsa staaaghlo KNOWLEDGE dial had siyd f bzaf 7wayj machi ghir domaine\n\nMn 9alb kantmana lik a khouya Zakaria dakchi li kat tmana f 7yatk w dommage 3raftk m3atl walakin had forsa jat 7amdolilah\n\nW kanchrok hta Team rakom 3zaz 😍\n\nA7san mentor Khouya Zac ❤️",
-      reactions: [
-        { emoji: "❤️", count: 9 },
-        { emoji: "💯", count: 4 },
-        { emoji: "♠️", count: 4 },
-      ],
-      time: "2/11/2025, 15:34",
-      tone: "text-bull",
+        "Kanbghi nchker 3la lformation li dar m3ana vrm fiha wahd l value li kbiiira katkhlik tfhem kifach dir analysis w tfhem l context dyal trading kifach dayer 3ans 9bel kent ghi kankhrbe9 hmd db wlit fahm w surtout strategy li 3tana w ba9i l daba kanswlo w kay3ti lkhater w yzid ychrahlina ay haja mzl mafahminhach wakha salina lformation wakha n3ya nhder dakchi li an9olo f7e9 had siyed rah 9lil w ncha2llah lkhir mzl ghayji ncha2llah thank you khouya",
+      imageUrls: [abdellatifReviewCertificate],
+      reactions: [{ emoji: "⭐", count: 5 }],
+      time: "12/09/2026",
+      tone: "text-gold",
     },
     {
       name: "BOUMA3ZA",
-      badges: ["ZTC", "💰"],
+      badges: [],
+      planLabel: "1-to-1 Coaching",
+      rating: 5,
       quote:
-        "LI HMD BFDAL LAH O FDAL ZAC T3lmt HAD DOMAINE O MN LES LIVE WAKHA RANI L HMD PROFITABLE MAIS KNB9a FLES LIVE HITACH TMA FIN KTLA7o LES VRAI TRUC LI KHASSK TSM3 AND WSLT WA/eD NIVO LI WLIT KNVALIDI FIH LES COMPT KOLA SIMANA KOLA NHAR C EST INCROYABLE THANKS ZAC",
-      reactions: [
-        { emoji: "❤️", count: 28 },
-        { emoji: "🔥", count: 17 },
-      ],
-      time: "30/10/2025, 13:11",
-      tone: "text-primary",
-    },
-    {
-      name: "oumaimaesque",
-      badges: ["ZTC", "VIP"],
-      quote:
-        "Franchement grâce l had community et spécifiquement ZAC t3alamt bezaf ou f koula live kant3alam bezaf risk psychologie kifach tkoun discipliné hta walit profitable blama nhadro 3la l’ambiance, Motivation aye haja bghitiha kayna hna.\nEn bref Merciiii beaucoup ZAC ✨✨✨",
-      reactions: [
-        { emoji: "♠️", count: 6 },
-        { emoji: "❤️", count: 7 },
-      ],
-      time: "18/11/2025, 16:40",
-      tone: "text-primary",
+        "LHMD BFDAL LAH O FDAL ZAC T3lmt HAD DOMAINE O MN LES LIVE WAKHA RANI LHMD PROFITABLE MAIS KNB9a FLES LIVE HITACH TMA FIN KITLA7o LES VRAI TRUC LI KHASSK TSM3 AND WSLT WA/eD NIVO LI WLIT KNVALIDI FIH LES COMPT KOLA SIMANA KOLA NHAR C EST INCROYABLE THANKS ZAC",
+      imageUrls: [bouma3zaReviewCertificate],
+      reactions: [{ emoji: "⭐", count: 5 }],
+      time: "10/29/2025",
+      tone: "text-bull",
     },
     {
       name: "Adnane",
-      badges: ["ZTC", "🎓"],
+      badges: [],
+      planLabel: "1-to-1 Coaching",
+      rating: 5,
       quote:
-        "Bonjour tt le monde,\nJe viens de terminer une séance( la troisième ) dial 1to1 mentorship avec Zac , et je voulais faire un témoignage( n9lebha 3arbiya daba 😅):\nKane 3tani wa7ed tamarin ndirhoum men 9bel et rje3lihoum galiya adnane hadchi lli 3atini rah ma houach , ha chnou bghitek te3tini ou bel mital ou l khater , dik sa3at ka tel9a l wa7ed dayer leak niya baghik t3elem machi wa7ed baghi i zreb 3lik wi tnez 3lik .\nGaliya rje3 lah i khelik et 3awed l exercice .\nAutre chose 3awtani ,\nZac professionnel et me39oul, ki programmi m3ak la séance , ki ltazem ou ila gaa3 khrej lih blane men jenb, ki sifet lik message dik sa3at bachi i 3elmek machi i 7ensrek ( kane siftli un message m3a 3h du matin ).\nBghit ndir had chhada lillah et merci beaucoup pour ta disponibilité et ton humilité 🙏🙏",
-      reactions: [
-        { emoji: "♠️", count: 8 },
-        { emoji: "❤️", count: 14 },
-      ],
+        "Bonjour tt le monde,\nJe viens de terminer une séance( la troisieme ) dial 1to1 mentorship avec Zac , et je voulais faire un témoignage( n9lebha 3arbiya daba 😅):\nKane 3tani wa7ed tamarin ndirhoum men 9bel et rje3lihoum galiya adnane hadchi lli 3atini rah ma houach , ha chnou bghitek te3tini ou bel mital ou l khater , dik sa3at ka tel9a l wa7ed dayer leak niya baghik t3elem machi wa7ed baghi i zreb 3lik wi tnez 3lik .\nGaliya rje3 lah i khelik et 3awed l exercice .\nAutre chose 3awtani ,\nZac professionnel et me39oul, ki programmi m3ak la séance , ki ltazem ou ila gaa3 khrej lih blane men jenb, ki sifet lik message dik sa3at bachi i 3elmek machi i 7ensrek ( kane siftli un message m3a 3h du matin ).\nBghit ndir had chhada lillah et merci beaucoup pour ta disponibilité et ton humilité 🙏🙏",
+      reactions: [{ emoji: "⭐", count: 5 }],
       time: "2/12/2025, 08:05",
       tone: "text-bull",
     },
     {
-      name: "Nizar",
-      badges: ["ZTC"],
+      name: "Mimi",
+      badges: [],
+      planLabel: "1-to-1 Coaching",
+      rating: 5,
       quote:
-        "ناس كنتي صباح او كنا لجال هاد المساج كنخرج اوقول الحمدالله تعلمت شيحاجا نخرج منها الفلوس ... ولكنها كنكر تقول شحال و انا كنت ترون من كروب لكروب على سينيال ... حتى حمدالله لقيت راسي هنا معاكم او حمد الله حيت علمني زكريا شي\nبغيت نقول ليكم الحراري و الله اي كوانشي سال تعلمو بدور ستراتيجيتكم ديركم ربي يسخر ليكم\nشكرا ليكم 🙏",
-      reactions: [
-        { emoji: "❤️", count: 22 },
-        { emoji: "♠️", count: 9 },
-      ],
+        "Je tiens à remercier Zakaria pour la qualité de sa formation et de son accompagnement en trading. Sa pédagogie, sa rigueur et sa capacité à simplifier des notions complexes m’ont permis de faire de réels progrès. Grâce à son coaching personnalisé, j’ai acquis une méthode claire, une meilleure gestion des émotions et une vision plus structurée des marchés. Je recommande vivement sa formation à toute personne souhaitant progresser sérieusement dans le trading.",
+      reactions: [{ emoji: "⭐", count: 5 }],
+      time: "12/10/2025, 20:25",
+      tone: "text-bull",
+    },
+    {
+      name: "Nizar",
+      badges: [],
+      planLabel: "1-to-1 Coaching",
+      rating: 5,
+      quote:
+        "فاش كتفيق صباح اوكتلقا بحال هاد الميساج كتفرح اوتقول الحمدالله تعلمت شيحجا نخرج منها الفلوس … اوكنبقا كنفكر تنقول شحال او انا كنت تنرون من قروب لقروب قلب على سينيال … حتى حمدلله لقيت راسي هنا معاكوم او حمد الله حيت علمني زكرياء مشي عطاني سينيال او من هنا كنقول ليه شكرا بزاف  بغيت نقوليكوم لدراري والله الى كولشي ساهل تعلمو ديرو ستراتيجيات ديالكوم اربي ايسخرليكوم  شكرا زيكو  شكرا لدراري كاملين",
+      imageUrls: [nizarReviewReward],
+      reactions: [{ emoji: "⭐", count: 5 }],
       time: "20/11/2025, 12:56",
-      tone: "text-gold",
+      tone: "text-bull",
     },
   ];
 
@@ -1749,10 +1742,14 @@ function Testimonials() {
                         <span className="mr-2 rounded-md bg-primary/25 px-1.5 py-0.5 font-semibold text-primary">
                           @Zac Trades
                         </span>
-                        {review.quote}
+                        <span dir="auto">{review.quote}</span>
                       </p>
                       {review.imageUrls?.length ? (
-                        <div className="mt-4 grid grid-cols-2 gap-3">
+                        <div
+                          className={`mt-4 grid gap-3 ${
+                            review.imageUrls.length > 1 ? "grid-cols-2" : "grid-cols-1"
+                          }`}
+                        >
                           {review.imageUrls.map((imageUrl, imageIndex) => (
                             <a
                               key={`${review.name}-${review.time}-image-${imageIndex}`}
@@ -1764,7 +1761,7 @@ function Testimonials() {
                               <img
                                 src={imageUrl}
                                 alt={`${review.name} review image ${imageIndex + 1}`}
-                                className="aspect-video w-full object-cover transition-transform duration-300 group-hover/image:scale-105"
+                                className="max-h-[520px] w-full object-contain transition-transform duration-300 group-hover/image:scale-[1.02]"
                               />
                             </a>
                           ))}

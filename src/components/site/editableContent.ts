@@ -59,6 +59,22 @@ export type CommunitySocialRow = {
   display_order: number;
 };
 
+export type OfferHeadlineTone = "gold" | "electric" | "bull" | "violet";
+
+export type OfferHeadlineRow = {
+  slug: string;
+  eyebrow: string;
+  headline: string;
+  subheadline: string;
+  cta_label: string;
+  cta_url: string;
+  tone: OfferHeadlineTone;
+  is_active: boolean;
+  starts_at: string | null;
+  expires_at: string | null;
+  display_order: number;
+};
+
 export const defaultIndicators: IndicatorRow[] = [
   {
     slug: "zac_trend_pro",
@@ -312,6 +328,23 @@ export const defaultCommunitySocials: CommunitySocialRow[] = [
     display_order: 4,
   },
 ];
+
+export const defaultOfferHeadlines: OfferHeadlineRow[] = [
+  {
+    slug: "live-room-launch",
+    eyebrow: "Live Trading Access",
+    headline: "Join the next live room cycle before seats reset.",
+    subheadline: "Premium access, Discord role, and structured live-market sessions.",
+    cta_label: "Get access",
+    cta_url: "/live-trading",
+    tone: "gold",
+    is_active: true,
+    starts_at: null,
+    expires_at: null,
+    display_order: 1,
+  },
+];
+
 const curatedPropFirmUrls = new Map(defaultPropFirms.map((firm) => [firm.slug, firm.url]));
 
 function mergeCuratedPropFirms(data: PropFirmRow[] | null | undefined) {
@@ -408,4 +441,25 @@ export async function fetchCommunitySocials() {
   }
 
   return data?.length ? (data as CommunitySocialRow[]) : defaultCommunitySocials;
+}
+
+export async function fetchOfferHeadlines() {
+  if (!supabase) return defaultOfferHeadlines;
+
+  const { data, error } = await supabase
+    .from("offer_headlines")
+    .select(
+      "slug,eyebrow,headline,subheadline,cta_label,cta_url,tone,is_active,starts_at,expires_at,display_order",
+    )
+    .eq("is_active", true)
+    .or(`starts_at.is.null,starts_at.lte.${new Date().toISOString()}`)
+    .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+    .order("display_order", { ascending: true });
+
+  if (error) {
+    console.error(error);
+    return [];
+  }
+
+  return (data as OfferHeadlineRow[] | null) ?? [];
 }
