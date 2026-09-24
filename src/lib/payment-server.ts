@@ -174,6 +174,8 @@ type PaymentTarget =
       durationLabel?: string | null;
       amountLabel: string | null;
       status: string;
+      accessStartsAt?: string | null;
+      accessExpiresAt?: string | null;
       notes?: string | null;
     }
   | {
@@ -720,7 +722,32 @@ async function loadMentorshipProduct(adminClient: AdminClient, planSlug: "one_to
   } satisfies PaymentProduct;
 }
 
-function paidAccessExpiresAt(product: Pick<PaymentProduct, "kind" | "slug">) {
+function liveAccessDurationMonths(packageSlug: string | null) {
+  const monthsBySlug: Record<string, number> = {
+    one_month: 1,
+    three_months: 3,
+    six_months: 6,
+    twelve_months: 12,
+  };
+
+  return packageSlug ? (monthsBySlug[packageSlug] ?? 1) : 1;
+}
+
+function liveAccessExtensionBase(accessExpiresAt: string | null | undefined) {
+  if (!accessExpiresAt) return new Date();
+
+  const currentExpiry = new Date(accessExpiresAt);
+  if (Number.isNaN(currentExpiry.getTime()) || currentExpiry <= new Date()) {
+    return new Date();
+  }
+
+  return currentExpiry;
+}
+
+function paidAccessExpiresAt(
+  product: Pick<PaymentProduct, "kind" | "slug">,
+  options?: { liveBaseDate?: Date },
+) {
   if (product.kind === "news") return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
   if (product.kind === "mentorship") {
     if (product.slug === "one_to_one")
@@ -730,14 +757,8 @@ function paidAccessExpiresAt(product: Pick<PaymentProduct, "kind" | "slug">) {
     return expiresAt.toISOString();
   }
 
-  const monthsBySlug: Record<string, number> = {
-    one_month: 1,
-    three_months: 3,
-    six_months: 6,
-    twelve_months: 12,
-  };
-  const expiresAt = new Date();
-  expiresAt.setMonth(expiresAt.getMonth() + (product.slug ? (monthsBySlug[product.slug] ?? 1) : 1));
+  const expiresAt = options?.liveBaseDate ? new Date(options.liveBaseDate) : new Date();
+  expiresAt.setMonth(expiresAt.getMonth() + liveAccessDurationMonths(product.slug));
   return expiresAt.toISOString();
 }
 
@@ -1385,7 +1406,9 @@ async function findPaymentTargetByColumn(
   const live = await maybeSingleTarget(
     adminClient
       .from("user_live_trading_access")
-      .select("user_id,package_slug,duration_label,status,amount_label,notes")
+      .select(
+        "user_id,package_slug,duration_label,status,amount_label,access_starts_at,access_expires_at,notes",
+      )
       .eq("payment_provider", provider)
       .eq(column, value)
       .maybeSingle(),
@@ -1399,6 +1422,8 @@ async function findPaymentTargetByColumn(
       durationLabel: live.duration_label ? String(live.duration_label) : null,
       amountLabel: live.amount_label ? String(live.amount_label) : null,
       status: String(live.status),
+      accessStartsAt: live.access_starts_at ? String(live.access_starts_at) : null,
+      accessExpiresAt: live.access_expires_at ? String(live.access_expires_at) : null,
       notes: live.notes ? String(live.notes) : null,
     } satisfies PaymentTarget;
   }
@@ -1526,6 +1551,7 @@ async function applyPaidTarget(
   if (target.kind === "live") {
     const pendingReplacement = pendingLiveReplacementFromNotes(target.notes);
     const livePackageSlug = pendingReplacement?.packageSlug ?? target.packageSlug;
+    const liveBaseDate = liveAccessExtensionBase(target.accessExpiresAt);
 
     await adminClient
       .from("user_live_trading_access")
@@ -1534,10 +1560,14 @@ async function applyPaidTarget(
         package_slug: livePackageSlug,
         duration_label: pendingReplacement?.durationLabel ?? target.durationLabel ?? null,
         amount_label: pendingReplacement?.amountLabel ?? target.amountLabel ?? null,
-        access_expires_at: paidAccessExpiresAt({
-          kind: "live",
-          slug: livePackageSlug,
-        }),
+        access_starts_at: target.accessStartsAt ?? patch.access_starts_at,
+        access_expires_at: paidAccessExpiresAt(
+          {
+            kind: "live",
+            slug: livePackageSlug,
+          },
+          { liveBaseDate },
+        ),
       })
       .eq("user_id", target.userId);
     await provisionDiscordAccess(adminClient, target.userId, { kind: "live" });

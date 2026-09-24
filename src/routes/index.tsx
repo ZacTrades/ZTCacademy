@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import {
   Play,
@@ -77,7 +77,9 @@ import {
 } from "@/components/site/liveTradingPackages";
 import hero from "@/assets/hero-trading.jpg";
 import abdellatifReviewCertificate from "@/assets/member-review-abdellatif-ouard-fundednext.png";
+import bhcReviewCertificate from "@/assets/member-review-bhc-fundednext.png";
 import bouma3zaReviewCertificate from "@/assets/member-review-bouma3za-myfundedfutures.png";
+import mrHAlphaFuturesCertificate from "@/assets/member-review-mr-h-alpha-futures.jpg";
 import nizarReviewReward from "@/assets/member-review-nizar-fundednext-reward.jpg";
 import tradingViewPreview from "@/assets/zactrades-tradingview-preview.jpeg";
 import { useCurrency } from "@/lib/currency";
@@ -118,6 +120,19 @@ const fadeUp = {
 const comingSoonIndicatorSlugs = new Set(["liquidity_sweep", "smart_entry_ai"]);
 
 function Home() {
+  const navigate = useNavigate();
+  const { loading, isStaff } = useAuth();
+
+  useEffect(() => {
+    if (!loading && isStaff) {
+      void navigate({ to: "/admin", replace: true });
+    }
+  }, [isStaff, loading, navigate]);
+
+  if (!loading && isStaff) {
+    return <div className="min-h-screen bg-background text-foreground" />;
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
@@ -1417,6 +1432,41 @@ function Testimonials() {
       reactions: [{ emoji: "⭐", count: 5 }],
       time: "10/29/2025",
       tone: "text-bull",
+    },
+    {
+      name: "Mr H",
+      badges: [],
+      planLabel: "1-to-1 Coaching",
+      rating: 5,
+      quote:
+        "أولًا وقبل كل شيء، الحمد لله على كل شيء. كما أحب أن أتقدم بجزيل الشكر لزاك على تعليمه ودعمه لي. أنا سعيد جدًا لأنني تعرفت على شخص مثله، فهو إنسان رائع وطيب القلب. وأخيرًا، أتمنى لنا جميعًا التوفيق والنجاح، إن شاء الله.",
+      imageUrls: [mrHAlphaFuturesCertificate],
+      reactions: [{ emoji: "⭐", count: 5 }],
+      time: "17/12/2025",
+      tone: "text-bull",
+    },
+    {
+      name: "BHC",
+      badges: [],
+      planLabel: "Live Trading",
+      rating: 5,
+      quote:
+        "Hi all! I’m happy to share my certificate for passing the challenge with you guys. 1st I want to say Alhamdulillah for everything. I also want to thank Zac for teaching me. I’m really happy to have met someone like him! He’s a really nice person! Finally, Wishing success for all of us, Inshallah",
+      imageUrls: [bhcReviewCertificate],
+      reactions: [{ emoji: "⭐", count: 5 }],
+      time: "11/12/2025",
+      tone: "text-gold",
+    },
+    {
+      name: "Moad",
+      badges: [],
+      planLabel: "Live Trading",
+      rating: 5,
+      quote:
+        "Slm alikom 2 mois de formation m3a Zac Kent kangol 3andi des bases bach nkon profitable Trader ( presque 1 an et demi dial 9raya bou7di ) + had la formation li O9sim bilah hta had siyed awal 7aja wold nas w mrabi w baghi l khir l ayi wa7d baghi it3alm fahmo had kelma dial T3ALM 7aydo alikom l3gaz w ba3do 3la les groupes signaux b tajriba ba3do 3la s7ab affiliate b khosos ( li kigol likom dakhlo w 3andkom bonus ) had siyed macheft m3ah ghir khir O9sim bilah staghlo forsa staaaghlo KNOWLEDGE dial had siyd f bzaf 7wayj machi ghir domaine Mn 9alb kantmana lik a khouya Zakaria dakchi li kat tmana f 7yatk w dommage 3raftk m3atl walakin had forsa jat 7amdolilah W kanchrok hta Team rakom 3zaz A7san mentor Khouya Zac",
+      reactions: [{ emoji: "⭐", count: 5 }],
+      time: "23/09/2026",
+      tone: "text-gold",
     },
     {
       name: "Adnane",

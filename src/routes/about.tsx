@@ -16,6 +16,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Footer } from "@/components/site/Footer";
 import { Navbar } from "@/components/site/Navbar";
+import zactradesCircleHero from "@/assets/zactrades-circle-hero.png";
+import zactradesCircleMask from "@/assets/zactrades-circle-mask.png";
 
 export const Route = createFileRoute("/about")({
   head: () => ({
@@ -119,17 +121,90 @@ const beliefs = [
 
 function AboutPage() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen overflow-x-clip bg-background text-foreground">
       <Navbar />
       <main>
-        <section className="relative overflow-hidden pt-32 pb-20 md:pt-40 md:pb-24">
+        <section className="relative overflow-hidden pb-14 pt-28 sm:pb-16 sm:pt-32 md:pb-20 md:pt-36 xl:pb-24 xl:pt-40">
           <div className="absolute inset-0 -z-10" style={{ background: "var(--gradient-hero)" }} />
           <div className="grid-bg absolute inset-0 -z-10" />
           <div className="absolute inset-0 -z-10 bg-gradient-to-b from-background/45 via-background/75 to-background" />
           <div className="absolute right-0 top-24 -z-10 h-80 w-80 rounded-full bg-gold/15 blur-3xl" />
           <div className="absolute left-0 bottom-0 -z-10 h-96 w-96 rounded-full bg-primary/15 blur-3xl" />
 
-          <div className="mx-auto max-w-7xl px-4 md:px-6">
+          <motion.div
+            aria-hidden="true"
+            initial={{ opacity: 0, x: -42 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+            className="pointer-events-none absolute bottom-[-2rem] left-[-2rem] z-0 hidden w-[clamp(38rem,44vw,52rem)] select-none xl:block"
+            style={{
+              WebkitMaskImage:
+                "linear-gradient(to right, black 0%, black 68%, transparent 100%)",
+              maskImage:
+                "linear-gradient(to right, black 0%, black 68%, transparent 100%)",
+            }}
+          >
+            <img
+              src={zactradesCircleHero}
+              alt=""
+              className="h-auto w-full mix-blend-screen"
+              draggable={false}
+            />
+          </motion.div>
+
+          <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 xl:hidden">
+            <motion.div
+              {...fadeUp}
+              className="grid items-center gap-8 md:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] md:gap-10 lg:gap-14"
+            >
+              <div className="order-2 mx-auto w-full max-w-sm md:order-1 md:max-w-none">
+                <img
+                  src={zactradesCircleHero}
+                  alt="ZacTrades Circle hoodie"
+                  className="h-auto w-full mix-blend-screen"
+                  draggable={false}
+                />
+              </div>
+
+              <div className="order-1 text-center md:order-2 md:text-left">
+                <Badge variant="outline" className="glass mb-5 border-primary/40 text-xs uppercase">
+                  About ZacTrades
+                </Badge>
+                <h1 className="font-display text-3xl font-bold leading-tight tracking-tight sm:text-4xl md:text-4xl lg:text-5xl">
+                  It started with a <span className="text-gradient-gold">dream</span> and became a
+                  trading <span className="text-gradient">community.</span>
+                </h1>
+                <p className="mt-5 text-sm leading-6 text-muted-foreground sm:text-base sm:leading-7 md:max-w-xl">
+                  I started trading 6 years ago because I wanted freedom, independence, and the
+                  chance to build something of my own. ZacTrades is the community I wish I had when
+                  I was learning the hard way.
+                </p>
+                <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center md:justify-start">
+                  <Button
+                    asChild
+                    size="lg"
+                    style={{ background: "var(--gradient-primary)" }}
+                    className="group h-12 w-full px-6 font-semibold text-primary-foreground glow-primary hover:opacity-90 sm:w-auto"
+                  >
+                    <a href="/mentorship">
+                      Start Mentorship
+                      <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                    </a>
+                  </Button>
+                  <Button
+                    asChild
+                    size="lg"
+                    variant="outline"
+                    className="glass h-12 w-full border-border/60 px-6 font-semibold sm:w-auto"
+                  >
+                    <a href="/education">Explore Education</a>
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+
+          <div className="relative z-10 mx-auto hidden max-w-7xl px-6 xl:block">
             <motion.div {...fadeUp} className="mx-auto max-w-4xl text-center">
               <Badge variant="outline" className="glass mb-6 border-primary/40 text-xs uppercase">
                 About ZacTrades
@@ -166,18 +241,54 @@ function AboutPage() {
               </div>
             </motion.div>
           </div>
+
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 z-20 hidden pt-32 md:pt-40 xl:block"
+            style={{
+              WebkitMaskImage: `url(${zactradesCircleMask})`,
+              WebkitMaskPosition: "-2rem calc(100% + 2rem)",
+              WebkitMaskRepeat: "no-repeat",
+              WebkitMaskSize: "clamp(38rem, 44vw, 52rem) auto",
+              maskImage: `url(${zactradesCircleMask})`,
+              maskPosition: "-2rem calc(100% + 2rem)",
+              maskRepeat: "no-repeat",
+              maskSize: "clamp(38rem, 44vw, 52rem) auto",
+            }}
+          >
+            <div className="mx-auto max-w-7xl px-4 md:px-6">
+              <motion.div {...fadeUp} className="mx-auto max-w-4xl text-center text-black">
+                <Badge
+                  variant="outline"
+                  className="invisible mb-6 border-primary/40 text-xs uppercase"
+                >
+                  About ZacTrades
+                </Badge>
+                <h1 className="font-display text-4xl font-bold leading-tight tracking-tight sm:text-5xl md:text-7xl">
+                  It started with a <span>dream</span> and became a trading <span>community.</span>
+                </h1>
+                <p className="mx-auto mt-6 max-w-3xl text-base leading-7 text-black md:text-lg">
+                  I started trading 6 years ago because I wanted freedom, independence, and the
+                  chance to build something of my own. ZacTrades is the community I wish I had when
+                  I was learning the hard way.
+                </p>
+              </motion.div>
+            </div>
+          </div>
         </section>
 
-        <section className="py-12">
-          <div className="mx-auto grid max-w-7xl gap-6 px-4 md:grid-cols-3 md:px-6">
+        <section className="py-10 sm:py-12">
+          <div className="mx-auto grid max-w-7xl gap-4 px-4 sm:grid-cols-3 sm:gap-5 sm:px-6 md:gap-6">
             {stats.map((stat, index) => (
               <motion.div
                 key={stat.label}
                 {...fadeUp}
                 transition={{ ...fadeUp.transition, delay: index * 0.05 }}
-                className="rounded-2xl border border-border/50 bg-card/35 p-6 text-center"
+                className="rounded-2xl border border-border/50 bg-card/35 p-5 text-center sm:p-6"
               >
-                <div className="font-mono text-4xl font-bold text-gradient-gold">{stat.value}</div>
+                <div className="font-mono text-3xl font-bold text-gradient-gold md:text-4xl">
+                  {stat.value}
+                </div>
                 <div className="mt-2 text-sm uppercase tracking-widest text-muted-foreground">
                   {stat.label}
                 </div>
@@ -186,14 +297,14 @@ function AboutPage() {
           </div>
         </section>
 
-        <section className="py-16 md:py-20">
-          <div className="mx-auto grid max-w-7xl gap-6 px-4 md:px-6 lg:grid-cols-2">
+        <section className="py-12 sm:py-16 md:py-20">
+          <div className="mx-auto grid max-w-7xl gap-5 px-4 sm:px-6 lg:grid-cols-2 lg:gap-6">
             {storySections.map((section, index) => (
               <motion.article
                 key={section.title}
                 {...fadeUp}
                 transition={{ ...fadeUp.transition, delay: index * 0.06 }}
-                className="glass-strong relative overflow-hidden rounded-3xl p-6 md:p-8"
+                className="glass-strong relative overflow-hidden rounded-3xl p-5 sm:p-6 md:p-8"
               >
                 <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
                 <div className="relative">
@@ -219,8 +330,8 @@ function AboutPage() {
           </div>
         </section>
 
-        <section className="py-16 md:py-20">
-          <div className="mx-auto max-w-7xl px-4 md:px-6">
+        <section className="py-12 sm:py-16 md:py-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6">
             <motion.div {...fadeUp} className="mx-auto max-w-3xl text-center">
               <Badge variant="outline" className="glass mb-4 border-gold/40 text-xs">
                 <GraduationCap className="mr-1.5 h-3.5 w-3.5 text-gold" />
@@ -235,13 +346,13 @@ function AboutPage() {
               </p>
             </motion.div>
 
-            <div className="mt-12 grid gap-5 md:grid-cols-3">
+            <div className="mt-9 grid gap-5 sm:mt-12 md:grid-cols-3">
               {beliefs.map((belief, index) => (
                 <motion.div
                   key={belief.title}
                   {...fadeUp}
                   transition={{ ...fadeUp.transition, delay: index * 0.06 }}
-                  className="rounded-2xl border border-border/50 bg-card/35 p-6"
+                  className="rounded-2xl border border-border/50 bg-card/35 p-5 sm:p-6"
                 >
                   <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/15 text-electric ring-1 ring-primary/30">
                     <belief.icon className="h-5 w-5" />
@@ -256,11 +367,11 @@ function AboutPage() {
           </div>
         </section>
 
-        <section className="pb-20 md:pb-28">
-          <div className="mx-auto max-w-5xl px-4 md:px-6">
+        <section className="pb-16 sm:pb-20 md:pb-28">
+          <div className="mx-auto max-w-5xl px-4 sm:px-6">
             <motion.div
               {...fadeUp}
-              className="glass-strong relative overflow-hidden rounded-3xl p-7 text-center md:p-10"
+              className="glass-strong relative overflow-hidden rounded-3xl p-6 text-center sm:p-7 md:p-10"
             >
               <div className="absolute left-1/2 top-0 -z-10 h-56 w-56 -translate-x-1/2 rounded-full bg-gold/15 blur-3xl" />
               <div className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-bull/15 text-bull ring-1 ring-bull/30">

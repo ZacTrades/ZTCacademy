@@ -118,14 +118,14 @@ export function Navbar() {
   });
 
   useEffect(() => {
-    if (loading || !isAdmin) return;
+    if (loading || !isStaff) return;
 
     const isAdminRoute =
       pathname === "/admin" || pathname.startsWith("/admin/") || pathname.startsWith("/admin_");
     if (!isAdminRoute) {
       void navigate({ to: "/admin", replace: true });
     }
-  }, [isAdmin, loading, navigate, pathname]);
+  }, [isStaff, loading, navigate, pathname]);
 
   const openAuth = (mode: "signin" | "join") => {
     setAuthMode(mode);
@@ -195,6 +195,10 @@ export function Navbar() {
   const userLabel = user?.user_metadata?.full_name ?? user?.email ?? "Member";
   const isAdminRoute =
     pathname === "/admin" || pathname.startsWith("/admin/") || pathname.startsWith("/admin_");
+
+  if (isStaff) {
+    return null;
+  }
 
   return (
     <>

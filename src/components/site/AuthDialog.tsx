@@ -37,6 +37,28 @@ const countryCodes = [
   { id: "sa", flag: "🇸🇦", code: "+966", country: "Saudi Arabia" },
 ];
 
+const AUTH_SUBMIT_TIMEOUT_MS = 20000;
+
+async function withAuthTimeout<T>(promise: Promise<T>) {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(
+            new Error(
+              "Sign in is taking too long. Please check your connection and try again.",
+            ),
+          );
+        }, AUTH_SUBMIT_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
 export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialogProps) {
   const { signIn, signUp } = useAuth();
   const { t } = useLanguage();
@@ -65,13 +87,13 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
 
     try {
       if (isJoin) {
-        const result = await signUp({ email, password, fullName, phoneNumber });
+        const result = await withAuthTimeout(signUp({ email, password, fullName, phoneNumber }));
         setSuccessMessage(
           result.needsEmailConfirmation ? t("auth.signupConfirm") : t("auth.signupReady"),
         );
       } else {
-        await signIn(email, password);
-        setSuccessMessage(t("auth.signInSuccess"));
+        await withAuthTimeout(signIn(email, password));
+        onOpenChange(false);
       }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : t("auth.failed"));

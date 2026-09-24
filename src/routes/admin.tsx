@@ -9,6 +9,7 @@ import {
   History,
   Loader2,
   Lock,
+  LogOut,
   Megaphone,
   MessageCircle,
   Pencil,
@@ -47,12 +48,10 @@ import {
   type TradingToolRow,
 } from "@/components/site/editableContent";
 import { AuthDialog } from "@/components/site/AuthDialog";
-import { Footer } from "@/components/site/Footer";
 import {
   defaultLiveTradingPackageRows,
   type LiveTradingPackageRow,
 } from "@/components/site/liveTradingPackages";
-import { Navbar } from "@/components/site/Navbar";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -299,7 +298,7 @@ const educationCategoryOptions: Array<{ value: EducationArticleCategory; label: 
 const staffVisiblePanelKeys: AdminPanelKey[] = ["communityMembers", "registeredAccounts"];
 
 function AdminPage() {
-  const { user, loading, isConfigured, isAdmin, isStaff, role } = useAuth();
+  const { user, loading, isConfigured, isAdmin, isStaff, role, signOut } = useAuth();
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"signin" | "join">("signin");
   const [plans, setPlans] = useState<EditablePlan[]>([]);
@@ -319,8 +318,9 @@ function AdminPage() {
   const [liveAccessAdjustments, setLiveAccessAdjustments] = useState<
     LiveTradingAccessAdjustmentRow[]
   >([]);
-  const [activePanel, setActivePanel] = useState<AdminPanelKey>("staff");
+  const [activePanel, setActivePanel] = useState<AdminPanelKey>("offers");
   const [liveExtensionDays, setLiveExtensionDays] = useState("7");
+  const [signingOut, setSigningOut] = useState(false);
   const [indicatorDeleteTarget, setIndicatorDeleteTarget] = useState<IndicatorRow | null>(null);
   const [toolDeleteTarget, setToolDeleteTarget] = useState<EditableTool | null>(null);
   const [communitySocialDeleteTarget, setCommunitySocialDeleteTarget] =
@@ -1829,13 +1829,6 @@ function AdminPage() {
 
   const adminPanels = [
     {
-      key: "staff" as const,
-      title: "Staff Members",
-      description: "Give members moderator or admin access.",
-      count: teamProfiles.length,
-      icon: ShieldCheck,
-    },
-    {
       key: "offers" as const,
       title: "Offer Headlines",
       description: "Show sharp offer banners below the site header.",
@@ -1843,8 +1836,15 @@ function AdminPage() {
       icon: Megaphone,
     },
     {
+      key: "staff" as const,
+      title: "Staff Members",
+      description: "Give members moderator or admin access.",
+      count: teamProfiles.length,
+      icon: ShieldCheck,
+    },
+    {
       key: "communityMembers" as const,
-      title: "Community Members",
+      title: "Paid Members",
       description: "Only members with paid access.",
       count: paidMemberProfiles.length,
       icon: UserCog,
@@ -1932,6 +1932,22 @@ function AdminPage() {
     : adminPanels.filter((panel) => staffVisiblePanelKeys.includes(panel.key));
   const visibleActivePanel =
     !isAdmin && !staffVisiblePanelKeys.includes(activePanel) ? "communityMembers" : activePanel;
+  const heroRoleLabel = isAdmin ? "Admin" : "Moderator";
+  const heroDescription = isAdmin
+    ? "Edit prop firm partners, coaching prices, live trading access, premium indicators, trading tools, education articles, and member access across the site."
+    : "Review paid members, check registered accounts, and follow member access details without changing site content or pricing.";
+
+  const handleStaffSignOut = async () => {
+    setSigningOut(true);
+
+    try {
+      await signOut();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setSigningOut(false);
+    }
+  };
 
   useEffect(() => {
     if (!isAdmin && isStaff && !staffVisiblePanelKeys.includes(activePanel)) {
@@ -1941,26 +1957,46 @@ function AdminPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <Navbar />
       <main>
-        <section className="relative overflow-hidden pt-32 pb-12 md:pt-40 md:pb-16">
+        <section className="relative overflow-hidden pt-12 pb-12 md:pt-16 md:pb-16">
           <div className="absolute inset-0 -z-10" style={{ background: "var(--gradient-hero)" }} />
           <div className="grid-bg absolute inset-0 -z-10" />
           <div className="absolute inset-0 -z-10 bg-gradient-to-b from-background/45 via-background/75 to-background" />
 
           <div className="mx-auto max-w-7xl px-4 md:px-6">
-            <motion.div {...fadeUp} className="max-w-3xl">
-              <Badge variant="outline" className="glass mb-5 border-gold/40 text-xs">
-                <ShieldCheck className="mr-1.5 h-3.5 w-3.5 text-gold" />
-                Admin
-              </Badge>
-              <h1 className="font-display text-4xl font-bold leading-tight tracking-tight sm:text-5xl md:text-7xl">
-                Site content <span className="text-gradient-gold">control room.</span>
-              </h1>
-              <p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground md:text-lg">
-                Edit prop firm partners, coaching prices, live trading access, premium indicators,
-                trading tools, education articles, and member access across the site.
-              </p>
+            <motion.div
+              {...fadeUp}
+              className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between"
+            >
+              <div className="max-w-3xl">
+                <Badge variant="outline" className="glass mb-5 border-gold/40 text-xs">
+                  <ShieldCheck className="mr-1.5 h-3.5 w-3.5 text-gold" />
+                  {heroRoleLabel}
+                </Badge>
+                <h1 className="font-display text-4xl font-bold leading-tight tracking-tight sm:text-5xl md:text-7xl">
+                  Site content <span className="text-gradient-gold">control room.</span>
+                </h1>
+                <p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground md:text-lg">
+                  {heroDescription}
+                </p>
+              </div>
+
+              {user && isStaff && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleStaffSignOut}
+                  disabled={signingOut}
+                  className="w-fit border-border/60 bg-card/35 text-muted-foreground hover:bg-card/60 hover:text-foreground"
+                >
+                  {signingOut ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <LogOut className="h-4 w-4" />
+                  )}
+                  Sign out
+                </Button>
+              )}
             </motion.div>
           </div>
         </section>
@@ -2192,7 +2228,7 @@ function AdminPage() {
 
                     {visibleActivePanel === "communityMembers" && (
                       <AdminSection
-                        title="Community Members"
+                        title="Paid Members"
                         description="Only users with verified paid access appear here."
                         contentClassName="grid-cols-1"
                       >
@@ -2374,7 +2410,6 @@ function AdminPage() {
           </div>
         </section>
       </main>
-      <Footer />
       <AuthDialog
         open={authOpen}
         mode={authMode}
@@ -5226,7 +5261,7 @@ function CommunityMembersPanel({ memberProfiles }: { memberProfiles: UserProfile
       </div>
 
       <CommunityMembersTable
-        title="Paid Community Members"
+        title="Paid Members"
         description="Members with an active paid plan, Live Trading access, or Premium access."
         profiles={filteredPaidProfiles}
         totalCount={paidMemberProfiles.length}
@@ -5266,6 +5301,7 @@ function RegisteredAccountsPanel({ memberProfiles }: { memberProfiles: UserProfi
         totalCount={registeredMemberProfiles.length}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        showPaidAccessColumns={false}
         emptyMessage={
           searchQuery.trim()
             ? "No unpaid registered accounts match this search."
@@ -5284,6 +5320,7 @@ function CommunityMembersTable({
   searchQuery,
   onSearchChange,
   showSearch = true,
+  showPaidAccessColumns = true,
   emptyMessage,
 }: {
   title: string;
@@ -5293,10 +5330,15 @@ function CommunityMembersTable({
   searchQuery: string;
   onSearchChange: (value: string) => void;
   showSearch?: boolean;
+  showPaidAccessColumns?: boolean;
   emptyMessage: string;
 }) {
+  const tableWidthClass = showPaidAccessColumns
+    ? "w-[2040px] min-w-[2040px]"
+    : "w-[1260px] min-w-[1260px]";
+
   return (
-    <section className="rounded-2xl border border-border/50 bg-card/20 p-4">
+    <section className="min-w-0 max-w-[calc(100vw-3rem)] rounded-2xl border border-border/50 bg-card/20 p-4">
       <div className="mb-4 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
           <h3 className="font-display text-xl font-bold sm:text-2xl">{title}</h3>
@@ -5310,7 +5352,11 @@ function CommunityMembersTable({
                 type="search"
                 value={searchQuery}
                 onChange={(event) => onSearchChange(event.target.value)}
-                placeholder="Search name, email, phone, plan..."
+                placeholder={
+                  showPaidAccessColumns
+                    ? "Search name, email, phone, plan..."
+                    : "Search name, email, phone..."
+                }
                 className="h-11 bg-background/45 pl-10"
               />
             </div>
@@ -5327,27 +5373,41 @@ function CommunityMembersTable({
         <>
           <div className="grid gap-3 md:hidden">
             {profiles.map((profile) => (
-              <CommunityMemberMobileCard key={profile.id} profile={profile} />
+              <CommunityMemberMobileCard
+                key={profile.id}
+                profile={profile}
+                showPaidAccessColumns={showPaidAccessColumns}
+              />
             ))}
           </div>
-          <div className="hidden rounded-xl border border-border/50 bg-background/35 md:block">
-            <div className="max-w-full overflow-x-auto pb-2">
-              <table className="w-full min-w-[1280px] text-left text-sm">
+          <div className="hidden min-w-0 rounded-xl border border-border/50 bg-background/35 md:block">
+            <div className="w-full max-w-full overflow-x-scroll overscroll-x-contain pb-4 [scrollbar-gutter:stable]">
+              <table className={`${tableWidthClass} table-fixed text-left text-sm`}>
                 <thead className="border-b border-border/60 bg-card/45 text-xs uppercase tracking-[0.18em] text-muted-foreground">
                   <tr>
-                    <th className="px-4 py-3 font-semibold">Full name</th>
-                    <th className="px-4 py-3 font-semibold">Email</th>
-                    <th className="px-4 py-3 font-semibold">Phone</th>
-                    <th className="px-4 py-3 font-semibold">Discord user / ID</th>
-                    <th className="px-4 py-3 font-semibold">Plan</th>
-                    <th className="px-4 py-3 font-semibold">Access</th>
-                    <th className="px-4 py-3 font-semibold">Joined</th>
-                    <th className="px-4 py-3 text-right font-semibold">Invoice</th>
+                    <th className="w-[180px] px-5 py-4 font-semibold">Name</th>
+                    <th className="w-[260px] px-5 py-4 font-semibold">Email</th>
+                    <th className="w-[220px] px-5 py-4 font-semibold">Phone</th>
+                    <th className="w-[270px] px-5 py-4 font-semibold">Discord user / ID</th>
+                    {showPaidAccessColumns && (
+                      <>
+                        <th className="w-[260px] px-5 py-4 font-semibold">Plan</th>
+                        <th className="w-[180px] px-5 py-4 font-semibold">Access</th>
+                      </>
+                    )}
+                    <th className="w-[150px] px-5 py-4 font-semibold">Joined</th>
+                    {showPaidAccessColumns && (
+                      <th className="w-[160px] px-5 py-4 text-right font-semibold">Invoice</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/45">
                   {profiles.map((profile) => (
-                    <CommunityMembersTableRow key={profile.id} profile={profile} />
+                    <CommunityMembersTableRow
+                      key={profile.id}
+                      profile={profile}
+                      showPaidAccessColumns={showPaidAccessColumns}
+                    />
                   ))}
                 </tbody>
               </table>
@@ -5363,7 +5423,13 @@ function CommunityMembersTable({
   );
 }
 
-function CommunityMemberMobileCard({ profile }: { profile: UserProfileRow }) {
+function CommunityMemberMobileCard({
+  profile,
+  showPaidAccessColumns = true,
+}: {
+  profile: UserProfileRow;
+  showPaidAccessColumns?: boolean;
+}) {
   const paidPlans = paidPlanItems(profile);
   const whatsappUrl = whatsAppMessageUrl(profile.phone_number);
   const invoiceItems = paidInvoiceItems(profile);
@@ -5423,63 +5489,87 @@ function CommunityMemberMobileCard({ profile }: { profile: UserProfileRow }) {
           </div>
         </div>
 
-        <div className="rounded-xl border border-border/40 bg-card/25 p-3">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Plan
-          </div>
-          {paidPlans.length ? (
-            <div className="mt-2 grid gap-2">
-              {paidPlans.map((plan) => (
-                <div key={plan.key} className="grid gap-1">
-                  <Badge variant="outline" className={plan.className}>
-                    {plan.label}
-                  </Badge>
-                  <PaidPlanDetails plan={plan} />
+        {showPaidAccessColumns && (
+          <>
+            <div className="rounded-xl border border-border/40 bg-card/25 p-3">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Plan
+              </div>
+              {paidPlans.length ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {paidPlans.map((plan) => (
+                    <Badge key={plan.key} variant="outline" className={plan.className}>
+                      {plan.label}
+                    </Badge>
+                  ))}
                 </div>
-              ))}
+              ) : (
+                <Badge
+                  variant="outline"
+                  className="mt-2 border-muted-foreground/35 text-muted-foreground"
+                >
+                  No paid plan
+                </Badge>
+              )}
             </div>
-          ) : (
-            <Badge
-              variant="outline"
-              className="mt-2 border-muted-foreground/35 text-muted-foreground"
-            >
-              No paid plan
-            </Badge>
-          )}
-        </div>
 
-        <div className="rounded-xl border border-border/40 bg-card/25 p-3">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Access
-          </div>
-          <PaidPlanAccessList plans={paidPlans} />
-        </div>
+            <div className="rounded-xl border border-border/40 bg-card/25 p-3">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Access
+              </div>
+              <div className="mt-2">
+                <AccessDetailsDialog profile={profile} plans={paidPlans} fullWidth />
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="mt-4 flex flex-col gap-3 border-t border-border/50 pt-4 text-xs text-muted-foreground">
         <span>Joined {formatAdminDate(profile.created_at)}</span>
-        {invoiceItems.length ? (
-          <InvoicePrintActions profile={profile} paidMemberships={invoiceItems} fullWidth />
-        ) : (
-          <span>No invoice</span>
+        {showPaidAccessColumns && (
+          <>
+            {invoiceItems.length ? (
+              <InvoicePrintActions profile={profile} paidMemberships={invoiceItems} fullWidth />
+            ) : (
+              <span>No invoice</span>
+            )}
+          </>
         )}
       </div>
     </article>
   );
 }
 
-function CommunityMembersTableRow({ profile }: { profile: UserProfileRow }) {
+function CommunityMembersTableRow({
+  profile,
+  showPaidAccessColumns = true,
+}: {
+  profile: UserProfileRow;
+  showPaidAccessColumns?: boolean;
+}) {
   const paidPlans = paidPlanItems(profile);
   const whatsappUrl = whatsAppMessageUrl(profile.phone_number);
   const invoiceItems = paidInvoiceItems(profile);
 
   return (
     <tr className="transition-colors hover:bg-card/35">
-      <td className="px-4 py-4">
-        <div className="font-semibold text-foreground">{profile.full_name || "No name"}</div>
+      <td className="px-5 py-5 align-top">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/30 bg-primary/10 font-display font-bold text-electric">
+            {getProfileInitials(profile)}
+          </div>
+          <div className="min-w-0">
+            <div className="truncate font-semibold text-foreground">
+              {profile.full_name || "No name"}
+            </div>
+          </div>
+        </div>
       </td>
-      <td className="px-4 py-4 text-muted-foreground">{profile.email || "Not provided"}</td>
-      <td className="px-4 py-4">
+      <td className="px-5 py-5 align-top text-muted-foreground">
+        <div className="max-w-[240px] break-words">{profile.email || "Not provided"}</div>
+      </td>
+      <td className="px-5 py-5 align-top">
         {profile.phone_number ? (
           <div className="grid gap-2">
             <span className="text-muted-foreground">{profile.phone_number}</span>
@@ -5504,38 +5594,45 @@ function CommunityMembersTableRow({ profile }: { profile: UserProfileRow }) {
           <span className="text-muted-foreground">Not provided</span>
         )}
       </td>
-      <td className="px-4 py-4">
-        <DiscordIdentityCell profile={profile} />
+      <td className="px-5 py-5 align-top">
+        <div className="max-w-[250px]">
+          <DiscordIdentityCell profile={profile} />
+        </div>
       </td>
-      <td className="px-4 py-4">
-        {paidPlans.length ? (
-          <div className="grid gap-1.5">
-            {paidPlans.map((plan) => (
-              <div key={plan.key} className="grid gap-1">
-                <Badge variant="outline" className={plan.className}>
-                  {plan.label}
-                </Badge>
-                <PaidPlanDetails plan={plan} />
+      {showPaidAccessColumns && (
+        <>
+          <td className="px-5 py-5 align-top">
+            {paidPlans.length ? (
+              <div className="flex flex-wrap gap-2">
+                {paidPlans.map((plan) => (
+                  <Badge key={plan.key} variant="outline" className={plan.className}>
+                    {plan.label}
+                  </Badge>
+                ))}
               </div>
-            ))}
-          </div>
-        ) : (
-          <Badge variant="outline" className="border-muted-foreground/35 text-muted-foreground">
-            No paid plan
-          </Badge>
-        )}
+            ) : (
+              <Badge variant="outline" className="border-muted-foreground/35 text-muted-foreground">
+                No paid plan
+              </Badge>
+            )}
+          </td>
+          <td className="px-5 py-5 align-top">
+            <AccessDetailsDialog profile={profile} plans={paidPlans} />
+          </td>
+        </>
+      )}
+      <td className="px-5 py-5 align-top text-muted-foreground">
+        {formatAdminDate(profile.created_at)}
       </td>
-      <td className="px-4 py-4">
-        <PaidPlanAccessList plans={paidPlans} />
-      </td>
-      <td className="px-4 py-4 text-muted-foreground">{formatAdminDate(profile.created_at)}</td>
-      <td className="px-4 py-4 text-right">
-        {invoiceItems.length ? (
-          <InvoicePrintActions profile={profile} paidMemberships={invoiceItems} />
-        ) : (
-          <span className="text-xs text-muted-foreground">No invoice</span>
-        )}
-      </td>
+      {showPaidAccessColumns && (
+        <td className="px-5 py-5 text-right align-top">
+          {invoiceItems.length ? (
+            <InvoicePrintActions profile={profile} paidMemberships={invoiceItems} />
+          ) : (
+            <span className="text-xs text-muted-foreground">No invoice</span>
+          )}
+        </td>
+      )}
     </tr>
   );
 }
@@ -5625,59 +5722,88 @@ function normalizeMemberSearch(value: string) {
 
 type PaidPlanItem = ReturnType<typeof paidPlanItems>[number];
 
-function PaidPlanDetails({ plan }: { plan: PaidPlanItem }) {
-  return (
-    <div className="grid gap-1 text-xs text-muted-foreground">
-      {plan.detail && <span>{plan.detail}</span>}
-    </div>
-  );
-}
+function AccessDetailsDialog({
+  profile,
+  plans,
+  fullWidth = false,
+}: {
+  profile: UserProfileRow;
+  plans: PaidPlanItem[];
+  fullWidth?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
 
-function PaidPlanAccessList({ plans }: { plans: PaidPlanItem[] }) {
   if (!plans.length) {
-    return <span className="mt-2 block text-sm text-muted-foreground">No paid access</span>;
+    return <span className="block text-sm text-muted-foreground">No paid access</span>;
   }
 
   return (
-    <div className="mt-2 grid min-w-[260px] gap-2">
-      {plans.map((plan) => {
-        const remaining = accessRemainingMeta(plan.accessExpiresAt);
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => setOpen(true)}
+        className={`border-primary/35 bg-primary/10 text-electric hover:bg-primary/15 ${
+          fullWidth ? "w-full" : "w-fit"
+        }`}
+      >
+        View access
+      </Button>
+      <DialogContent className="glass-strong max-w-2xl border-border/60 p-0">
+        <div className="relative overflow-hidden rounded-2xl">
+          <div className="absolute -right-20 -top-20 h-48 w-48 rounded-full bg-primary/20 blur-3xl" />
+          <div className="relative p-6">
+            <DialogHeader>
+              <DialogTitle className="font-display text-3xl">Access Details</DialogTitle>
+              <DialogDescription>
+                {profile.full_name || profile.email || "Member"} paid access periods and remaining
+                time.
+              </DialogDescription>
+            </DialogHeader>
 
-        return (
-          <div
-            key={plan.key}
-            className="grid gap-2 rounded-xl border border-border/35 bg-background/30 p-3 text-xs"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <Badge variant="outline" className={plan.className}>
-                {plan.label}
-              </Badge>
-              <span className={remaining.className}>{remaining.label}</span>
-            </div>
-            <div className="grid gap-1 text-muted-foreground">
-              <span>
-                <span className="font-mono text-[10px] text-muted-foreground/80">
-                  access_starts_at
-                </span>
-                {": "}
-                <span className="text-foreground">
-                  {formatOptionalAdminDateTime(plan.accessStartsAt)}
-                </span>
-              </span>
-              <span>
-                <span className="font-mono text-[10px] text-muted-foreground/80">
-                  access_expires_at
-                </span>
-                {": "}
-                <span className="text-foreground">
-                  {formatOptionalAdminDateTime(plan.accessExpiresAt, "No expiry")}
-                </span>
-              </span>
+            <div className="mt-6 grid gap-3">
+              {plans.map((plan) => {
+                const remaining = accessRemainingMeta(plan.accessExpiresAt);
+
+                return (
+                  <div
+                    key={plan.key}
+                    className="rounded-2xl border border-border/45 bg-background/45 p-4"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <Badge variant="outline" className={plan.className}>
+                        {plan.label}
+                      </Badge>
+                      <span className={remaining.className}>{remaining.label}</span>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                      <div className="rounded-xl border border-border/35 bg-card/25 p-3">
+                        <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                          access_starts_at
+                        </div>
+                        <div className="mt-2 text-foreground">
+                          {formatOptionalAdminDateTime(plan.accessStartsAt)}
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-border/35 bg-card/25 p-3">
+                        <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                          access_expires_at
+                        </div>
+                        <div className="mt-2 text-foreground">
+                          {formatOptionalAdminDateTime(plan.accessExpiresAt, "No expiry")}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
-        );
-      })}
-    </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -5717,21 +5843,15 @@ function accessRemainingMeta(expiresAt: string | null) {
 
 function paidPlanItems(profile: UserProfileRow) {
   const plans = mentorshipMembershipPlans
-    .map(({ slug, label }) => {
+    .map(({ slug }) => {
       const membership = profile.memberships[slug];
       if (membership.status !== "paid") return null;
 
       return {
         key: slug,
-        label: slug === "one_to_one" ? "Coaching" : "Mentorship",
+        label: slug === "one_to_one" ? "1 to 1" : "Group",
         className: "w-fit border-bull/40 bg-bull/10 text-bull",
-        detail: [
-          label,
-          membership.amount_label,
-          membership.paid_at ? formatAdminDate(membership.paid_at) : null,
-        ]
-          .filter(Boolean)
-          .join(" - "),
+        detail: "",
         accessStartsAt: membership.access_starts_at,
         accessExpiresAt: membership.access_expires_at,
       };
@@ -5744,13 +5864,7 @@ function paidPlanItems(profile: UserProfileRow) {
       key: "live_trading",
       label: "Live Trading",
       className: "w-fit border-primary/40 bg-primary/10 text-electric",
-      detail: [
-        liveAccess.duration_label,
-        liveAccess.amount_label,
-        liveAccess.paid_at ? formatAdminDate(liveAccess.paid_at) : null,
-      ]
-        .filter(Boolean)
-        .join(" - "),
+      detail: "",
       accessStartsAt: liveAccess.access_starts_at,
       accessExpiresAt: liveAccess.access_expires_at,
     });
@@ -5760,14 +5874,9 @@ function paidPlanItems(profile: UserProfileRow) {
   if (hasPaidNewsSubscription(profile)) {
     plans.push({
       key: "news_subscribers",
-      label: "News Subscribers",
+      label: "Premium",
       className: "w-fit border-gold/40 bg-gold/10 text-gold",
-      detail: [
-        newsSubscription.amount_label || "$5/mo",
-        newsSubscription.paid_at ? formatAdminDate(newsSubscription.paid_at) : null,
-      ]
-        .filter(Boolean)
-        .join(" - "),
+      detail: "",
       accessStartsAt: newsSubscription.access_starts_at,
       accessExpiresAt: newsSubscription.access_expires_at,
     });
