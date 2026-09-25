@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { AlertCircle, Check, Loader2, Lock, Mail, Phone, User } from "lucide-react";
+import { AlertCircle, Check, Eye, EyeOff, Loader2, Lock, Mail, Phone, User } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -66,6 +66,7 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
   const [errorMessage, setErrorMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [selectedCountryId, setSelectedCountryId] = useState("us");
+  const [showPassword, setShowPassword] = useState(false);
 
   const isJoin = mode === "join";
   const selectedCountry =
@@ -106,6 +107,7 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
     setSuccessMessage("");
     setErrorMessage("");
     setSubmitting(false);
+    setShowPassword(false);
   };
 
   return (
@@ -239,13 +241,23 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
                 <Input
                   id={`${mode}-password`}
                   name="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   required
                   minLength={6}
                   placeholder="••••••••"
-                  className="bg-background/40 pl-9"
+                  className="bg-background/40 pl-9 pr-11"
                   disabled={submitting}
                 />
+                <button
+                  type="button"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showPassword}
+                  onClick={() => setShowPassword((current) => !current)}
+                  className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  disabled={submitting}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </div>
 
