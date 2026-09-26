@@ -45,6 +45,8 @@ const en = {
   "auth.joinDescription":
     "Create your member profile to access mentorship, live sessions, and premium tools.",
   "auth.signInDescription": "Access your live room, signals dashboard, and mentorship portal.",
+  "auth.forgotTitle": "Reset your password",
+  "auth.forgotDescription": "Enter your account email and we will send you a secure reset link.",
   "auth.accountCreated": "Account created",
   "auth.welcomeBack": "Welcome back",
   "auth.signupConfirm":
@@ -60,6 +62,15 @@ const en = {
   "auth.discordUsernamePlaceholder": "yourname#0000 or @yourname",
   "auth.email": "Email",
   "auth.password": "Password",
+  "auth.forgotPassword": "Forgot password?",
+  "auth.resetSent": "Password reset link sent. Check your email and follow the secure link.",
+  "auth.sendResetLink": "Send Reset Link",
+  "auth.backToSignIn": "Back to sign in",
+  "auth.newPassword": "New password",
+  "auth.confirmPassword": "Confirm password",
+  "auth.passwordUpdated":
+    "Your password has been updated. You are signed out now, please sign in with the new password.",
+  "auth.passwordMismatch": "Passwords do not match.",
   "auth.includes": "Elite membership includes",
   "auth.includeLive": "Live trading room access",
   "auth.includeMentorship": "Mentorship sessions",
@@ -116,6 +127,9 @@ const fr: Record<TranslationKey, string> = {
     "Creez votre profil membre pour acceder au mentorat, aux sessions live et aux outils premium.",
   "auth.signInDescription":
     "Accedez a votre salle live, au tableau des signaux et au portail de mentorat.",
+  "auth.forgotTitle": "Reinitialiser votre mot de passe",
+  "auth.forgotDescription":
+    "Entrez l'email de votre compte et nous vous enverrons un lien securise.",
   "auth.accountCreated": "Compte cree",
   "auth.welcomeBack": "Bon retour",
   "auth.signupConfirm":
@@ -131,6 +145,15 @@ const fr: Record<TranslationKey, string> = {
   "auth.discordUsernamePlaceholder": "votrenom#0000 ou @votrenom",
   "auth.email": "Email",
   "auth.password": "Mot de passe",
+  "auth.forgotPassword": "Mot de passe oublie ?",
+  "auth.resetSent": "Lien de reinitialisation envoye. Verifiez votre email.",
+  "auth.sendResetLink": "Envoyer le lien",
+  "auth.backToSignIn": "Retour a la connexion",
+  "auth.newPassword": "Nouveau mot de passe",
+  "auth.confirmPassword": "Confirmer le mot de passe",
+  "auth.passwordUpdated":
+    "Votre mot de passe a ete mis a jour. Vous etes deconnecte, connectez-vous avec le nouveau mot de passe.",
+  "auth.passwordMismatch": "Les mots de passe ne correspondent pas.",
   "auth.includes": "L'abonnement elite inclut",
   "auth.includeLive": "Acces a la salle de trading live",
   "auth.includeMentorship": "Sessions de mentorat",

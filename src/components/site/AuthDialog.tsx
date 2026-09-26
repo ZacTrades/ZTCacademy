@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { AlertCircle, Check, Eye, EyeOff, Loader2, Lock, Mail, Phone, User } from "lucide-react";
 import {
   Dialog,
@@ -60,15 +60,17 @@ async function withAuthTimeout<T>(promise: Promise<T>) {
 }
 
 export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialogProps) {
-  const { signIn, signUp } = useAuth();
+  const { requestPasswordReset, signIn, signUp } = useAuth();
   const { t } = useLanguage();
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [selectedCountryId, setSelectedCountryId] = useState("us");
   const [showPassword, setShowPassword] = useState(false);
+  const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
 
   const isJoin = mode === "join";
+  const isForgotPassword = !isJoin && forgotPasswordMode;
   const selectedCountry =
     countryCodes.find((country) => country.id === selectedCountryId) ?? countryCodes[0];
 
@@ -87,7 +89,10 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
     const phoneNumber = localPhoneNumber ? `${countryCode} ${localPhoneNumber}` : "";
 
     try {
-      if (isJoin) {
+      if (isForgotPassword) {
+        await withAuthTimeout(requestPasswordReset(email));
+        setSuccessMessage(t("auth.resetSent"));
+      } else if (isJoin) {
         const result = await withAuthTimeout(signUp({ email, password, fullName, phoneNumber }));
         setSuccessMessage(
           result.needsEmailConfirmation ? t("auth.signupConfirm") : t("auth.signupReady"),
@@ -108,7 +113,14 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
     setErrorMessage("");
     setSubmitting(false);
     setShowPassword(false);
+    setForgotPasswordMode(false);
   };
+
+  useEffect(() => {
+    if (open) {
+      resetState();
+    }
+  }, [mode, open]);
 
   return (
     <Dialog
@@ -122,10 +134,18 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
         <DialogHeader className="shrink-0 border-b border-border/60 p-5 pb-4 sm:p-6 sm:pb-4">
           <BrandLogo className="mb-3 h-20 w-20" />
           <DialogTitle className="font-display text-2xl">
-            {isJoin ? t("auth.joinTitle") : t("auth.signInTitle")}
+            {isForgotPassword
+              ? t("auth.forgotTitle")
+              : isJoin
+                ? t("auth.joinTitle")
+                : t("auth.signInTitle")}
           </DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
-            {isJoin ? t("auth.joinDescription") : t("auth.signInDescription")}
+            {isForgotPassword
+              ? t("auth.forgotDescription")
+              : isJoin
+                ? t("auth.joinDescription")
+                : t("auth.signInDescription")}
           </DialogDescription>
         </DialogHeader>
 
@@ -141,7 +161,10 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
             <Button
               className="mt-6 w-full font-semibold text-primary-foreground glow-primary hover:opacity-90"
               style={{ background: "var(--gradient-primary)" }}
-              onClick={() => onOpenChange(false)}
+              onClick={() => {
+                resetState();
+                onOpenChange(false);
+              }}
             >
               {t("auth.continue")}
             </Button>
@@ -232,34 +255,52 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
               </div>
             </div>
 
-            <div>
-              <Label htmlFor={`${mode}-password`} className="text-xs">
-                {t("auth.password")}
-              </Label>
-              <div className="relative mt-1">
-                <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id={`${mode}-password`}
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  required
-                  minLength={6}
-                  placeholder="••••••••"
-                  className="bg-background/40 pl-9 pr-11"
-                  disabled={submitting}
-                />
-                <button
-                  type="button"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                  aria-pressed={showPassword}
-                  onClick={() => setShowPassword((current) => !current)}
-                  className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  disabled={submitting}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
+            {!isForgotPassword && (
+              <div>
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor={`${mode}-password`} className="text-xs">
+                    {t("auth.password")}
+                  </Label>
+                  {!isJoin && (
+                    <button
+                      type="button"
+                      className="text-xs font-semibold text-electric transition-colors hover:text-primary"
+                      onClick={() => {
+                        setErrorMessage("");
+                        setSuccessMessage("");
+                        setForgotPasswordMode(true);
+                      }}
+                      disabled={submitting}
+                    >
+                      {t("auth.forgotPassword")}
+                    </button>
+                  )}
+                </div>
+                <div className="relative mt-1">
+                  <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id={`${mode}-password`}
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    minLength={6}
+                    placeholder="••••••••"
+                    className="bg-background/40 pl-9 pr-11"
+                    disabled={submitting}
+                  />
+                  <button
+                    type="button"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-pressed={showPassword}
+                    onClick={() => setShowPassword((current) => !current)}
+                    className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    disabled={submitting}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {isJoin && (
               <div className="rounded-xl border border-border/60 bg-background/40 p-4">
@@ -294,7 +335,11 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
               disabled={submitting}
             >
               {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-              {isJoin ? t("auth.createAccount") : t("auth.signIn")}
+              {isForgotPassword
+                ? t("auth.sendResetLink")
+                : isJoin
+                  ? t("auth.createAccount")
+                  : t("auth.signIn")}
             </Button>
 
             <button
@@ -302,11 +347,19 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
               className="w-full text-center text-xs text-muted-foreground transition-colors hover:text-foreground"
               onClick={() => {
                 resetState();
-                onModeChange(isJoin ? "signin" : "join");
+                if (isForgotPassword) {
+                  setForgotPasswordMode(false);
+                } else {
+                  onModeChange(isJoin ? "signin" : "join");
+                }
               }}
               disabled={submitting}
             >
-              {isJoin ? t("auth.alreadyMember") : t("auth.newHere")}
+              {isForgotPassword
+                ? t("auth.backToSignIn")
+                : isJoin
+                  ? t("auth.alreadyMember")
+                  : t("auth.newHere")}
             </button>
           </form>
         )}

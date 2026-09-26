@@ -176,6 +176,10 @@ type PaymentTarget =
       status: string;
       accessStartsAt?: string | null;
       accessExpiresAt?: string | null;
+      paymentProvider?: string | null;
+      providerCustomerId?: string | null;
+      providerCheckoutId?: string | null;
+      providerSubscriptionId?: string | null;
       notes?: string | null;
     }
   | {
@@ -185,6 +189,10 @@ type PaymentTarget =
       planSlug: "one_to_one" | "group";
       amountLabel: string | null;
       status: string;
+      paymentProvider?: string | null;
+      providerCustomerId?: string | null;
+      providerCheckoutId?: string | null;
+      providerSubscriptionId?: string | null;
       notes?: string | null;
     }
   | {
@@ -193,6 +201,10 @@ type PaymentTarget =
       userId: string;
       amountLabel: string | null;
       status: string;
+      paymentProvider?: string | null;
+      providerCustomerId?: string | null;
+      providerCheckoutId?: string | null;
+      providerSubscriptionId?: string | null;
       notes?: string | null;
     };
 
@@ -1407,7 +1419,7 @@ async function findPaymentTargetByColumn(
     adminClient
       .from("user_live_trading_access")
       .select(
-        "user_id,package_slug,duration_label,status,amount_label,access_starts_at,access_expires_at,notes",
+        "user_id,package_slug,duration_label,status,amount_label,access_starts_at,access_expires_at,payment_provider,provider_customer_id,provider_checkout_id,provider_subscription_id,notes",
       )
       .eq("payment_provider", provider)
       .eq(column, value)
@@ -1424,6 +1436,12 @@ async function findPaymentTargetByColumn(
       status: String(live.status),
       accessStartsAt: live.access_starts_at ? String(live.access_starts_at) : null,
       accessExpiresAt: live.access_expires_at ? String(live.access_expires_at) : null,
+      paymentProvider: live.payment_provider ? String(live.payment_provider) : null,
+      providerCustomerId: live.provider_customer_id ? String(live.provider_customer_id) : null,
+      providerCheckoutId: live.provider_checkout_id ? String(live.provider_checkout_id) : null,
+      providerSubscriptionId: live.provider_subscription_id
+        ? String(live.provider_subscription_id)
+        : null,
       notes: live.notes ? String(live.notes) : null,
     } satisfies PaymentTarget;
   }
@@ -1431,7 +1449,9 @@ async function findPaymentTargetByColumn(
   const membership = await maybeSingleTarget(
     adminClient
       .from("user_memberships")
-      .select("user_id,plan_slug,status,amount_label,notes")
+      .select(
+        "user_id,plan_slug,status,amount_label,payment_provider,provider_customer_id,provider_checkout_id,provider_subscription_id,notes",
+      )
       .eq("payment_provider", provider)
       .eq(column, value)
       .maybeSingle(),
@@ -1447,6 +1467,16 @@ async function findPaymentTargetByColumn(
       planSlug,
       amountLabel: membership.amount_label ? String(membership.amount_label) : null,
       status: String(membership.status),
+      paymentProvider: membership.payment_provider ? String(membership.payment_provider) : null,
+      providerCustomerId: membership.provider_customer_id
+        ? String(membership.provider_customer_id)
+        : null,
+      providerCheckoutId: membership.provider_checkout_id
+        ? String(membership.provider_checkout_id)
+        : null,
+      providerSubscriptionId: membership.provider_subscription_id
+        ? String(membership.provider_subscription_id)
+        : null,
       notes: membership.notes ? String(membership.notes) : null,
     } satisfies PaymentTarget;
   }
@@ -1454,7 +1484,9 @@ async function findPaymentTargetByColumn(
   const news = await maybeSingleTarget(
     adminClient
       .from("user_news_subscriptions")
-      .select("user_id,status,amount_label,notes")
+      .select(
+        "user_id,status,amount_label,payment_provider,provider_customer_id,provider_checkout_id,provider_subscription_id,notes",
+      )
       .eq("payment_provider", provider)
       .eq(column, value)
       .maybeSingle(),
@@ -1466,6 +1498,12 @@ async function findPaymentTargetByColumn(
       userId: String(news.user_id),
       amountLabel: news.amount_label ? String(news.amount_label) : null,
       status: String(news.status),
+      paymentProvider: news.payment_provider ? String(news.payment_provider) : null,
+      providerCustomerId: news.provider_customer_id ? String(news.provider_customer_id) : null,
+      providerCheckoutId: news.provider_checkout_id ? String(news.provider_checkout_id) : null,
+      providerSubscriptionId: news.provider_subscription_id
+        ? String(news.provider_subscription_id)
+        : null,
       notes: news.notes ? String(news.notes) : null,
     } satisfies PaymentTarget;
   }
@@ -1519,6 +1557,112 @@ function validateNowPaymentsAmount(target: PaymentTarget, payload: NowPaymentsIp
   );
 }
 
+async function createInvoiceNumber(adminClient: AdminClient) {
+  const { data, error } = await adminClient.rpc("next_invoice_number");
+
+  if (!error && typeof data === "string" && data.trim()) {
+    return data;
+  }
+
+  console.error("[invoice]", "number_sequence_failed", error?.message ?? "No invoice number returned");
+
+  const { count } = await adminClient.from("invoices").select("id", {
+    count: "exact",
+    head: true,
+  });
+
+  return `ZTC-${String((count ?? 0) + 1).padStart(6, "0")}`;
+}
+
+function formatMadInvoiceAmount(amountLabel: string | null | undefined) {
+  if (!amountLabel) return null;
+  if (/\bMAD\b/i.test(amountLabel)) return amountLabel;
+
+  const amount = parseAmountLabel(amountLabel);
+  if (!amount) return amountLabel;
+
+  const madAmount = amount * payzoneUsdToMadRate();
+
+  return `${new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: madAmount % 1 === 0 ? 0 : 2,
+  }).format(madAmount)} MAD`;
+}
+
+function invoiceProviderValue(target: PaymentTarget, confirmation: PaymentConfirmation) {
+  return target.paymentProvider || confirmation.providerLabel.toLowerCase();
+}
+
+function invoiceProductName(target: PaymentTarget) {
+  if (target.kind === "live") return "Live Trading";
+  if (target.kind === "mentorship") {
+    return target.planSlug === "one_to_one" ? "1-to-1 Coaching" : "Training Group Coaching";
+  }
+  return "Premium Access";
+}
+
+async function createInvoiceSnapshot(
+  adminClient: AdminClient,
+  target: PaymentTarget,
+  confirmation: PaymentConfirmation,
+  data: {
+    productName?: string;
+    productDescription?: string | null;
+    sourceKey: string;
+    accessType: string | null;
+    amountLabel: string | null;
+    paidAt: string;
+    accessStartsAt: string | null;
+    accessExpiresAt: string | null;
+  },
+) {
+  try {
+    const { data: profile } = await adminClient
+      .from("profiles")
+      .select("full_name,email,phone_number")
+      .eq("id", target.userId)
+      .maybeSingle();
+
+    const snapshot = profile as
+      | {
+          full_name?: string | null;
+          email?: string | null;
+          phone_number?: string | null;
+        }
+      | null;
+
+    const invoiceNumber = await createInvoiceNumber(adminClient);
+
+    const { error } = await adminClient.from("invoices").insert({
+      invoice_number: invoiceNumber,
+      user_id: target.userId,
+      source_kind: target.kind,
+      source_key: data.sourceKey || "default",
+      product_name: data.productName || invoiceProductName(target),
+      product_description: data.productDescription,
+      access_type: data.accessType,
+      amount_label: data.amountLabel,
+      gross_amount_label: formatMadInvoiceAmount(data.amountLabel),
+      currency: "MAD",
+      payment_provider: invoiceProviderValue(target, confirmation),
+      provider_customer_id: target.providerCustomerId ?? null,
+      provider_checkout_id: target.providerCheckoutId ?? null,
+      provider_transaction_id: confirmation.providerReference,
+      customer_name: snapshot?.full_name ?? null,
+      customer_email: snapshot?.email ?? target.providerCustomerId ?? null,
+      customer_phone: snapshot?.phone_number ?? null,
+      paid_at: data.paidAt,
+      access_starts_at: data.accessStartsAt,
+      access_expires_at: data.accessExpiresAt,
+    });
+
+    if (error && error.code !== "23505") {
+      console.error("[invoice]", "create_failed", error.message);
+    }
+  } catch (error) {
+    console.error("[invoice]", "create_failed", error);
+  }
+}
+
 async function applyPaidTarget(
   adminClient: AdminClient,
   target: PaymentTarget,
@@ -1552,24 +1696,38 @@ async function applyPaidTarget(
     const pendingReplacement = pendingLiveReplacementFromNotes(target.notes);
     const livePackageSlug = pendingReplacement?.packageSlug ?? target.packageSlug;
     const liveBaseDate = liveAccessExtensionBase(target.accessExpiresAt);
+    const liveAccessStartsAt = target.accessStartsAt ?? patch.access_starts_at;
+    const liveAccessExpiresAt = paidAccessExpiresAt(
+      {
+        kind: "live",
+        slug: livePackageSlug,
+      },
+      { liveBaseDate },
+    );
+    const liveAmountLabel = pendingReplacement?.amountLabel ?? target.amountLabel ?? null;
+    const liveDurationLabel = pendingReplacement?.durationLabel ?? target.durationLabel ?? null;
 
     await adminClient
       .from("user_live_trading_access")
       .update({
         ...patch,
         package_slug: livePackageSlug,
-        duration_label: pendingReplacement?.durationLabel ?? target.durationLabel ?? null,
-        amount_label: pendingReplacement?.amountLabel ?? target.amountLabel ?? null,
-        access_starts_at: target.accessStartsAt ?? patch.access_starts_at,
-        access_expires_at: paidAccessExpiresAt(
-          {
-            kind: "live",
-            slug: livePackageSlug,
-          },
-          { liveBaseDate },
-        ),
+        duration_label: liveDurationLabel,
+        amount_label: liveAmountLabel,
+        access_starts_at: liveAccessStartsAt,
+        access_expires_at: liveAccessExpiresAt,
       })
       .eq("user_id", target.userId);
+    await createInvoiceSnapshot(adminClient, target, confirmation, {
+      productName: "Live Trading",
+      productDescription: liveDurationLabel,
+      sourceKey: livePackageSlug ?? "live_trading",
+      accessType: liveDurationLabel || "Live Trading access",
+      amountLabel: liveAmountLabel,
+      paidAt: now,
+      accessStartsAt: liveAccessStartsAt,
+      accessExpiresAt: liveAccessExpiresAt,
+    });
     await provisionDiscordAccess(adminClient, target.userId, { kind: "live" });
     return;
   }
@@ -1580,6 +1738,17 @@ async function applyPaidTarget(
       .update(patch)
       .eq("user_id", target.userId)
       .eq("plan_slug", target.planSlug);
+    await createInvoiceSnapshot(adminClient, target, confirmation, {
+      productName:
+        target.planSlug === "one_to_one" ? "1-to-1 Coaching" : "Training Group Coaching",
+      productDescription: "Acces complet au programme d'accompagnement.",
+      sourceKey: target.planSlug,
+      accessType: "Mentorship access",
+      amountLabel: target.amountLabel,
+      paidAt: now,
+      accessStartsAt: patch.access_starts_at,
+      accessExpiresAt: patch.access_expires_at,
+    });
     await provisionDiscordAccess(adminClient, target.userId, {
       kind: "mentorship",
       planSlug: target.planSlug,
@@ -1588,6 +1757,16 @@ async function applyPaidTarget(
   }
 
   await adminClient.from("user_news_subscriptions").update(patch).eq("user_id", target.userId);
+  await createInvoiceSnapshot(adminClient, target, confirmation, {
+    productName: "Premium Access",
+    productDescription: "Acces premium aux contenus education et news.",
+    sourceKey: "news_subscription",
+    accessType: "Premium education/news access",
+    amountLabel: target.amountLabel,
+    paidAt: now,
+    accessStartsAt: patch.access_starts_at,
+    accessExpiresAt: patch.access_expires_at,
+  });
   await provisionDiscordAccess(adminClient, target.userId, { kind: "news" });
 }
 
