@@ -35,6 +35,7 @@ export const Route = createFileRoute("/admin_/education/edit/$slug")({
 
 const EDUCATION_IMAGE_BUCKET = "education-images";
 const MAX_EDUCATION_IMAGE_BYTES = 4 * 1024 * 1024;
+const ARTICLE_IMAGE_DRAG_TYPE = "application/x-zactrades-article-image";
 
 const educationCategoryOptions: Array<{ value: EducationArticleCategory; label: string }> = [
   { value: "study", label: "Study" },
@@ -747,11 +748,17 @@ function ThumbnailPicker({
         Article thumbnail
       </p>
       {selectedUrl ? (
-        <div className="mt-3 overflow-hidden rounded-xl border border-primary/25 bg-background/40">
+        <div
+          draggable
+          title="Drag image into article content"
+          onDragStart={(event) => setArticleImageDragData(event.dataTransfer, selectedUrl)}
+          className="mt-3 cursor-grab overflow-hidden rounded-xl border border-primary/25 bg-background/40 active:cursor-grabbing"
+        >
           <img
             src={selectedUrl}
             alt="Article thumbnail preview"
             className="aspect-video w-full object-cover"
+            draggable={false}
           />
           <p className="px-3 py-2 text-xs font-bold text-electric">Current thumbnail</p>
         </div>
@@ -765,16 +772,20 @@ function ThumbnailPicker({
                 key={image.url + index}
                 type="button"
                 onClick={() => onSelect(image.url)}
+                draggable
+                title="Drag image into article content"
+                onDragStart={(event) => setArticleImageDragData(event.dataTransfer, image.url)}
                 className={`flex items-center gap-3 rounded-xl border p-2 text-left transition-colors ${
                   isSelected
-                    ? "border-gold/50 bg-gold/10 text-gold"
-                    : "border-border/45 bg-background/35 text-muted-foreground hover:border-primary/35 hover:text-foreground"
+                    ? "cursor-grab border-gold/50 bg-gold/10 text-gold active:cursor-grabbing"
+                    : "cursor-grab border-border/45 bg-background/35 text-muted-foreground hover:border-primary/35 hover:text-foreground active:cursor-grabbing"
                 }`}
               >
                 <img
                   src={image.url}
                   alt={image.caption || `Article image ${index + 1}`}
                   className="h-14 w-20 shrink-0 rounded-lg object-cover"
+                  draggable={false}
                 />
                 <span className="min-w-0 flex-1 text-xs font-bold">
                   {isSelected ? "Selected thumbnail" : "Use this image as thumbnail"}
@@ -792,6 +803,14 @@ function ThumbnailPicker({
 function buildImageHtml(url: string) {
   const safeUrl = escapeHtmlAttribute(url);
   return '<img src="' + safeUrl + '" alt="Education article image" />';
+}
+
+function setArticleImageDragData(dataTransfer: DataTransfer, url: string) {
+  dataTransfer.effectAllowed = "copy";
+  dataTransfer.setData(ARTICLE_IMAGE_DRAG_TYPE, url);
+  dataTransfer.setData("text/uri-list", url);
+  dataTransfer.setData("text/plain", url);
+  dataTransfer.setData("text/html", buildImageHtml(url));
 }
 
 function escapeHtml(value: string) {

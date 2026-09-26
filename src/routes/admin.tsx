@@ -74,7 +74,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import logoUrl from "@/assets/zactrades-logo4-clean.png";
+import invoiceLogoUrl from "@/assets/zactrix-limited-invoice-logo.png";
+import websiteLogoUrl from "@/assets/zactrades-logo4-clean.png";
 import {
   defaultEducationArticleRows,
   type EducationArticleCategory,
@@ -223,6 +224,31 @@ type UserLiveTradingAccessRow = {
   updated_at?: string;
 };
 
+type UserInvoiceRow = {
+  id: string;
+  invoice_number: string;
+  user_id: string;
+  source_kind: "live" | "mentorship" | "news";
+  source_key: string;
+  product_name: string;
+  product_description: string | null;
+  access_type: string | null;
+  amount_label: string | null;
+  gross_amount_label: string | null;
+  currency: string;
+  payment_provider: string | null;
+  provider_customer_id: string | null;
+  provider_checkout_id: string | null;
+  provider_transaction_id: string | null;
+  customer_name: string | null;
+  customer_email: string | null;
+  customer_phone: string | null;
+  paid_at: string;
+  access_starts_at: string | null;
+  access_expires_at: string | null;
+  created_at: string;
+};
+
 type LiveTradingAccessAdjustmentRow = {
   id: string;
   admin_user_id: string | null;
@@ -250,13 +276,14 @@ type UserProfileRow = {
   memberships: Record<CoachingPlanSlug, UserMembershipRow>;
   newsSubscription: UserNewsSubscriptionRow;
   liveTradingAccess: UserLiveTradingAccessRow;
+  invoices: UserInvoiceRow[];
   created_at: string;
   updated_at: string;
 };
 
 type BasicProfileRow = Omit<
   UserProfileRow,
-  "memberships" | "newsSubscription" | "liveTradingAccess"
+  "memberships" | "newsSubscription" | "liveTradingAccess" | "invoices"
 >;
 
 type AdminPanelKey =
@@ -368,6 +395,7 @@ function AdminPage() {
           membershipsResult,
           newsSubscriptionsResult,
           liveAccessResult,
+          invoicesResult,
           liveAccessAdjustmentsResult,
         ] = await Promise.all([
           supabase
@@ -451,6 +479,12 @@ function AdminPage() {
             )
             .order("updated_at", { ascending: false }),
           supabase
+            .from("invoices")
+            .select(
+              "id,invoice_number,user_id,source_kind,source_key,product_name,product_description,access_type,amount_label,gross_amount_label,currency,payment_provider,provider_customer_id,provider_checkout_id,provider_transaction_id,customer_name,customer_email,customer_phone,paid_at,access_starts_at,access_expires_at,created_at",
+            )
+            .order("created_at", { ascending: false }),
+          supabase
             .from("live_trading_access_adjustments")
             .select(
               "id,admin_user_id,extra_days,reason,affected_user_ids,affected_count,created_at",
@@ -476,6 +510,7 @@ function AdminPage() {
           membershipsResult.error ||
           newsSubscriptionsResult.error ||
           liveAccessResult.error ||
+          invoicesResult.error ||
           liveAccessAdjustmentsResult.error;
 
         if (firstError) {
@@ -538,6 +573,7 @@ function AdminPage() {
             (membershipsResult.data as UserMembershipRow[]) ?? [],
             (newsSubscriptionsResult.data as UserNewsSubscriptionRow[]) ?? [],
             (liveAccessResult.data as UserLiveTradingAccessRow[]) ?? [],
+            (invoicesResult.data as UserInvoiceRow[]) ?? [],
           ),
         );
       } catch (error) {
@@ -1756,6 +1792,8 @@ function AdminPage() {
         ...(data as BasicProfileRow),
         memberships: membershipsFromRows(profile.id, (membershipData as UserMembershipRow[]) ?? []),
         newsSubscription: profile.newsSubscription,
+        liveTradingAccess: profile.liveTradingAccess,
+        invoices: profile.invoices,
       };
 
       setProfiles((current) =>
@@ -5670,6 +5708,23 @@ function memberMatchesSearch(profile: UserProfileRow, query: string) {
   });
   const newsSubscription = profile.newsSubscription;
   const liveAccess = profile.liveTradingAccess;
+  const invoiceFields = profile.invoices.flatMap((invoice) => [
+    invoice.invoice_number,
+    invoice.source_kind,
+    invoice.source_key,
+    invoice.product_name,
+    invoice.product_description,
+    invoice.amount_label,
+    invoice.gross_amount_label,
+    invoice.payment_provider,
+    invoice.provider_customer_id,
+    invoice.provider_checkout_id,
+    invoice.provider_transaction_id,
+    invoice.customer_name,
+    invoice.customer_email,
+    invoice.customer_phone,
+    invoice.paid_at,
+  ]);
   const fields = [
     profile.id,
     profile.full_name,
@@ -5709,6 +5764,7 @@ function memberMatchesSearch(profile: UserProfileRow, query: string) {
     liveAccess.access_starts_at,
     liveAccess.access_expires_at,
     liveAccess.notes,
+    ...invoiceFields,
   ];
 
   return fields.some((field) =>
@@ -6235,6 +6291,22 @@ function paidInvoiceItems(profile: UserProfileRow) {
   return items;
 }
 
+function invoiceToPaidItem(invoice: UserInvoiceRow): PaidInvoiceItem {
+  return {
+    label: invoice.product_name,
+    accessType: invoice.product_description || invoice.access_type || "Paid access",
+    amountLabel: invoice.gross_amount_label || invoice.amount_label,
+    paidAt: invoice.paid_at,
+    accessStartsAt: invoice.access_starts_at,
+    accessExpiresAt: invoice.access_expires_at,
+    paymentProvider: invoice.payment_provider,
+    providerCustomerId: invoice.provider_customer_id,
+    providerCheckoutId: invoice.provider_checkout_id,
+    providerSubscriptionId: invoice.provider_transaction_id,
+    notes: null,
+  };
+}
+
 function InvoicePrintActions({
   profile,
   paidMemberships,
@@ -6245,9 +6317,82 @@ function InvoicePrintActions({
   fullWidth?: boolean;
 }) {
   const memberLabel = profile.full_name || profile.email || "paid member";
+  const storedInvoices = profile.invoices;
   const wrapperClassName = fullWidth
     ? "grid grid-cols-2 gap-2"
     : "flex flex-wrap justify-end gap-2";
+
+  if (storedInvoices.length) {
+    return (
+      <div className={fullWidth ? "grid gap-2" : "grid justify-items-end gap-2"}>
+        {storedInvoices.map((invoice) => (
+          <div
+            key={invoice.id}
+            className={
+              fullWidth
+                ? "grid gap-2 rounded-xl border border-border/45 bg-background/35 p-2"
+                : "grid justify-items-end gap-2"
+            }
+          >
+            <div className="max-w-[180px] text-right text-[11px] leading-4 text-muted-foreground">
+              <span className="block truncate font-semibold text-foreground">
+                {invoice.product_name}
+              </span>
+              <span>{formatAdminDate(invoice.paid_at)}</span>
+            </div>
+            <div className={wrapperClassName}>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className={
+                  fullWidth
+                    ? "w-full border-primary/35 text-electric hover:bg-primary/10"
+                    : "border-primary/35 text-electric hover:bg-primary/10"
+                }
+                aria-label={`Print admin invoice ${invoice.invoice_number} for ${memberLabel}`}
+                onClick={() =>
+                  printPaidMemberInvoice(
+                    profile,
+                    [invoiceToPaidItem(invoice)],
+                    "admin",
+                    invoice,
+                    storedInvoices.map(invoiceToPaidItem),
+                  )
+                }
+              >
+                <Printer className="h-3.5 w-3.5" />
+                Admin
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className={
+                  fullWidth
+                    ? "w-full border-gold/35 text-gold hover:bg-gold/10"
+                    : "border-gold/35 text-gold hover:bg-gold/10"
+                }
+                aria-label={`Print member invoice ${invoice.invoice_number} for ${memberLabel}`}
+                onClick={() =>
+                  printPaidMemberInvoice(
+                    profile,
+                    [invoiceToPaidItem(invoice)],
+                    "member",
+                    invoice,
+                    storedInvoices.map(invoiceToPaidItem),
+                  )
+                }
+              >
+                <Printer className="h-3.5 w-3.5" />
+                Member
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className={wrapperClassName}>
@@ -6328,6 +6473,8 @@ function printPaidMemberInvoice(
   profile: UserProfileRow,
   paidMemberships: PaidInvoiceItem[],
   model: InvoiceModel,
+  invoice?: UserInvoiceRow,
+  totalPaidItems: PaidInvoiceItem[] = paidMemberships,
 ) {
   const invoiceWindow = window.open("", "_blank", "width=900,height=1100");
 
@@ -6336,7 +6483,7 @@ function printPaidMemberInvoice(
   }
 
   invoiceWindow.document.open();
-  invoiceWindow.document.write(buildInvoiceHtml(profile, paidMemberships, model));
+  invoiceWindow.document.write(buildInvoiceHtml(profile, paidMemberships, model, invoice, totalPaidItems));
   invoiceWindow.document.close();
 }
 
@@ -6344,11 +6491,13 @@ function buildInvoiceHtml(
   profile: UserProfileRow,
   paidMemberships: PaidInvoiceItem[],
   model: InvoiceModel,
+  invoice?: UserInvoiceRow,
+  totalPaidItems: PaidInvoiceItem[] = paidMemberships,
 ) {
   const isAdminCopy = model === "admin";
-  const memberName = profile.full_name || "Member";
-  const invoiceNumber = `ZT-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`;
-  const copyLabel = isAdminCopy ? "Admin copy" : "Member copy";
+  const memberName = invoice?.customer_name || profile.full_name || "Member";
+  const invoiceNumber =
+    invoice?.invoice_number ?? `ZT-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`;
   const generatedAt = new Intl.DateTimeFormat("en", {
     month: "short",
     day: "numeric",
@@ -6356,197 +6505,277 @@ function buildInvoiceHtml(
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date());
+  const invoiceGeneratedAt = invoice?.created_at
+    ? formatOptionalAdminDateTime(invoice.created_at)
+    : generatedAt;
 
-  const lineItems = paidMemberships
+  if (isAdminCopy) {
+    return buildAdminInvoiceHtml(
+      profile,
+      paidMemberships,
+      invoiceNumber,
+      invoiceGeneratedAt,
+      memberName,
+      invoice,
+      totalPaidItems,
+    );
+  }
+
+  const memberRows = paidMemberships
     .map((item) => {
-      const amount = item.amountLabel || "Recorded payment";
-      const paidDate = item.paidAt ? formatAdminDate(item.paidAt) : "Paid date missing";
-      const accessStart = formatOptionalAdminDateTime(item.accessStartsAt);
-      const accessExpiry = formatOptionalAdminDateTime(item.accessExpiresAt, "No expiry");
-      const internalDetails = isAdminCopy
-        ? `
-            <span>Provider: ${escapeHtml(item.paymentProvider || "Not recorded")}</span>
-            <span>Customer ID: ${escapeHtml(item.providerCustomerId || "Not recorded")}</span>
-            <span>Checkout ID: ${escapeHtml(item.providerCheckoutId || "Not recorded")}</span>
-            <span>Subscription / order: ${escapeHtml(item.providerSubscriptionId || "Not recorded")}</span>
-            <span>Admin notes: ${escapeHtml(item.notes || "No notes")}</span>
-          `
-        : "";
+      const amount = formatAdminInvoiceMadAmount(item.amountLabel) || "Montant enregistre";
 
       return `
         <tr>
           <td>
             <strong>${escapeHtml(item.label)}</strong>
-            <span>${escapeHtml(item.accessType)}</span>
-            <span>access_starts_at: ${escapeHtml(accessStart)}</span>
-            <span>access_expires_at: ${escapeHtml(accessExpiry)}</span>
-            ${internalDetails}
+            <span>${escapeHtml(item.accessType || "Acces complet au programme d'accompagnement.")}</span>
           </td>
           <td>${escapeHtml(amount)}</td>
-          <td>${escapeHtml(paidDate)}</td>
-          <td><strong>Paid</strong></td>
         </tr>
       `;
     })
     .join("");
+  const subtotalAmount = formatAdminInvoiceMadTotal(paidMemberships) || "Montant enregistre";
+  const totalAmount = formatAdminInvoiceMadTotal(totalPaidItems) || subtotalAmount;
+  const billedAddress =
+    invoice?.customer_phone ||
+    profile.phone_number ||
+    profile.discord_username ||
+    "Adresse du Client - Optionnel";
 
   return `<!doctype html>
 <html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ZacTrades ${escapeHtml(copyLabel)} Invoice - ${escapeHtml(memberName)}</title>
+    <title>Facture membre - ${escapeHtml(memberName)}</title>
     <style>
       * { box-sizing: border-box; }
+      @page {
+        size: A4;
+        margin: 8mm;
+      }
+      html,
       body {
         margin: 0;
-        background: #f4f7fb;
-        color: #0b1220;
+        min-height: 100%;
+        background: #f3f6fb;
+        color: #111827;
         font-family: Inter, Arial, sans-serif;
       }
       .invoice {
-        width: min(860px, calc(100% - 32px));
+        width: min(820px, calc(100% - 32px));
+        min-height: 1120px;
         margin: 24px auto;
-        border: 1px solid #d8e0ec;
-        border-radius: 24px;
         background: #ffffff;
-        overflow: hidden;
+        color: #111827;
+        border: 1px solid #d8e0ec;
+        padding: 70px 68px 48px;
       }
       header {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         justify-content: space-between;
-        gap: 24px;
-        padding: 28px 34px;
-        background: #07111f;
-        color: #ffffff;
+        gap: 28px;
+        padding-bottom: 28px;
+        border-bottom: 2px solid #d6e0ed;
       }
       .brand {
         display: flex;
         align-items: center;
-        gap: 14px;
+        gap: 12px;
       }
       .brand img {
-        width: 72px;
-        height: 72px;
+        width: 58px;
+        height: 58px;
         object-fit: contain;
       }
-      .brand strong {
+      .brand-mark strong {
         display: block;
-        font-size: 28px;
+        color: #111827;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 30px;
+        letter-spacing: 0.05em;
         line-height: 1;
       }
-      .brand span {
-        display: block;
-        margin-top: 6px;
-        color: #9aa8ba;
-        font-size: 13px;
+      .brand-mark p {
+        margin: 9px 0 0;
+        color: #596579;
+        font-size: 12px;
+        line-height: 1.45;
       }
-      .invoice-label {
+      .invoice-title {
         text-align: right;
       }
-      .invoice-label h1 {
+      .invoice-title h1 {
         margin: 0;
+        color: #111827;
+        font-family: Georgia, "Times New Roman", serif;
         font-size: 32px;
-        line-height: 1;
-      }
-      .invoice-label p {
-        margin: 8px 0 0;
-        color: #9aa8ba;
-        font-size: 13px;
-      }
-      .copy-badge {
-        display: inline-flex;
-        margin-top: 12px;
-        border: 1px solid ${isAdminCopy ? "#38bdf8" : "#f5c542"};
-        border-radius: 999px;
-        padding: 6px 12px;
-        color: ${isAdminCopy ? "#38bdf8" : "#f5c542"};
-        font-size: 11px;
         font-weight: 900;
-        letter-spacing: 0.16em;
+        letter-spacing: 0.02em;
         text-transform: uppercase;
       }
-      main {
-        padding: 34px;
+      .invoice-title p {
+        margin: 10px 0 0;
+        color: #596579;
+        font-size: 12px;
+        line-height: 1.45;
       }
-      .grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 18px;
+      .billed-box {
+        margin-top: 34px;
+        border-left: 4px solid #0ea5e9;
+        background: #eef2f8;
+        padding: 20px 24px;
+        color: #111827;
+        min-height: 128px;
       }
-      .box {
-        border: 1px solid #d8e0ec;
-        border-radius: 18px;
-        padding: 18px;
-      }
-      .eyebrow {
-        margin: 0 0 10px;
-        color: #64748b;
-        font-size: 11px;
-        font-weight: 800;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-      }
-      .line {
-        margin: 7px 0;
-        color: #334155;
+      .billed-box p {
+        margin: 5px 0;
+        font-family: Georgia, "Times New Roman", serif;
         font-size: 14px;
-      }
-      .line strong {
-        color: #0f172a;
+        line-height: 1.25;
       }
       table {
         width: 100%;
-        margin-top: 26px;
+        margin-top: 42px;
         border-collapse: collapse;
-        overflow: hidden;
-        border-radius: 18px;
       }
-      th {
-        background: #eef4fb;
-        color: #475569;
-        font-size: 11px;
-        letter-spacing: 0.16em;
+      thead th {
+        background: #eef2f8;
+        color: #637083;
+        font-size: 12px;
+        font-weight: 900;
+        padding: 13px 14px;
         text-align: left;
         text-transform: uppercase;
       }
-      th, td {
-        border-bottom: 1px solid #d8e0ec;
-        padding: 15px;
+      thead th:last-child,
+      tbody td:last-child {
+        text-align: right;
+      }
+      tbody td {
+        border-bottom: 2px solid #d6e0ed;
+        color: #111827;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 15px;
+        padding: 17px 14px;
         vertical-align: top;
       }
-      td {
-        color: #334155;
-        font-size: 14px;
+      tbody td:first-child {
+        width: 72%;
       }
-      td span {
+      tbody strong {
         display: block;
-        margin-top: 4px;
-        color: #64748b;
-        font-size: 12px;
+        color: #111827;
+        font-weight: 900;
       }
-      .paid {
-        margin-top: 22px;
-        border-radius: 18px;
-        background: #ecfdf5;
-        color: #047857;
-        padding: 16px 18px;
+      tbody span {
+        display: block;
+        margin-top: 5px;
+        color: #596579;
+        font-size: 13px;
+      }
+      .subtotal {
+        margin-top: 38px;
+        display: grid;
+        grid-template-columns: 1fr 150px;
+        justify-content: end;
+        gap: 28px;
+        color: #111827;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 15px;
+        text-align: right;
+      }
+      .total-paid {
+        margin-top: 18px;
+        margin-left: auto;
+        display: grid;
+        grid-template-columns: 1fr 170px;
+        width: 340px;
+        background: #eef2f8;
+        color: #111827;
+        border-left: 4px solid #0ea5e9;
+        font-size: 13px;
+        font-weight: 900;
+        padding: 14px 16px;
+        text-align: right;
+        text-transform: uppercase;
+      }
+      .quote {
+        margin: 170px auto 0;
+        max-width: 520px;
+        color: #344154;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 18px;
+        font-style: italic;
         font-weight: 800;
+        text-align: center;
       }
       footer {
-        padding: 0 34px 30px;
-        color: #64748b;
-        font-size: 12px;
-        line-height: 1.6;
+        margin-top: 220px;
+        border-top: 1px solid #d6e0ed;
+        padding-top: 16px;
+        display: flex;
+        justify-content: space-between;
+        color: #596579;
+        font-size: 11px;
       }
       @media print {
-        body { background: #ffffff; }
+        html,
+        body {
+          width: 210mm;
+          height: 297mm;
+          background: #ffffff !important;
+          overflow: hidden;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
         .invoice {
           width: 100%;
+          height: 281mm;
+          min-height: 0;
           margin: 0;
-          border-radius: 0;
+          padding: 18mm 14mm 10mm;
           border: 0;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          page-break-after: avoid;
+          page-break-inside: avoid;
+        }
+        .brand img {
+          width: 48px;
+          height: 48px;
+        }
+        .brand-mark strong {
+          font-size: 25px;
+        }
+        .invoice-title h1 {
+          font-size: 27px;
+        }
+        .billed-box {
+          margin-top: 28px;
+          min-height: 112px;
+          padding: 17px 21px;
+        }
+        table {
+          margin-top: 36px;
+        }
+        thead th {
+          padding: 11px 12px;
+        }
+        tbody td {
+          padding: 14px 12px;
+        }
+        .quote {
+          margin-top: auto;
+          padding-top: 110px;
+        }
+        footer {
+          margin-top: auto;
+          padding-top: 14px;
         }
       }
     </style>
@@ -6555,61 +6784,383 @@ function buildInvoiceHtml(
     <article class="invoice">
       <header>
         <div class="brand">
-          <img src="${escapeHtml(logoUrl)}" alt="ZacTrades logo" />
-          <div>
-            <strong>ZacTrades</strong>
-            <span>${escapeHtml(copyLabel)} paid access invoice</span>
+          <img src="${escapeHtml(websiteLogoUrl)}" alt="ZacTrades logo" />
+          <div class="brand-mark">
+            <strong>ZACTRADES</strong>
+            <p>Site Web : www.zactrades.com<br />Email : support@zactrades.com</p>
           </div>
         </div>
-        <div class="invoice-label">
-          <h1>Invoice</h1>
-          <p>${escapeHtml(invoiceNumber)}</p>
-          <span class="copy-badge">${escapeHtml(copyLabel)}</span>
+        <div class="invoice-title">
+          <h1>Facture</h1>
+          <p>N Facture : ${escapeHtml(invoiceNumber)}<br />Date : ${escapeHtml(invoiceGeneratedAt)}</p>
         </div>
       </header>
-      <main>
-        <section class="grid">
-          <div class="box">
-            <p class="eyebrow">Billed to</p>
-            <p class="line"><strong>${escapeHtml(memberName)}</strong></p>
-            <p class="line">${escapeHtml(profile.email || "No email recorded")}</p>
-            <p class="line">Phone: ${escapeHtml(profile.phone_number || "Not provided")}</p>
-            <p class="line">Discord: ${escapeHtml(profile.discord_username || "Not provided")}</p>
-            ${isAdminCopy ? `<p class="line">Discord ID: ${escapeHtml(profile.discord_user_id || "Not recorded")}</p>` : ""}
-          </div>
-          <div class="box">
-            <p class="eyebrow">Invoice details</p>
-            <p class="line"><strong>Generated:</strong> ${escapeHtml(generatedAt)}</p>
-            <p class="line"><strong>Joined:</strong> ${escapeHtml(formatAdminDate(profile.created_at))}</p>
-            <p class="line"><strong>Status:</strong> Paid</p>
-            ${isAdminCopy ? `<p class="line"><strong>Member ID:</strong> ${escapeHtml(profile.id)}</p>` : ""}
-            ${isAdminCopy ? `<p class="line"><strong>Admin role:</strong> ${escapeHtml(profileRoleLabel(profile.role))}</p>` : ""}
-          </div>
-        </section>
-        <table>
-          <thead>
-            <tr>
-              <th>Access</th>
-              <th>Amount</th>
-              <th>Paid date</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>${lineItems}</tbody>
-        </table>
-        <div class="paid">${
-          isAdminCopy
-            ? "Internal copy - payment confirmed and paid access recorded."
-            : "Payment confirmed - paid access granted."
-        }</div>
-      </main>
+
+      <section class="billed-box">
+        <p>${escapeHtml(memberName)}</p>
+        <p>${escapeHtml(invoice?.customer_email || profile.email || "Email du Client")}</p>
+        <p>${escapeHtml(billedAddress)}</p>
+      </section>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Description de la formation</th>
+            <th>Montant</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${memberRows}
+        </tbody>
+      </table>
+
+      <div class="subtotal">
+        <span>Sous-total</span>
+        <strong>${escapeHtml(subtotalAmount)}</strong>
+      </div>
+      <div class="total-paid">
+        <span>Total paye</span>
+        <strong>${escapeHtml(totalAmount)}</strong>
+      </div>
+
+      <p class="quote">« Merci pour votre confiance. Pret a dominer les marches ! »</p>
+
       <footer>
-        ${
-          isAdminCopy
-            ? "Admin copy: this document includes internal payment references and should be kept for ZacTrades records."
-            : "Member copy: this invoice confirms your recorded payment with ZacTrades."
+        <span>ZACTRADES - Coaching & Mentoring</span>
+        <span>Page 1/1</span>
+      </footer>
+    </article>
+    <script>
+      window.addEventListener("load", () => {
+        setTimeout(() => {
+          window.focus();
+          window.print();
+        }, 250);
+      });
+    </script>
+  </body>
+</html>`;
+}
+
+function buildAdminInvoiceHtml(
+  profile: UserProfileRow,
+  paidMemberships: PaidInvoiceItem[],
+  invoiceNumber: string,
+  generatedAt: string,
+  memberName: string,
+  invoice?: UserInvoiceRow,
+  totalPaidItems: PaidInvoiceItem[] = paidMemberships,
+) {
+  const operationDate =
+    paidMemberships.find((item) => item.paidAt)?.paidAt ?? new Date().toISOString();
+  const operationLabel = formatOptionalAdminDateTime(operationDate);
+  const firstProvider =
+    paidMemberships.find((item) => item.paymentProvider)?.paymentProvider ?? "Payzone";
+  const firstTrace =
+    paidMemberships.find((item) => item.providerCheckoutId)?.providerCheckoutId ??
+    paidMemberships.find((item) => item.providerSubscriptionId)?.providerSubscriptionId ??
+    "Not recorded";
+  const productValue = paidMemberships
+    .map((item) => item.label)
+    .filter(Boolean)
+    .join(" + ");
+  const providerValue = paidMemberships
+    .map((item) => item.paymentProvider || firstProvider)
+    .filter(Boolean)
+    .filter((value, index, values) => values.indexOf(value) === index)
+    .join(" + ");
+  const traceValue = paidMemberships
+    .map((item) => item.providerCheckoutId || item.providerSubscriptionId || item.providerCustomerId)
+    .filter(Boolean)
+    .join(" + ");
+  const grossValue = paidMemberships
+    .map((item) => formatAdminInvoiceMadAmount(item.amountLabel))
+    .filter(Boolean)
+    .join(" + ");
+  const totalPaidValue = formatAdminInvoiceMadTotal(totalPaidItems) || grossValue;
+
+  return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Facture admin - ${escapeHtml(memberName)}</title>
+    <style>
+      * { box-sizing: border-box; }
+      @page {
+        size: A4;
+        margin: 8mm;
+      }
+      html,
+      body {
+        min-height: 100%;
+      }
+      body {
+        margin: 0;
+        background: #eef2f7;
+        color: #111827;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      .page {
+        width: min(940px, calc(100% - 32px));
+        margin: 24px auto;
+        background: #ffffff;
+        border: 1px solid #d9e2ef;
+        padding: 42px 48px;
+      }
+      .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 24px;
+        padding-bottom: 20px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+      }
+      .brand img {
+        width: 250px;
+        max-width: 42vw;
+        height: auto;
+        object-fit: contain;
+      }
+      .invoice-title {
+        margin: 16px 0 42px;
+        border: 1px solid #cfd5dc;
+        background: #f1f3f5;
+        padding: 16px 24px;
+        text-align: center;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+      .info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 28px;
+        margin-bottom: 42px;
+      }
+      .invoice-box {
+        min-height: 190px;
+        border: 2px solid #111111;
+        padding: 24px 24px 20px;
+      }
+      .invoice-box h2 {
+        margin: 0 0 16px;
+        border-bottom: 1px solid #d9dde2;
+        padding-bottom: 8px;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 22px;
+        line-height: 1.15;
+        text-transform: uppercase;
+      }
+      .line {
+        margin: 9px 0;
+        color: #000000;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 20px;
+        line-height: 1.25;
+      }
+      .line strong {
+        color: #000000;
+        font-weight: 800;
+      }
+      .billing-table {
+        width: 100%;
+        border-collapse: collapse;
+        color: #000000;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 20px;
+      }
+      .billing-table th,
+      .billing-table td {
+        border: 2px solid #111111;
+        padding: 20px 14px;
+        vertical-align: middle;
+      }
+      .billing-table th {
+        background: #f4f4f4;
+        font-size: 21px;
+        font-weight: 800;
+        text-align: left;
+      }
+      .billing-table th:last-child,
+      .billing-table td:last-child {
+        text-align: right;
+      }
+      .billing-table td:first-child {
+        width: 60%;
+        font-weight: 800;
+      }
+      .billing-table tr:last-child td {
+        background: #f1f3f5;
+        font-weight: 800;
+      }
+      footer {
+        margin-top: 48px;
+        display: flex;
+        justify-content: space-between;
+        color: #64748b;
+        font-size: 11px;
+      }
+      @media print {
+        html,
+        body {
+          width: 210mm;
+          height: 297mm;
+          background: #ffffff;
+          overflow: hidden;
         }
-        Trading education, mentorship, and community access services are subject to the site terms and policies.
+        .page {
+          width: 100%;
+          height: 281mm;
+          margin: 0;
+          border: 0;
+          padding: 0;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          page-break-after: avoid;
+          page-break-inside: avoid;
+        }
+        .top {
+          gap: 14px;
+          padding-bottom: 8px;
+          flex: 0 0 auto;
+        }
+        .brand img {
+          width: 245px;
+          max-width: 245px;
+        }
+        .top > div:last-child {
+          max-width: 310px;
+          text-align: right;
+        }
+        .invoice-title {
+          margin: 14px 0 28px;
+          padding: 13px 16px;
+          font-size: 24px;
+          flex: 0 0 auto;
+        }
+        .info-grid {
+          gap: 20px;
+          margin-bottom: 28px;
+          flex: 0 0 auto;
+        }
+        .invoice-box {
+          min-height: 154px;
+          padding: 18px 18px 14px;
+        }
+        .invoice-box h2 {
+          margin-bottom: 11px;
+          padding-bottom: 6px;
+          font-size: 18px;
+        }
+        .line {
+          margin: 6px 0;
+          font-size: 14.5px;
+          line-height: 1.26;
+        }
+        .billing-table {
+          height: 122mm;
+          font-size: 17px;
+          flex: 0 0 auto;
+        }
+        .billing-table th,
+        .billing-table td {
+          padding: 15px 12px;
+        }
+        .billing-table th {
+          font-size: 18px;
+        }
+        footer {
+          margin-top: auto;
+          padding-top: 14px;
+          font-size: 10px;
+          flex: 0 0 auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <article class="page">
+      <div class="top">
+        <div class="brand">
+          <img src="${escapeHtml(invoiceLogoUrl)}" alt="ZACTRIX LIMITED logo" />
+        </div>
+        <div>
+          <p class="line">156 RUE ABOU ZAID ADADOUSSI N9 MAARIF, Casablanca 20330</p>
+          <p class="line"><strong>ICE :</strong> 003839525000023</p>
+          <p class="line"><strong>Raison Sociale :</strong> ZACTRIX LIMITED</p>
+        </div>
+      </div>
+
+      <div class="invoice-title">Facture d'encaissement</div>
+
+      <section class="info-grid">
+        <div class="invoice-box">
+          <h2>References de transaction</h2>
+          <p class="line"><strong>N Piece Interne :</strong> ${escapeHtml(invoiceNumber)}</p>
+          <p class="line"><strong>Date d'operation :</strong> ${escapeHtml(operationLabel)}</p>
+          <p class="line"><strong>Marque d'exploitation :</strong> ZACTRADES</p>
+          <p class="line"><strong>Plateforme de vente :</strong> www.zactrades.com</p>
+        </div>
+
+        <div class="invoice-box">
+          <h2>Details du client</h2>
+          <p class="line"><strong>Nom renseigne :</strong> ${escapeHtml(memberName)}</p>
+          <p class="line"><strong>Email :</strong> ${escapeHtml(
+            invoice?.customer_email || profile.email || "No email recorded",
+          )}</p>
+          <p class="line"><strong>Adresse IP :</strong> Non collectee dans l'admin</p>
+        </div>
+      </section>
+
+      <table class="billing-table">
+        <thead>
+          <tr>
+            <th>Designation</th>
+            <th>Donnees de facturation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Produit vendu</td>
+            <td>${escapeHtml(productValue || "[Nom de la Formation]")}</td>
+          </tr>
+          <tr>
+            <td>Passerelle de paiement utilisee</td>
+            <td>${escapeHtml(providerValue || "Payzone")}</td>
+          </tr>
+          <tr>
+            <td>ID de Transaction Passerelle (Trace)</td>
+            <td>${escapeHtml(traceValue || firstTrace || "[PAYZONE_TRANSACTION_ID]")}</td>
+          </tr>
+          <tr>
+            <td>Montant brut encaisse par le client</td>
+            <td><strong>${escapeHtml(grossValue || "[MONTANT_BRUT] $")}</strong></td>
+          </tr>
+          <tr>
+            <td>Total paye par le client</td>
+            <td><strong>${escapeHtml(totalPaidValue || "[TOTAL_PAYE] MAD")}</strong></td>
+          </tr>
+          <tr>
+            <td>Frais de passerelle estimes (a deduire)</td>
+            <td>- [FRAIS_ESTIMES] $</td>
+          </tr>
+          <tr>
+            <td>Montant net comptable (Virement vers ZACTRIX)</td>
+            <td>[MONTANT_NET] $</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <footer>
+        <span>Document Interne Confidentiel</span>
+        <span>Page 1/1</span>
       </footer>
     </article>
     <script>
@@ -6631,6 +7182,54 @@ function escapeHtml(value: string) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+function formatAdminInvoiceMadAmount(value: string | null | undefined) {
+  if (!value) return null;
+  if (/\bMAD\b/i.test(value)) return value;
+
+  const amount = getAdminInvoiceMadValue(value);
+  if (amount === null) return value;
+
+  const suffix = value.match(/(\/[a-zA-Z]+)$/)?.[1] ?? "";
+
+  return `${formatAdminInvoiceMadNumber(amount)} MAD${suffix}`;
+}
+
+function formatAdminInvoiceMadTotal(items: PaidInvoiceItem[]) {
+  const total = items.reduce((sum, item) => {
+    const amount = getAdminInvoiceMadValue(item.amountLabel);
+    return amount === null ? sum : sum + amount;
+  }, 0);
+
+  if (total <= 0) return null;
+
+  return `${formatAdminInvoiceMadNumber(total)} MAD`;
+}
+
+function getAdminInvoiceMadValue(value: string | null | undefined) {
+  if (!value) return null;
+
+  const madMatch = value.match(/([0-9]+(?:,[0-9]{3})*(?:\.[0-9]+)?)\s*MAD/i);
+  if (madMatch) {
+    const amount = Number(madMatch[1].replace(/,/g, ""));
+    return Number.isFinite(amount) ? amount : null;
+  }
+
+  const dollarMatch = value.match(/\$\s*([0-9]+(?:,[0-9]{3})*(?:\.[0-9]+)?)/);
+  const amountMatch = dollarMatch ?? value.match(/([0-9]+(?:,[0-9]{3})*(?:\.[0-9]+)?)/);
+  if (!amountMatch) return null;
+
+  const amount = Number(amountMatch[1].replace(/,/g, ""));
+  if (!Number.isFinite(amount)) return null;
+
+  return amount * 10;
+}
+
+function formatAdminInvoiceMadNumber(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: value % 1 === 0 ? 0 : 2,
+  }).format(value);
 }
 
 function RegisteredMembersTableRow({ profile }: { profile: UserProfileRow }) {
@@ -7018,6 +7617,7 @@ function buildUserProfiles(
   memberships: UserMembershipRow[],
   newsSubscriptions: UserNewsSubscriptionRow[],
   liveTradingAccessRows: UserLiveTradingAccessRow[],
+  invoices: UserInvoiceRow[],
 ): UserProfileRow[] {
   return profiles.map((profile) => ({
     ...profile,
@@ -7028,6 +7628,7 @@ function buildUserProfiles(
     liveTradingAccess:
       liveTradingAccessRows.find((access) => access.user_id === profile.id) ??
       defaultLiveTradingAccess(profile.id),
+    invoices: invoices.filter((invoice) => invoice.user_id === profile.id),
   }));
 }
 

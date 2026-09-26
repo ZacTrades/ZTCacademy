@@ -128,6 +128,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const requestPasswordReset = useCallback(async (email: string) => {
+    if (!supabase) {
+      throw new Error(missingConfigMessage);
+    }
+
+    const redirectTo =
+      typeof window !== "undefined" ? `${window.location.origin}/reset-password` : undefined;
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo,
+    });
+
+    if (error) {
+      throw error;
+    }
+  }, []);
+
+  const updatePassword = useCallback(async (password: string) => {
+    if (!supabase) {
+      throw new Error(missingConfigMessage);
+    }
+
+    const { error } = await supabase.auth.updateUser({ password });
+
+    if (error) {
+      throw error;
+    }
+  }, []);
+
   const signOut = useCallback(async () => {
     if (!supabase) return;
 
@@ -151,9 +180,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshProfile,
       signUp,
       signIn,
+      requestPasswordReset,
+      updatePassword,
       signOut,
     }),
-    [discordConnection, loading, refreshProfile, role, session, signIn, signOut, signUp],
+    [
+      discordConnection,
+      loading,
+      refreshProfile,
+      requestPasswordReset,
+      role,
+      session,
+      signIn,
+      signOut,
+      signUp,
+      updatePassword,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

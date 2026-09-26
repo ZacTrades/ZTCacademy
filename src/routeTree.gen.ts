@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TermsOfServiceRouteImport } from './routes/terms-of-service'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RefundPolicyRouteImport } from './routes/refund-policy'
 import { Route as PropfirmsRouteImport } from './routes/propfirms'
 import { Route as PrivacyPolicyRouteImport } from './routes/privacy-policy'
@@ -32,6 +33,11 @@ import { Route as AdminEducationEditSlugRouteImport } from './routes/admin_.educ
 const TermsOfServiceRoute = TermsOfServiceRouteImport.update({
   id: '/terms-of-service',
   path: '/terms-of-service',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RefundPolicyRoute = RefundPolicyRouteImport.update({
@@ -137,6 +143,7 @@ export interface FileRoutesByFullPath {
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/propfirms': typeof PropfirmsRoute
   '/refund-policy': typeof RefundPolicyRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/terms-of-service': typeof TermsOfServiceRoute
   '/discord/callback': typeof DiscordCallbackRoute
   '/education/$slug': typeof EducationSlugRoute
@@ -158,6 +165,7 @@ export interface FileRoutesByTo {
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/propfirms': typeof PropfirmsRoute
   '/refund-policy': typeof RefundPolicyRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/terms-of-service': typeof TermsOfServiceRoute
   '/discord/callback': typeof DiscordCallbackRoute
   '/education/$slug': typeof EducationSlugRoute
@@ -180,6 +188,7 @@ export interface FileRoutesById {
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/propfirms': typeof PropfirmsRoute
   '/refund-policy': typeof RefundPolicyRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/terms-of-service': typeof TermsOfServiceRoute
   '/discord/callback': typeof DiscordCallbackRoute
   '/education_/$slug': typeof EducationSlugRoute
@@ -203,6 +212,7 @@ export interface FileRouteTypes {
     | '/privacy-policy'
     | '/propfirms'
     | '/refund-policy'
+    | '/reset-password'
     | '/terms-of-service'
     | '/discord/callback'
     | '/education/$slug'
@@ -224,6 +234,7 @@ export interface FileRouteTypes {
     | '/privacy-policy'
     | '/propfirms'
     | '/refund-policy'
+    | '/reset-password'
     | '/terms-of-service'
     | '/discord/callback'
     | '/education/$slug'
@@ -245,6 +256,7 @@ export interface FileRouteTypes {
     | '/privacy-policy'
     | '/propfirms'
     | '/refund-policy'
+    | '/reset-password'
     | '/terms-of-service'
     | '/discord/callback'
     | '/education_/$slug'
@@ -267,6 +279,7 @@ export interface RootRouteChildren {
   PrivacyPolicyRoute: typeof PrivacyPolicyRoute
   PropfirmsRoute: typeof PropfirmsRoute
   RefundPolicyRoute: typeof RefundPolicyRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   TermsOfServiceRoute: typeof TermsOfServiceRoute
   DiscordCallbackRoute: typeof DiscordCallbackRoute
   EducationSlugRoute: typeof EducationSlugRoute
@@ -284,6 +297,13 @@ declare module '@tanstack/react-router' {
       path: '/terms-of-service'
       fullPath: '/terms-of-service'
       preLoaderRoute: typeof TermsOfServiceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/refund-policy': {
@@ -427,6 +447,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyPolicyRoute: PrivacyPolicyRoute,
   PropfirmsRoute: PropfirmsRoute,
   RefundPolicyRoute: RefundPolicyRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   TermsOfServiceRoute: TermsOfServiceRoute,
   DiscordCallbackRoute: DiscordCallbackRoute,
   EducationSlugRoute: EducationSlugRoute,
