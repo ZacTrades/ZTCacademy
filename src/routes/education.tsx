@@ -437,7 +437,7 @@ function EducationPage() {
   }, [activeCategory, allLessons, searchTerm]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen overflow-x-clip bg-background text-foreground">
       <Navbar />
       <main>
         <section className="relative overflow-visible pt-32 pb-10 md:pt-40 md:pb-14">
@@ -449,7 +449,7 @@ function EducationPage() {
 
           <div className="mx-auto max-w-7xl px-4 md:px-6">
             <motion.div {...fadeUp} className="mx-auto max-w-5xl text-center">
-              <h1 className="font-display text-5xl font-black leading-tight tracking-tight sm:text-6xl md:text-7xl lg:text-8xl">
+              <h1 className="font-display text-4xl font-black leading-tight tracking-tight sm:text-6xl md:text-7xl lg:text-8xl">
                 Trading <span className="text-gradient">Education Center</span>
               </h1>
               <p className="mx-auto mt-7 max-w-3xl text-base leading-7 text-muted-foreground md:text-xl">
@@ -828,12 +828,6 @@ function LessonCard({
     >
       <div className={"relative aspect-[1.55] overflow-hidden bg-gradient-to-br " + articleTone.cover}>
         <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(to_right,#fff_1px,transparent_1px),linear-gradient(to_bottom,#fff_1px,transparent_1px)] [background-size:46px_46px]" />
-        <div className="absolute left-8 top-7 rotate-[-5deg] rounded-md bg-white px-4 py-2 font-display text-2xl font-black uppercase leading-tight text-background shadow-xl md:text-3xl">
-          {getCoverTitle(lesson)}
-        </div>
-        <div className="absolute bottom-8 left-8 max-w-[62%] -rotate-3 rounded-md bg-background/90 px-3 py-2 text-xs font-black uppercase tracking-[0.08em] text-foreground shadow-lg">
-          {lesson.level}
-        </div>
         <div className="absolute bottom-9 right-8 flex h-28 w-44 items-end gap-2 opacity-90 sm:w-52">
           {[42, 70, 50, 92, 62, 105, 78].map((height, candleIndex) => (
             <div key={candleIndex} className="relative flex h-full flex-1 items-end justify-center">

@@ -60,7 +60,7 @@ function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen overflow-x-clip bg-background text-foreground">
       <Navbar />
       <main className="relative overflow-hidden pt-32 pb-20 md:pt-40">
         <div className="absolute inset-0 -z-10" style={{ background: "var(--gradient-hero)" }} />

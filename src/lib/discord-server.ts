@@ -120,6 +120,16 @@ function discordDisplayName(user: DiscordUserResponse) {
   return user.global_name || user.username;
 }
 
+function isDiscordAlreadyConnectedError(error: { code?: string; message?: string }) {
+  const message = error.message ?? "";
+
+  return (
+    error.code === "23505" &&
+    (message.includes("discord_connections_discord_user_id_key") ||
+      message.includes("discord_user_id"))
+  );
+}
+
 async function getAuthenticatedUser(accessToken: string) {
   const supabaseUrl = readServerEnv("VITE_SUPABASE_URL");
   const supabaseAnonKey = readServerEnv("VITE_SUPABASE_ANON_KEY");
@@ -321,6 +331,30 @@ export const completeDiscordConnection = createServerFn({ method: "POST" })
     const username = discordDisplayName(discordUser);
     const avatarUrl = discordAvatarUrl(discordUser);
 
+    const { data: existingConnection, error: existingConnectionError } = await adminClient
+      .from("discord_connections")
+      .select("user_id")
+      .eq("discord_user_id", discordUser.id)
+      .maybeSingle();
+
+    if (existingConnectionError) {
+      return {
+        ok: false,
+        status: "connection_lookup_failed",
+        message: existingConnectionError.message,
+      };
+    }
+
+    if (existingConnection && existingConnection.user_id !== auth.userId) {
+      await adminClient.from("discord_oauth_states").delete().eq("state", data.state);
+
+      return {
+        ok: false,
+        status: "discord_already_connected",
+        message: "This Discord account is already connected to another ZacTrades account.",
+      };
+    }
+
     const { error: connectionError } = await adminClient.from("discord_connections").upsert(
       {
         user_id: auth.userId,
@@ -338,6 +372,16 @@ export const completeDiscordConnection = createServerFn({ method: "POST" })
     );
 
     if (connectionError) {
+      if (isDiscordAlreadyConnectedError(connectionError)) {
+        await adminClient.from("discord_oauth_states").delete().eq("state", data.state);
+
+        return {
+          ok: false,
+          status: "discord_already_connected",
+          message: "This Discord account is already connected to another ZacTrades account.",
+        };
+      }
+
       return {
         ok: false,
         status: "connection_save_failed",

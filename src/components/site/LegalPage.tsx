@@ -26,7 +26,7 @@ export function LegalPage({
   sections,
 }: LegalPageProps) {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen overflow-x-clip bg-background text-foreground">
       <Navbar />
       <main>
         <section className="relative overflow-hidden pt-32 pb-16 md:pt-40 md:pb-20">

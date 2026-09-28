@@ -490,7 +490,7 @@ function AdminEditShell({
   children: ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen overflow-x-clip bg-background text-foreground">
       <Navbar />
       <main>{children}</main>
       <Footer />
