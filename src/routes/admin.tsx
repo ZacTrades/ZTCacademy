@@ -1994,7 +1994,7 @@ function AdminPage() {
   }, [activePanel, isAdmin, isStaff]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen overflow-x-clip bg-background text-foreground">
       <main>
         <section className="relative overflow-hidden pt-12 pb-12 md:pt-16 md:pb-16">
           <div className="absolute inset-0 -z-10" style={{ background: "var(--gradient-hero)" }} />

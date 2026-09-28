@@ -130,11 +130,11 @@ function Home() {
   }, [isStaff, loading, navigate]);
 
   if (!loading && isStaff) {
-    return <div className="min-h-screen bg-background text-foreground" />;
+    return <div className="min-h-screen overflow-x-clip bg-background text-foreground" />;
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen overflow-x-clip bg-background text-foreground">
       <Navbar />
       <Hero />
       <TickerTape />

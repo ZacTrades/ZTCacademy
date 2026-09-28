@@ -126,7 +126,7 @@ function EducationArticlePage() {
   }, [user?.id, isStaff]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen overflow-x-clip bg-background text-foreground">
       <Navbar />
       <main>
         <section className="relative overflow-hidden pt-32 pb-12 md:pt-40 md:pb-16">
@@ -310,22 +310,23 @@ function SocialShareButtons({ article }: { article: EducationArticle }) {
   const articleUrl = `https://www.zactrades.com/education/${article.slug}`;
   const encodedUrl = encodeURIComponent(articleUrl);
   const encodedTitle = encodeURIComponent(article.title);
+  const encodedTelegramText = encodeURIComponent(`${article.title} ${articleUrl}`);
 
   const shareLinks = [
     {
       label: "Facebook",
-      shortLabel: "f",
+      icon: <FacebookIcon />,
       href: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedTitle}`,
     },
     {
-      label: "X",
-      shortLabel: "x",
-      href: `https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedTitle}`,
+      label: "Telegram",
+      icon: <TelegramIcon />,
+      href: `https://t.me/share/url?url=${encodedUrl}&text=${encodedTelegramText}`,
     },
     {
-      label: "LinkedIn",
-      shortLabel: "in",
-      href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
+      label: "X",
+      icon: <XIcon />,
+      href: `https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedTitle}`,
     },
   ];
 
@@ -338,12 +339,36 @@ function SocialShareButtons({ article }: { article: EducationArticle }) {
           target="_blank"
           rel="noopener noreferrer"
           aria-label={`Share on ${network.label}`}
-          className="grid h-11 w-11 place-items-center rounded-xl border border-border/60 bg-card/60 text-sm font-black uppercase text-foreground shadow-[0_18px_45px_-34px_hsl(var(--primary)/0.8)] transition-all hover:-translate-y-0.5 hover:border-primary/45 hover:bg-primary/10 hover:text-electric"
+          className="grid h-11 w-11 place-items-center rounded-xl border border-border/60 bg-card/60 text-foreground shadow-[0_18px_45px_-34px_hsl(var(--primary)/0.8)] transition-all hover:-translate-y-0.5 hover:border-primary/45 hover:bg-primary/10 hover:text-electric"
         >
-          {network.shortLabel}
+          {network.icon}
         </a>
       ))}
     </div>
+  );
+}
+
+function FacebookIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-current">
+      <path d="M14 8.2V6.7c0-.7.5-.9.9-.9h2.3V2.1L14 2c-3.5 0-4.4 2.7-4.4 4.4v1.8H7v3.9h2.6V22H14v-9.9h3l.5-3.9H14Z" />
+    </svg>
+  );
+}
+
+function TelegramIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-current">
+      <path d="M21.7 4.4 18.5 19c-.2 1-.8 1.2-1.6.8l-4.8-3.5-2.3 2.2c-.3.3-.5.5-1 .5l.3-4.9 8.9-8c.4-.3-.1-.5-.6-.2L6.4 12.8 1.7 11.3c-1-.3-1-1 .2-1.5L20.3 2.7c.9-.3 1.7.2 1.4 1.7Z" />
+    </svg>
+  );
+}
+
+function XIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4 fill-current">
+      <path d="M18.9 2h3.3l-7.3 8.3L23.5 22h-6.7l-5.3-6.9L5.5 22H2.2l7.8-8.9L1.8 2h6.9l4.7 6.2L18.9 2Zm-1.2 17.9h1.8L7.7 4H5.8l11.9 15.9Z" />
+    </svg>
   );
 }
 
