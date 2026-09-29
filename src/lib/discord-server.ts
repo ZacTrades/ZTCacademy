@@ -411,21 +411,30 @@ export const completeDiscordConnection = createServerFn({ method: "POST" })
       };
     }
 
+    const joinResult = await ensureDiscordGuildMember(adminClient, auth.userId);
     const syncResult = await syncPaidDiscordAccess(adminClient, auth.userId);
     const syncWarning =
       syncResult.failedMessages.length > 0
         ? " Some paid roles could not sync yet: " + syncResult.failedMessages.join("; ")
         : "";
+    const joinWarning =
+      !joinResult.ok && syncResult.syncedCount === 0
+        ? " Discord server join could not be completed yet: " + joinResult.message
+        : "";
     const connectedMessage =
       syncResult.syncedCount > 0
         ? "Discord connected as " + username + ". Your paid Discord access has been synced."
-        : "Discord connected as " + username + ". Server access will be assigned after payment.";
+        : joinResult.ok
+          ? "Discord connected as " +
+            username +
+            ". You have joined the server. Paid roles will be assigned after payment."
+          : "Discord connected as " + username + ". Paid roles will be assigned after payment.";
 
     return {
       ok: true,
       status: "connected",
       username,
-      message: connectedMessage + syncWarning,
+      message: connectedMessage + joinWarning + syncWarning,
     };
   });
 
@@ -560,6 +569,79 @@ function isActivePaidAccess(access: { status: string; access_expires_at: string 
 function isActiveDiscordAccess(access: { status: string; access_expires_at: string | null }) {
   if (access.status === "pending" && discordAllowPendingAccess()) return true;
   return isActivePaidAccess(access);
+}
+
+async function ensureDiscordGuildMember(adminClient: SupabaseClient, userId: string) {
+  const botToken = readServerEnv("DISCORD_BOT_TOKEN");
+  const guildId = readServerEnv("DISCORD_GUILD_ID");
+
+  if (!botToken || !guildId) {
+    return {
+      ok: false,
+      status: "discord_bot_not_configured",
+      message: "Discord bot is not configured yet.",
+    };
+  }
+
+  const { data: connection, error } = await adminClient
+    .from("discord_connections")
+    .select("discord_user_id,access_token")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false, status: "discord_connection_lookup_failed", message: error.message };
+  }
+
+  if (!connection?.discord_user_id || !connection?.access_token) {
+    return {
+      ok: false,
+      status: "discord_not_connected",
+      message: "Discord is not connected yet.",
+    };
+  }
+
+  const memberResponse = await fetch(
+    `https://discord.com/api/guilds/${guildId}/members/${connection.discord_user_id}`,
+    {
+      method: "PUT",
+      headers: {
+        authorization: `Bot ${botToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        access_token: connection.access_token,
+      }),
+    },
+  );
+
+  if (!memberResponse.ok && memberResponse.status !== 204) {
+    const message = await memberResponse.text();
+    await saveDiscordSyncFailure(adminClient, userId, message || "Unable to add Discord member.");
+
+    return {
+      ok: false,
+      status: "discord_member_add_failed",
+      message: message || `Discord member add failed with ${memberResponse.status}.`,
+    };
+  }
+
+  const now = new Date().toISOString();
+  await adminClient
+    .from("profiles")
+    .update({
+      discord_guild_joined_at: now,
+      discord_last_role_sync_at: now,
+      discord_role_sync_status: "server_joined",
+      discord_role_sync_error: null,
+    })
+    .eq("id", userId);
+
+  return {
+    ok: true,
+    status: "server_joined",
+    message: "Discord server joined.",
+  };
 }
 
 export async function provisionDiscordAccess(
