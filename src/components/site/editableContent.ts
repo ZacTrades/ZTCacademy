@@ -306,12 +306,12 @@ export const defaultCommunitySocials: CommunitySocialRow[] = [
     display_order: 2,
   },
   {
-    slug: "tiktok",
-    name: "TikTok",
-    handle: "@apextraders",
-    description: "Short trading tips, quick lessons, and psychology reminders.",
-    icon_key: "music",
-    url: "https://www.tiktok.com",
+    slug: "telegram",
+    name: "Telegram",
+    handle: "@ZacxTrades",
+    description: "Get live updates, quick announcements, and community trading alerts.",
+    icon_key: "telegram",
+    url: "https://t.me/ZacxTrades",
     tone_key: "primary",
     is_active: true,
     display_order: 3,
@@ -440,7 +440,23 @@ export async function fetchCommunitySocials() {
     return defaultCommunitySocials;
   }
 
-  return data?.length ? (data as CommunitySocialRow[]) : defaultCommunitySocials;
+  const rows = data?.length ? (data as CommunitySocialRow[]) : defaultCommunitySocials;
+  return rows.map((row) => {
+    const isTikTok = row.slug === "tiktok" || row.name.toLowerCase() === "tiktok";
+
+    if (!isTikTok) return row;
+
+    return {
+      ...row,
+      slug: "telegram",
+      name: "Telegram",
+      handle: "@ZacxTrades",
+      description: "Get live updates, quick announcements, and community trading alerts.",
+      icon_key: "telegram",
+      url: "https://t.me/ZacxTrades",
+      tone_key: "primary",
+    };
+  });
 }
 
 export async function fetchOfferHeadlines() {

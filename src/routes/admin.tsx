@@ -539,9 +539,7 @@ function AdminPage() {
             : defaultTradingTools.map(toEditableTool),
         );
         setEducationArticles(
-          educationResult.data?.length
-            ? (educationResult.data as EducationArticleRow[])
-            : defaultEducationArticleRows,
+          educationResult.data ? (educationResult.data as EducationArticleRow[]) : defaultEducationArticleRows,
         );
         setPropFirms(
           firmsResult.data?.length
@@ -1342,11 +1340,16 @@ function AdminPage() {
     setMessage("");
     setErrorMessage("");
 
-    const { error } = await supabase.from("education_articles").delete().eq("slug", item.slug);
+    const { count, error } = await supabase
+      .from("education_articles")
+      .delete({ count: "exact" })
+      .eq("slug", item.slug);
 
     if (error) {
       console.error(error);
       setErrorMessage(error.message);
+    } else if (count === 0) {
+      setErrorMessage("No education article was deleted. Please refresh and try again.");
     } else {
       setEducationArticles((current) => current.filter((article) => article.slug !== item.slug));
       setMessage(`${item.title} education article deleted.`);
@@ -4728,8 +4731,8 @@ function CommunitySocialEditor({
               Controls the social card shown in the homepage community section.
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
-              Icon keys: youtube, instagram, music, message. Color styles: bear, gold, primary,
-              bull.
+              Icon keys: youtube, instagram, telegram, music, message. Color styles: bear, gold,
+              primary, bull.
             </p>
           </div>
           <div className="hidden h-12 w-12 shrink-0 sm:grid place-items-center rounded-xl bg-primary/15 text-electric ring-1 ring-primary/30">
@@ -4756,7 +4759,7 @@ function CommunitySocialEditor({
               label="Icon key"
               value={item.icon_key}
               onChange={(value) => onChange(item.slug, { icon_key: value })}
-              placeholder="youtube, instagram, music, message"
+              placeholder="youtube, instagram, telegram, message"
             />
             <Field
               id={`${item.slug}-community-tone`}
@@ -6217,6 +6220,7 @@ function NewsSubscribersTableRow({ profile }: { profile: UserProfileRow }) {
 }
 
 type PaidInvoiceItem = {
+  invoiceNumber?: string;
   label: string;
   accessType: string;
   amountLabel: string | null;
@@ -6293,6 +6297,7 @@ function paidInvoiceItems(profile: UserProfileRow) {
 
 function invoiceToPaidItem(invoice: UserInvoiceRow): PaidInvoiceItem {
   return {
+    invoiceNumber: invoice.invoice_number,
     label: invoice.product_name,
     accessType: invoice.product_description || invoice.access_type || "Paid access",
     amountLabel: invoice.gross_amount_label || invoice.amount_label,
@@ -6323,73 +6328,79 @@ function InvoicePrintActions({
     : "flex flex-wrap justify-end gap-2";
 
   if (storedInvoices.length) {
+    const storedInvoiceItems = storedInvoices.map(invoiceToPaidItem);
+    const primaryInvoice = storedInvoices[0];
+    const productSummary = storedInvoices
+      .map((invoice) => invoice.product_name)
+      .filter(Boolean)
+      .join(" + ");
+    const paidDateSummary =
+      storedInvoices.length === 1
+        ? formatAdminDate(storedInvoices[0].paid_at)
+        : `${storedInvoices.length} paid plans`;
+
     return (
-      <div className={fullWidth ? "grid gap-2" : "grid justify-items-end gap-2"}>
-        {storedInvoices.map((invoice) => (
-          <div
-            key={invoice.id}
+      <div
+        className={
+          fullWidth
+            ? "grid gap-2 rounded-xl border border-border/45 bg-background/35 p-2"
+            : "grid justify-items-end gap-2"
+        }
+      >
+        <div className="max-w-[190px] text-right text-[11px] leading-4 text-muted-foreground">
+          <span className="block truncate font-semibold text-foreground">
+            {productSummary || "Paid access"}
+          </span>
+          <span>{paidDateSummary}</span>
+        </div>
+        <div className={wrapperClassName}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
             className={
               fullWidth
-                ? "grid gap-2 rounded-xl border border-border/45 bg-background/35 p-2"
-                : "grid justify-items-end gap-2"
+                ? "w-full border-primary/35 text-electric hover:bg-primary/10"
+                : "border-primary/35 text-electric hover:bg-primary/10"
+            }
+            aria-label={`Print combined admin invoice for ${memberLabel}`}
+            onClick={() =>
+              printPaidMemberInvoice(
+                profile,
+                storedInvoiceItems,
+                "admin",
+                primaryInvoice,
+                storedInvoiceItems,
+              )
             }
           >
-            <div className="max-w-[180px] text-right text-[11px] leading-4 text-muted-foreground">
-              <span className="block truncate font-semibold text-foreground">
-                {invoice.product_name}
-              </span>
-              <span>{formatAdminDate(invoice.paid_at)}</span>
-            </div>
-            <div className={wrapperClassName}>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className={
-                  fullWidth
-                    ? "w-full border-primary/35 text-electric hover:bg-primary/10"
-                    : "border-primary/35 text-electric hover:bg-primary/10"
-                }
-                aria-label={`Print admin invoice ${invoice.invoice_number} for ${memberLabel}`}
-                onClick={() =>
-                  printPaidMemberInvoice(
-                    profile,
-                    [invoiceToPaidItem(invoice)],
-                    "admin",
-                    invoice,
-                    storedInvoices.map(invoiceToPaidItem),
-                  )
-                }
-              >
-                <Printer className="h-3.5 w-3.5" />
-                Admin
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className={
-                  fullWidth
-                    ? "w-full border-gold/35 text-gold hover:bg-gold/10"
-                    : "border-gold/35 text-gold hover:bg-gold/10"
-                }
-                aria-label={`Print member invoice ${invoice.invoice_number} for ${memberLabel}`}
-                onClick={() =>
-                  printPaidMemberInvoice(
-                    profile,
-                    [invoiceToPaidItem(invoice)],
-                    "member",
-                    invoice,
-                    storedInvoices.map(invoiceToPaidItem),
-                  )
-                }
-              >
-                <Printer className="h-3.5 w-3.5" />
-                Member
-              </Button>
-            </div>
-          </div>
-        ))}
+            <Printer className="h-3.5 w-3.5" />
+            Admin
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className={
+              fullWidth
+                ? "w-full border-gold/35 text-gold hover:bg-gold/10"
+                : "border-gold/35 text-gold hover:bg-gold/10"
+            }
+            aria-label={`Print combined member invoice for ${memberLabel}`}
+            onClick={() =>
+              printPaidMemberInvoice(
+                profile,
+                storedInvoiceItems,
+                "member",
+                primaryInvoice,
+                storedInvoiceItems,
+              )
+            }
+          >
+            <Printer className="h-3.5 w-3.5" />
+            Member
+          </Button>
+        </div>
       </div>
     );
   }
@@ -6496,8 +6507,14 @@ function buildInvoiceHtml(
 ) {
   const isAdminCopy = model === "admin";
   const memberName = invoice?.customer_name || profile.full_name || "Member";
+  const invoiceNumbers = paidMemberships
+    .map((item) => item.invoiceNumber)
+    .filter((value): value is string => Boolean(value))
+    .filter((value, index, values) => values.indexOf(value) === index);
   const invoiceNumber =
-    invoice?.invoice_number ?? `ZT-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`;
+    invoiceNumbers.length
+      ? invoiceNumbers.join(" + ")
+      : invoice?.invoice_number ?? `ZT-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`;
   const generatedAt = new Intl.DateTimeFormat("en", {
     month: "short",
     day: "numeric",
@@ -6869,15 +6886,24 @@ function buildAdminInvoiceHtml(
     .filter(Boolean)
     .filter((value, index, values) => values.indexOf(value) === index)
     .join(" + ");
-  const traceValue = paidMemberships
+  const traceValues = paidMemberships
     .map((item) => item.providerCheckoutId || item.providerSubscriptionId || item.providerCustomerId)
-    .filter(Boolean)
-    .join(" + ");
+    .filter((value): value is string => Boolean(value));
+  const traceValueHtml = traceValues.length
+    ? traceValues.map((value) => escapeHtml(value)).join("<br />")
+    : escapeHtml(firstTrace || "[PAYZONE_TRANSACTION_ID]");
   const grossValue = paidMemberships
     .map((item) => formatAdminInvoiceMadAmount(item.amountLabel))
     .filter(Boolean)
     .join(" + ");
   const totalPaidValue = formatAdminInvoiceMadTotal(totalPaidItems) || grossValue;
+  const grossMadTotal = getAdminInvoiceMadTotalValue(totalPaidItems);
+  const vatValue =
+    grossMadTotal === null ? "[MONTANT_TVA] MAD" : `${formatAdminInvoiceMadNumber(grossMadTotal * 0.2)} MAD`;
+  const netAccountingValue =
+    grossMadTotal === null
+      ? "[MONTANT_NET] MAD"
+      : `${formatAdminInvoiceMadNumber(grossMadTotal - grossMadTotal * 0.2)} MAD`;
 
   return `<!doctype html>
 <html>
@@ -6994,6 +7020,10 @@ function buildAdminInvoiceHtml(
       .billing-table td:first-child {
         width: 60%;
         font-weight: 800;
+      }
+      .billing-table td:last-child {
+        overflow-wrap: anywhere;
+        word-break: break-word;
       }
       .billing-table tr:last-child td {
         background: #f1f3f5;
@@ -7137,7 +7167,7 @@ function buildAdminInvoiceHtml(
           </tr>
           <tr>
             <td>ID de Transaction Passerelle (Trace)</td>
-            <td>${escapeHtml(traceValue || firstTrace || "[PAYZONE_TRANSACTION_ID]")}</td>
+            <td>${traceValueHtml}</td>
           </tr>
           <tr>
             <td>Montant brut encaisse par le client</td>
@@ -7148,12 +7178,12 @@ function buildAdminInvoiceHtml(
             <td><strong>${escapeHtml(totalPaidValue || "[TOTAL_PAYE] MAD")}</strong></td>
           </tr>
           <tr>
-            <td>Frais de passerelle estimes (a deduire)</td>
-            <td>- [FRAIS_ESTIMES] $</td>
+            <td>Montant de la TVA (dont)</td>
+            <td><strong>${escapeHtml(vatValue)}</strong></td>
           </tr>
           <tr>
             <td>Montant net comptable (Virement vers ZACTRIX)</td>
-            <td>[MONTANT_NET] $</td>
+            <td><strong>${escapeHtml(netAccountingValue)}</strong></td>
           </tr>
         </tbody>
       </table>
@@ -7197,6 +7227,14 @@ function formatAdminInvoiceMadAmount(value: string | null | undefined) {
 }
 
 function formatAdminInvoiceMadTotal(items: PaidInvoiceItem[]) {
+  const total = getAdminInvoiceMadTotalValue(items);
+
+  if (total === null) return null;
+
+  return `${formatAdminInvoiceMadNumber(total)} MAD`;
+}
+
+function getAdminInvoiceMadTotalValue(items: PaidInvoiceItem[]) {
   const total = items.reduce((sum, item) => {
     const amount = getAdminInvoiceMadValue(item.amountLabel);
     return amount === null ? sum : sum + amount;
@@ -7204,7 +7242,7 @@ function formatAdminInvoiceMadTotal(items: PaidInvoiceItem[]) {
 
   if (total <= 0) return null;
 
-  return `${formatAdminInvoiceMadNumber(total)} MAD`;
+  return total;
 }
 
 function getAdminInvoiceMadValue(value: string | null | undefined) {

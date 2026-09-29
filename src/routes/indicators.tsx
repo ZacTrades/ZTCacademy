@@ -15,6 +15,7 @@ import {
   type IndicatorRow,
 } from "@/components/site/editableContent";
 import { useAuth } from "@/lib/use-auth";
+import liquidityLevelsPreview from "@/assets/ztc-liquidity-levels-preview.png";
 
 export const Route = createFileRoute("/indicators")({
   head: () => ({
@@ -150,6 +151,8 @@ function IndicatorsPage() {
               <div className="grid gap-5 lg:grid-cols-3">
                 {visibleIndicators.map((indicator, index) => {
                   const isComingSoon = comingSoonIndicatorSlugs.has(indicator.slug);
+                  const useLiquidityPreview = index === 0;
+                  const useBlurredPreview = index > 0;
 
                   return (
                     <motion.div
@@ -197,8 +200,33 @@ function IndicatorsPage() {
                         <p className="mt-3 text-sm leading-6 text-muted-foreground">
                           {indicator.description}
                         </p>
-                        <div className="relative mt-5 h-36 overflow-hidden rounded-xl bg-background/60 ring-1 ring-border/60">
-                          <CandleChart count={40} height={140} />
+                        <div
+                          className={`relative mt-5 overflow-hidden rounded-xl bg-background/60 ring-1 ring-border/60 ${
+                            useLiquidityPreview ? "aspect-[2910/1398]" : "h-36"
+                          }`}
+                        >
+                          {useLiquidityPreview ? (
+                            <img
+                              src={liquidityLevelsPreview}
+                              alt="ZTC Liquidity Levels chart preview"
+                              className="h-full w-full object-contain object-center"
+                              loading="lazy"
+                            />
+                          ) : useBlurredPreview ? (
+                            <>
+                              <img
+                                src={liquidityLevelsPreview}
+                                alt=""
+                                className="h-full w-full scale-110 object-cover object-center opacity-70 blur-[3px] brightness-75 saturate-125"
+                                loading="lazy"
+                                aria-hidden
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-br from-background/20 via-background/35 to-destructive/25" />
+                              <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background/75 to-transparent" />
+                            </>
+                          ) : (
+                            <CandleChart count={40} height={140} />
+                          )}
                           {isComingSoon && (
                             <div className="absolute inset-0 grid place-items-center bg-background/55 backdrop-blur-[2px]">
                               <div className="rounded-full border border-destructive/35 bg-background/80 px-4 py-2 text-xs font-black uppercase tracking-[0.26em] text-destructive shadow-[0_0_24px_rgba(248,113,113,0.18)]">

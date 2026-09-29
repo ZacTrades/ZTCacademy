@@ -297,7 +297,7 @@ export async function fetchEducationArticleRows({
     return defaultEducationArticleRows;
   }
 
-  return data?.length ? (data as EducationArticleRow[]) : defaultEducationArticleRows;
+  return (data ?? []) as EducationArticleRow[];
 }
 
 function getFirstArticleImageUrl(content: string) {

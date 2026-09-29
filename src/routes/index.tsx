@@ -82,6 +82,7 @@ import bouma3zaReviewCertificate from "@/assets/member-review-bouma3za-myfundedf
 import mrHAlphaFuturesCertificate from "@/assets/member-review-mr-h-alpha-futures.jpg";
 import nizarReviewReward from "@/assets/member-review-nizar-fundednext-reward.jpg";
 import tradingViewPreview from "@/assets/zactrades-tradingview-preview.jpeg";
+import liquidityLevelsPreview from "@/assets/ztc-liquidity-levels-preview.png";
 import { useCurrency } from "@/lib/currency";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/use-auth";
@@ -946,6 +947,8 @@ function Indicators() {
         <div className="mt-7 grid gap-5 md:mt-9 lg:grid-cols-3">
           {items.map((indicator, index) => {
             const isComingSoon = comingSoonIndicatorSlugs.has(indicator.slug);
+            const useLiquidityPreview = index === 0;
+            const useBlurredPreview = index > 0;
 
             return (
               <motion.div
@@ -996,8 +999,33 @@ function Indicators() {
                     {indicator.description}
                   </p>
 
-                  <div className="relative mt-5 h-36 overflow-hidden rounded-xl bg-background/60 ring-1 ring-border/60">
-                    <CandleChart count={40} height={140} />
+                  <div
+                    className={`relative mt-5 overflow-hidden rounded-xl bg-background/60 ring-1 ring-border/60 ${
+                      useLiquidityPreview ? "aspect-[2910/1398]" : "h-36"
+                    }`}
+                  >
+                    {useLiquidityPreview ? (
+                      <img
+                        src={liquidityLevelsPreview}
+                        alt="ZTC Liquidity Levels chart preview"
+                        className="h-full w-full object-contain object-center"
+                        loading="lazy"
+                      />
+                    ) : useBlurredPreview ? (
+                      <>
+                        <img
+                          src={liquidityLevelsPreview}
+                          alt=""
+                          className="h-full w-full scale-110 object-cover object-center opacity-70 blur-[3px] brightness-75 saturate-125"
+                          loading="lazy"
+                          aria-hidden
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-br from-background/20 via-background/35 to-destructive/25" />
+                        <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background/75 to-transparent" />
+                      </>
+                    ) : (
+                      <CandleChart count={40} height={140} />
+                    )}
                     {isComingSoon && (
                       <div className="absolute inset-0 grid place-items-center bg-background/55 backdrop-blur-[2px]">
                         <div className="rounded-full border border-destructive/35 bg-background/80 px-4 py-2 text-xs font-black uppercase tracking-[0.26em] text-destructive shadow-[0_0_24px_rgba(248,113,113,0.18)]">
@@ -1412,7 +1440,7 @@ function Testimonials() {
     {
       name: "Abdellatif",
       badges: [],
-      planLabel: "Live Trading",
+      planLabel: "Group Coaching",
       rating: 5,
       quote:
         "Kanbghi nchker 3la lformation li dar m3ana vrm fiha wahd l value li kbiiira katkhlik tfhem kifach dir analysis w tfhem l context dyal trading kifach dayer 3ans 9bel kent ghi kankhrbe9 hmd db wlit fahm w surtout strategy li 3tana w ba9i l daba kanswlo w kay3ti lkhater w yzid ychrahlina ay haja mzl mafahminhach wakha salina lformation wakha n3ya nhder dakchi li an9olo f7e9 had siyed rah 9lil w ncha2llah lkhir mzl ghayji ncha2llah thank you khouya",
@@ -1448,7 +1476,7 @@ function Testimonials() {
     {
       name: "BHC",
       badges: [],
-      planLabel: "Live Trading",
+      planLabel: "Group Coaching",
       rating: 5,
       quote:
         "Hi all! I’m happy to share my certificate for passing the challenge with you guys. 1st I want to say Alhamdulillah for everything. I also want to thank Zac for teaching me. I’m really happy to have met someone like him! He’s a really nice person! Finally, Wishing success for all of us, Inshallah",
@@ -2202,6 +2230,17 @@ function BrandSocialIcon({ iconKey, className = "" }: { iconKey: string; classNa
     );
   }
 
+  if (iconKey === "telegram") {
+    return (
+      <svg viewBox="0 0 496 512" aria-hidden="true" className={className}>
+        <path
+          fill="#2aabee"
+          d="M248 8C111 8 0 119 0 256s111 248 248 248 248-111 248-248S385 8 248 8Zm121.8 169.9-40.7 191.8c-3.1 13.6-11.1 16.9-22.4 10.5l-62-45.7-29.9 28.8c-3.3 3.3-6.1 6.1-12.5 6.1l4.5-63.1 114.9-103.8c5-4.5-1.1-7-7.8-2.5L171.8 289.4l-61.2-19.1c-13.3-4.2-13.6-13.3 2.8-19.7l239.1-92.2c11.1-4.2 20.8 2.5 17.3 19.5Z"
+        />
+      </svg>
+    );
+  }
+
   if (iconKey === "message") {
     return (
       <svg viewBox="0 0 512 512" aria-hidden="true" className={className}>
@@ -2237,6 +2276,7 @@ function ConnectWithUs() {
     youtube: "border-bear/35 bg-bear/10 shadow-bear/10",
     instagram: "border-gold/35 bg-gold/10 shadow-gold/10",
     music: "border-foreground/15 bg-white shadow-white/10 text-black",
+    telegram: "border-sky-400/35 bg-sky-400/10 shadow-sky-400/10",
     message: "border-[#6f82d8]/40 bg-[#6f82d8]/10 shadow-[#6f82d8]/10",
   };
 
