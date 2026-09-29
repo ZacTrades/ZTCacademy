@@ -17,6 +17,8 @@ import {
   Bold,
   Heading1,
   Heading2,
+  Heading3,
+  Heading4,
   ImageIcon,
   Italic,
   LinkIcon,
@@ -53,9 +55,13 @@ const colorOptions = [
   { label: "Red", value: "#ff3b4f" },
 ];
 
-const inlineHeadingStyles: Record<1 | 2, string> = {
+type ArticleHeadingLevel = 1 | 2 | 3 | 4;
+
+const inlineHeadingStyles: Record<ArticleHeadingLevel, string> = {
   1: "font-size: 2.25rem; font-weight: 900; line-height: 1.08; color: #f8fafc;",
   2: "font-size: 1.875rem; font-weight: 900; line-height: 1.12; color: #f8fafc;",
+  3: "font-size: 1.5rem; font-weight: 850; line-height: 1.18; color: #f8fafc;",
+  4: "font-size: 1.25rem; font-weight: 800; line-height: 1.24; color: #f8fafc;",
 };
 
 const InlineHeadingTextStyle = Extension.create({
@@ -72,11 +78,11 @@ const InlineHeadingTextStyle = Extension.create({
             renderHTML: (attributes) => {
               const level = Number(attributes.inlineHeadingLevel);
 
-              if (level !== 1 && level !== 2) return {};
+              if (level !== 1 && level !== 2 && level !== 3 && level !== 4) return {};
 
               return {
                 "data-inline-heading": String(level),
-                style: inlineHeadingStyles[level],
+                style: inlineHeadingStyles[level as ArticleHeadingLevel],
               };
             },
           },
@@ -144,7 +150,7 @@ export function RichArticleEditor({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        heading: { levels: [1, 2, 3] },
+        heading: { levels: [1, 2, 3, 4] },
       }),
       Underline,
       TextStyle,
@@ -260,7 +266,7 @@ export function RichArticleEditor({
     editor.commands.setYoutubeVideo({ src: url.trim(), width: 900, height: 506 });
   };
 
-  const setArticleHeading = (level: 1 | 2) => {
+  const setArticleHeading = (level: ArticleHeadingLevel) => {
     if (!editor) return;
 
     if (editor.state.selection.empty) {
@@ -329,6 +335,26 @@ export function RichArticleEditor({
             onClick={() => setArticleHeading(2)}
           >
             <Heading2 className="h-4 w-4" />
+          </ToolbarButton>
+          <ToolbarButton
+            label="Heading 3"
+            active={
+              editor?.isActive("heading", { level: 3 }) ||
+              editor?.isActive("textStyle", { inlineHeadingLevel: "3" })
+            }
+            onClick={() => setArticleHeading(3)}
+          >
+            <Heading3 className="h-4 w-4" />
+          </ToolbarButton>
+          <ToolbarButton
+            label="Heading 4"
+            active={
+              editor?.isActive("heading", { level: 4 }) ||
+              editor?.isActive("textStyle", { inlineHeadingLevel: "4" })
+            }
+            onClick={() => setArticleHeading(4)}
+          >
+            <Heading4 className="h-4 w-4" />
           </ToolbarButton>
           <ToolbarButton label="Paragraph" active={editor?.isActive("paragraph")} onClick={setArticleParagraph}>
             <Type className="h-4 w-4" />

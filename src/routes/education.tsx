@@ -32,6 +32,7 @@ import {
 } from "@/lib/education-content";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/use-auth";
+import websiteLogoUrl from "@/assets/zactrades-logo4-clean.png";
 
 export const Route = createFileRoute("/education")({
   head: () => ({
@@ -80,6 +81,7 @@ type Lesson = {
   query: string;
   videoUrl?: string;
   thumbnailUrl?: string;
+  isLogoThumbnail?: boolean;
   slug?: string;
   articleDate?: string;
 };
@@ -391,18 +393,23 @@ function EducationPage() {
 
   const articleLessons = useMemo<Lesson[]>(
     () =>
-      educationArticlesFromRows(educationArticleRows).map((article) => ({
-        title: article.title,
-        description: article.description,
-        category: article.category,
-        level: article.level,
-        duration: article.readTime,
-        access: article.access,
-        query: article.title,
-        slug: article.slug,
-        articleDate: article.date,
-        thumbnailUrl: article.coverImageUrl ?? undefined,
-      })),
+      educationArticlesFromRows(educationArticleRows).map((article) => {
+        const articleThumbnailUrl = article.coverImageUrl?.trim();
+
+        return {
+          title: article.title,
+          description: article.description,
+          category: article.category,
+          level: article.level,
+          duration: article.readTime,
+          access: article.access,
+          query: article.title,
+          slug: article.slug,
+          articleDate: article.date,
+          thumbnailUrl: articleThumbnailUrl || websiteLogoUrl,
+          isLogoThumbnail: !articleThumbnailUrl,
+        };
+      }),
     [educationArticleRows],
   );
 
@@ -641,11 +648,16 @@ function EducationSearchResult({
       }`}
     >
       <div className="relative aspect-video overflow-hidden rounded-xl border border-border/55 bg-card/60">
+        {lesson.isLogoThumbnail ? (
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,hsl(var(--primary)/0.24),transparent_42%),linear-gradient(135deg,hsl(var(--card)),hsl(var(--background)))]" />
+        ) : null}
         {lesson.thumbnailUrl ? (
           <img
             src={lesson.thumbnailUrl}
             alt={lesson.title + " thumbnail"}
-            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+            className={`relative h-full w-full transition duration-500 group-hover:scale-105 ${
+              lesson.isLogoThumbnail ? "object-contain p-5" : "object-cover"
+            }`}
             loading="lazy"
           />
         ) : (
@@ -757,10 +769,15 @@ function LessonCard({
           }`}
           aria-label={thumbnailLabel + " " + lesson.title}
         >
+          {lesson.isLogoThumbnail ? (
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_15%,hsl(var(--primary)/0.28),transparent_38%),radial-gradient(circle_at_85%_80%,hsl(var(--gold)/0.18),transparent_34%),linear-gradient(135deg,hsl(var(--card)),hsl(var(--background)))]" />
+          ) : null}
           <img
             src={lesson.thumbnailUrl}
             alt={lesson.title + " thumbnail"}
-            className="aspect-video w-full object-cover transition-transform duration-700 group-hover:scale-105"
+            className={`relative aspect-video w-full transition-transform duration-700 group-hover:scale-105 ${
+              lesson.isLogoThumbnail ? "object-contain p-10 sm:p-12" : "object-cover"
+            }`}
             loading="lazy"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-background/75 via-background/5 to-transparent" />
