@@ -53,6 +53,7 @@ const discountPreviewSchema = z.object({
 });
 
 type CheckoutKind = "live" | "mentorship" | "news";
+type LivePackageSlug = z.infer<typeof liveTradingCheckoutSchema>["packageSlug"];
 type PaymentMethod = z.infer<typeof paymentMethodSchema>;
 
 type GatewayCheckoutResponse = {
@@ -189,6 +190,8 @@ type PaymentTarget =
       planSlug: "one_to_one" | "group";
       amountLabel: string | null;
       status: string;
+      accessStartsAt?: string | null;
+      accessExpiresAt?: string | null;
       paymentProvider?: string | null;
       providerCustomerId?: string | null;
       providerCheckoutId?: string | null;
@@ -591,7 +594,7 @@ function isActivePaidAccess(access: { status: string; access_expires_at: string 
   return Number.isNaN(expiresAt.getTime()) || expiresAt > new Date();
 }
 
-function normalizeLivePackageSlug(value: unknown) {
+function normalizeLivePackageSlug(value: unknown): LivePackageSlug | null {
   if (
     value === "one_month" ||
     value === "three_months" ||
@@ -604,12 +607,40 @@ function normalizeLivePackageSlug(value: unknown) {
   return null;
 }
 
+function livePackageSlugFromDurationLabel(value: string | null | undefined): LivePackageSlug | null {
+  const normalized = value?.toLowerCase().replace(/\s+/g, " ").trim();
+  if (!normalized) return null;
+
+  if (normalized.includes("12")) return "twelve_months";
+  if (normalized.includes("6")) return "six_months";
+  if (normalized.includes("3")) return "three_months";
+  if (normalized.includes("1")) return "one_month";
+
+  return null;
+}
+
+function liveDurationLabelForPackage(packageSlug: LivePackageSlug | null) {
+  switch (packageSlug) {
+    case "twelve_months":
+      return "12 months";
+    case "six_months":
+      return "6 months";
+    case "three_months":
+      return "3 months";
+    case "one_month":
+      return "1 month";
+    default:
+      return null;
+  }
+}
+
 function normalizeMentorshipPlanSlug(value: unknown): "one_to_one" | "group" | null {
   if (value === "one_to_one" || value === "group") return value;
   return null;
 }
 
 const LIVE_REPLACEMENT_NOTE_PREFIX = "Pending live replacement:";
+const MENTORSHIP_RENEWAL_NOTE_PREFIX = "Pending mentorship renewal:";
 
 function liveReplacementNoteForProduct(product: PaymentProduct) {
   if (product.kind !== "live") return "";
@@ -650,8 +681,48 @@ function pendingLiveReplacementFromNotes(notes: string | null | undefined) {
   }
 }
 
+function mentorshipRenewalNoteForProduct(product: PaymentProduct) {
+  if (product.kind !== "mentorship") return "";
+
+  return ` ${MENTORSHIP_RENEWAL_NOTE_PREFIX} ${JSON.stringify({
+    plan_slug: product.slug,
+    duration_label: product.durationLabel,
+    amount_label: product.amountLabel,
+  })}.`;
+}
+
+function pendingMentorshipRenewalFromNotes(notes: string | null | undefined) {
+  const rawJson = notes?.match(/Pending mentorship renewal:\s*(\{[^}]+\})/)?.[1];
+  if (!rawJson) return null;
+
+  try {
+    const parsed = JSON.parse(rawJson) as {
+      plan_slug?: unknown;
+      duration_label?: unknown;
+      amount_label?: unknown;
+    };
+    const planSlug = normalizeMentorshipPlanSlug(parsed.plan_slug);
+    if (!planSlug) return null;
+
+    return {
+      planSlug,
+      durationLabel:
+        typeof parsed.duration_label === "string" && parsed.duration_label.trim()
+          ? parsed.duration_label
+          : null,
+      amountLabel:
+        typeof parsed.amount_label === "string" && parsed.amount_label.trim()
+          ? parsed.amount_label
+          : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function shouldSkipAlreadyPaidTarget(target: PaymentTarget) {
   if (target.status !== "paid") return false;
+  if (target.kind === "mentorship") return !pendingMentorshipRenewalFromNotes(target.notes);
   if (target.kind !== "live") return true;
 
   return !pendingLiveReplacementFromNotes(target.notes);
@@ -734,15 +805,15 @@ async function loadMentorshipProduct(adminClient: AdminClient, planSlug: "one_to
   } satisfies PaymentProduct;
 }
 
-function liveAccessDurationMonths(packageSlug: string | null) {
-  const monthsBySlug: Record<string, number> = {
+function liveAccessDurationMonths(packageSlug: LivePackageSlug | null) {
+  const monthsBySlug: Record<LivePackageSlug, number> = {
     one_month: 1,
     three_months: 3,
     six_months: 6,
     twelve_months: 12,
   };
 
-  return packageSlug ? (monthsBySlug[packageSlug] ?? 1) : 1;
+  return packageSlug ? monthsBySlug[packageSlug] : 1;
 }
 
 function liveAccessExtensionBase(accessExpiresAt: string | null | undefined) {
@@ -758,19 +829,24 @@ function liveAccessExtensionBase(accessExpiresAt: string | null | undefined) {
 
 function paidAccessExpiresAt(
   product: Pick<PaymentProduct, "kind" | "slug">,
-  options?: { liveBaseDate?: Date },
+  options?: { liveBaseDate?: Date; mentorshipBaseDate?: Date },
 ) {
   if (product.kind === "news") return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
   if (product.kind === "mentorship") {
-    if (product.slug === "one_to_one")
-      return new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
-    const expiresAt = new Date();
+    const expiresAt = options?.mentorshipBaseDate
+      ? new Date(options.mentorshipBaseDate)
+      : new Date();
+    if (product.slug === "one_to_one") {
+      expiresAt.setDate(expiresAt.getDate() + 365);
+      return expiresAt.toISOString();
+    }
     expiresAt.setMonth(expiresAt.getMonth() + 4);
     return expiresAt.toISOString();
   }
 
+  const packageSlug = normalizeLivePackageSlug(product.slug);
   const expiresAt = options?.liveBaseDate ? new Date(options.liveBaseDate) : new Date();
-  expiresAt.setMonth(expiresAt.getMonth() + liveAccessDurationMonths(product.slug));
+  expiresAt.setMonth(expiresAt.getMonth() + liveAccessDurationMonths(packageSlug));
   return expiresAt.toISOString();
 }
 
@@ -829,6 +905,28 @@ async function createPendingRecord(data: {
   }
 
   if (data.product.kind === "mentorship") {
+    const { data: existingMembership } = await data.adminClient
+      .from("user_memberships")
+      .select("status,access_expires_at")
+      .eq("user_id", data.userId)
+      .eq("plan_slug", data.product.slug)
+      .maybeSingle();
+
+    if (existingMembership && isActivePaidAccess(existingMembership)) {
+      return data.adminClient
+        .from("user_memberships")
+        .update({
+          payment_provider: data.provider,
+          provider_customer_id: data.customerEmail,
+          provider_checkout_id: data.checkoutId,
+          provider_subscription_id: data.providerPublicOrderId ?? null,
+          amount_label: data.product.amountLabel,
+          notes: `${notes}${mentorshipRenewalNoteForProduct(data.product)}`,
+        })
+        .eq("user_id", data.userId)
+        .eq("plan_slug", data.product.slug);
+    }
+
     return data.adminClient.from("user_memberships").upsert(
       {
         user_id: data.userId,
@@ -874,7 +972,7 @@ async function updateNowPaymentsInvoiceId(data: {
 }) {
   const patch = {
     provider_subscription_id: data.invoiceId,
-    notes: `NOWPayments invoice created. Awaiting verified IPN confirmation.${discountNoteForProduct(data.product)}${liveReplacementNoteForProduct(data.product)}`,
+    notes: `NOWPayments invoice created. Awaiting verified IPN confirmation.${discountNoteForProduct(data.product)}${liveReplacementNoteForProduct(data.product)}${mentorshipRenewalNoteForProduct(data.product)}`,
   };
 
   if (data.product.kind === "live") {
@@ -1069,7 +1167,7 @@ async function updateProviderCheckoutMetadata(data: {
   const patch = {
     provider_subscription_id: data.providerCheckoutId,
     provider_customer_id: data.providerCustomerId,
-    notes: `Hosted checkout created. Awaiting verified provider webhook confirmation.${discountNoteForProduct(data.product)}${liveReplacementNoteForProduct(data.product)}`,
+    notes: `Hosted checkout created. Awaiting verified provider webhook confirmation.${discountNoteForProduct(data.product)}${liveReplacementNoteForProduct(data.product)}${mentorshipRenewalNoteForProduct(data.product)}`,
   };
 
   if (data.product.kind === "live") {
@@ -1191,7 +1289,7 @@ export const startMentorshipCheckout = createServerFn({ method: "POST" })
       };
     }
 
-    const { data: existingMembership, error: existingError } = await context.adminClient
+    const { error: existingError } = await context.adminClient
       .from("user_memberships")
       .select("status,access_expires_at")
       .eq("user_id", context.user.id)
@@ -1200,14 +1298,6 @@ export const startMentorshipCheckout = createServerFn({ method: "POST" })
 
     if (existingError) {
       return { ok: false, status: "membership_lookup_failed", message: "Unable to check access." };
-    }
-
-    if (existingMembership && isActivePaidAccess(existingMembership)) {
-      return {
-        ok: true,
-        status: "already_paid",
-        message: "Your mentorship access is already active.",
-      };
     }
 
     const discountResult = await applyDiscountCodeToProduct(
@@ -1450,7 +1540,7 @@ async function findPaymentTargetByColumn(
     adminClient
       .from("user_memberships")
       .select(
-        "user_id,plan_slug,status,amount_label,payment_provider,provider_customer_id,provider_checkout_id,provider_subscription_id,notes",
+        "user_id,plan_slug,status,amount_label,access_starts_at,access_expires_at,payment_provider,provider_customer_id,provider_checkout_id,provider_subscription_id,notes",
       )
       .eq("payment_provider", provider)
       .eq(column, value)
@@ -1467,6 +1557,8 @@ async function findPaymentTargetByColumn(
       planSlug,
       amountLabel: membership.amount_label ? String(membership.amount_label) : null,
       status: String(membership.status),
+      accessStartsAt: membership.access_starts_at ? String(membership.access_starts_at) : null,
+      accessExpiresAt: membership.access_expires_at ? String(membership.access_expires_at) : null,
       paymentProvider: membership.payment_provider ? String(membership.payment_provider) : null,
       providerCustomerId: membership.provider_customer_id
         ? String(membership.provider_customer_id)
@@ -1694,7 +1786,10 @@ async function applyPaidTarget(
 
   if (target.kind === "live") {
     const pendingReplacement = pendingLiveReplacementFromNotes(target.notes);
-    const livePackageSlug = pendingReplacement?.packageSlug ?? target.packageSlug;
+    const livePackageSlug =
+      pendingReplacement?.packageSlug ??
+      normalizeLivePackageSlug(target.packageSlug) ??
+      livePackageSlugFromDurationLabel(target.durationLabel);
     const liveBaseDate = liveAccessExtensionBase(target.accessExpiresAt);
     const liveAccessStartsAt = target.accessStartsAt ?? patch.access_starts_at;
     const liveAccessExpiresAt = paidAccessExpiresAt(
@@ -1705,7 +1800,10 @@ async function applyPaidTarget(
       { liveBaseDate },
     );
     const liveAmountLabel = pendingReplacement?.amountLabel ?? target.amountLabel ?? null;
-    const liveDurationLabel = pendingReplacement?.durationLabel ?? target.durationLabel ?? null;
+    const liveDurationLabel =
+      pendingReplacement?.durationLabel ??
+      target.durationLabel ??
+      liveDurationLabelForPackage(livePackageSlug);
 
     await adminClient
       .from("user_live_trading_access")
@@ -1733,9 +1831,26 @@ async function applyPaidTarget(
   }
 
   if (target.kind === "mentorship") {
+    const renewal = pendingMentorshipRenewalFromNotes(target.notes);
+    const membershipBaseDate = liveAccessExtensionBase(target.accessExpiresAt);
+    const membershipAccessStartsAt = target.accessStartsAt ?? patch.access_starts_at;
+    const membershipAccessExpiresAt = paidAccessExpiresAt(
+      {
+        kind: "mentorship",
+        slug: renewal?.planSlug ?? target.planSlug,
+      },
+      { mentorshipBaseDate: membershipBaseDate },
+    );
+    const membershipAmountLabel = renewal?.amountLabel ?? target.amountLabel;
+
     await adminClient
       .from("user_memberships")
-      .update(patch)
+      .update({
+        ...patch,
+        amount_label: membershipAmountLabel,
+        access_starts_at: membershipAccessStartsAt,
+        access_expires_at: membershipAccessExpiresAt,
+      })
       .eq("user_id", target.userId)
       .eq("plan_slug", target.planSlug);
     await createInvoiceSnapshot(adminClient, target, confirmation, {
@@ -1744,10 +1859,10 @@ async function applyPaidTarget(
       productDescription: "Acces complet au programme d'accompagnement.",
       sourceKey: target.planSlug,
       accessType: "Mentorship access",
-      amountLabel: target.amountLabel,
+      amountLabel: membershipAmountLabel,
       paidAt: now,
-      accessStartsAt: patch.access_starts_at,
-      accessExpiresAt: patch.access_expires_at,
+      accessStartsAt: membershipAccessStartsAt,
+      accessExpiresAt: membershipAccessExpiresAt,
     });
     await provisionDiscordAccess(adminClient, target.userId, {
       kind: "mentorship",
