@@ -77,6 +77,8 @@ import { Textarea } from "@/components/ui/textarea";
 import invoiceLogoUrl from "@/assets/zactrix-limited-invoice-logo.png";
 import websiteLogoUrl from "@/assets/zactrades-logo4-clean.png";
 import {
+  ADMIN_EDUCATION_PREVIEW_STORAGE_KEY,
+  adminEducationPreviewPath,
   defaultEducationArticleRows,
   type EducationArticleCategory,
   type EducationArticleRow,
@@ -84,7 +86,29 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/use-auth";
 
+const ADMIN_PANEL_KEYS = [
+  "education",
+  "offers",
+  "staff",
+  "communityMembers",
+  "registeredAccounts",
+  "memberReviews",
+  "community",
+  "propfirms",
+  "coaching",
+  "discounts",
+  "live",
+  "liveHistory",
+  "indicators",
+  "tools",
+] as const;
+
+type AdminPanelKey = (typeof ADMIN_PANEL_KEYS)[number];
+
 export const Route = createFileRoute("/admin")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    panel: isAdminPanelKey(search.panel) ? search.panel : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Admin | ZacTrades" },
@@ -97,6 +121,14 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
+function isAdminPanelKey(value: unknown): value is AdminPanelKey {
+  return typeof value === "string" && ADMIN_PANEL_KEYS.includes(value as AdminPanelKey);
+}
+
+function adminPanelPath(panel: AdminPanelKey) {
+  return `/admin?panel=${encodeURIComponent(panel)}`;
+}
+
 const fadeUp = {
   initial: { opacity: 0, y: 24 },
   whileInView: { opacity: 1, y: 0 },
@@ -106,8 +138,10 @@ const fadeUp = {
 
 const PROP_FIRM_LOGO_BUCKET = "propfirm-logos";
 const TRADING_TOOL_LOGO_BUCKET = "trading-tool-logos";
+const INDICATOR_THUMBNAIL_BUCKET = "indicator-thumbnails";
 const MAX_PROP_FIRM_LOGO_BYTES = 2 * 1024 * 1024;
 const MAX_TRADING_TOOL_LOGO_BYTES = 2 * 1024 * 1024;
+const MAX_INDICATOR_THUMBNAIL_BYTES = 2 * 1024 * 1024;
 const PROP_FIRM_LOGO_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 type EditablePlan = CoachingPlanRow & {
@@ -286,22 +320,6 @@ type BasicProfileRow = Omit<
   "memberships" | "newsSubscription" | "liveTradingAccess" | "invoices"
 >;
 
-type AdminPanelKey =
-  | "education"
-  | "offers"
-  | "staff"
-  | "communityMembers"
-  | "registeredAccounts"
-  | "memberReviews"
-  | "community"
-  | "propfirms"
-  | "coaching"
-  | "discounts"
-  | "live"
-  | "liveHistory"
-  | "indicators"
-  | "tools";
-
 const mentorshipMembershipPlans = [
   { slug: "one_to_one" as const, label: "1-to-1 Coaching" },
   { slug: "group" as const, label: "Training Group Coaching" },
@@ -325,6 +343,7 @@ const educationCategoryOptions: Array<{ value: EducationArticleCategory; label: 
 const staffVisiblePanelKeys: AdminPanelKey[] = ["communityMembers", "registeredAccounts"];
 
 function AdminPage() {
+  const { panel } = Route.useSearch();
   const { user, loading, isConfigured, isAdmin, isStaff, role, signOut } = useAuth();
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"signin" | "join">("signin");
@@ -345,7 +364,7 @@ function AdminPage() {
   const [liveAccessAdjustments, setLiveAccessAdjustments] = useState<
     LiveTradingAccessAdjustmentRow[]
   >([]);
-  const [activePanel, setActivePanel] = useState<AdminPanelKey>("offers");
+  const [activePanel, setActivePanel] = useState<AdminPanelKey>(panel ?? "offers");
   const [liveExtensionDays, setLiveExtensionDays] = useState("7");
   const [signingOut, setSigningOut] = useState(false);
   const [indicatorDeleteTarget, setIndicatorDeleteTarget] = useState<IndicatorRow | null>(null);
@@ -413,7 +432,7 @@ function AdminPage() {
           supabase
             .from("premium_indicators")
             .select(
-              "slug,name,description,tag,stats_label,tradingview_url,video_url,is_active,display_order",
+              "slug,name,description,tag,stats_label,tradingview_url,thumbnail_url,video_url,is_active,display_order",
             )
             .order("display_order", { ascending: true }),
           supabase
@@ -696,7 +715,7 @@ function AdminPage() {
     };
 
     setDiscountCodes((current) => [nextDiscount, ...current]);
-    setActivePanel("discounts");
+    changeActivePanel("discounts");
     setMessage("New discount code added. Fill the details, then save it.");
     setErrorMessage("");
   };
@@ -731,7 +750,7 @@ function AdminPage() {
 
       return [newSocial, ...current];
     });
-    setActivePanel("community");
+    changeActivePanel("community");
     setMessage("New social link added. Fill the details, then save it.");
     setErrorMessage("");
   };
@@ -768,7 +787,7 @@ function AdminPage() {
 
       return [newOffer, ...current];
     });
-    setActivePanel("offers");
+    changeActivePanel("offers");
     setMessage("New offer headline added. Fill the details, then save it.");
     setErrorMessage("");
   };
@@ -805,7 +824,7 @@ function AdminPage() {
 
       return [newTool, ...current];
     });
-    setActivePanel("tools");
+    changeActivePanel("tools");
     setMessage("New trading tool added. Fill the details, then save it.");
     setErrorMessage("");
   };
@@ -849,7 +868,7 @@ function AdminPage() {
 
       return [newPropFirm, ...current];
     });
-    setActivePanel("propfirms");
+    changeActivePanel("propfirms");
     setMessage("New prop firm added. Fill the details, then save it.");
     setErrorMessage("");
   };
@@ -885,6 +904,13 @@ function AdminPage() {
     );
     setMessage("");
     setErrorMessage("");
+  };
+
+  const changeActivePanel = (panelKey: AdminPanelKey) => {
+    setActivePanel(panelKey);
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", adminPanelPath(panelKey));
+    }
   };
 
   const addEducationArticle = () => {
@@ -1068,9 +1094,23 @@ function AdminPage() {
     event.preventDefault();
     if (!supabase) return;
 
+    const formData = new FormData(event.currentTarget);
+
     setSavingKey(`indicator:${item.slug}`);
     setMessage("");
     setErrorMessage("");
+
+    let thumbnailUrl = item.thumbnail_url?.trim() || null;
+
+    try {
+      thumbnailUrl =
+        (await uploadIndicatorThumbnail(formData.get("thumbnail_file"), item.slug)) ?? thumbnailUrl;
+    } catch (error) {
+      console.error(error);
+      setErrorMessage(error instanceof Error ? error.message : "Could not upload this thumbnail.");
+      setSavingKey(null);
+      return;
+    }
 
     const payload: IndicatorRow = {
       ...item,
@@ -1079,6 +1119,7 @@ function AdminPage() {
       tag: item.tag.trim(),
       stats_label: item.stats_label.trim(),
       tradingview_url: item.tradingview_url.trim(),
+      thumbnail_url: thumbnailUrl,
       video_url: item.video_url?.trim() || null,
     };
 
@@ -1086,7 +1127,7 @@ function AdminPage() {
       .from("premium_indicators")
       .upsert(payload, { onConflict: "slug" })
       .select(
-        "slug,name,description,tag,stats_label,tradingview_url,video_url,is_active,display_order",
+        "slug,name,description,tag,stats_label,tradingview_url,thumbnail_url,video_url,is_active,display_order",
       )
       .single();
 
@@ -1992,7 +2033,7 @@ function AdminPage() {
 
   useEffect(() => {
     if (!isAdmin && isStaff && !staffVisiblePanelKeys.includes(activePanel)) {
-      setActivePanel("communityMembers");
+      changeActivePanel("communityMembers");
     }
   }, [activePanel, isAdmin, isStaff]);
 
@@ -2129,7 +2170,7 @@ function AdminPage() {
                     <AdminPanelChooser
                       panels={visibleAdminPanels}
                       activePanel={visibleActivePanel}
-                      onChange={setActivePanel}
+                      onChange={changeActivePanel}
                     />
 
                     {visibleActivePanel === "education" && (
@@ -2399,7 +2440,7 @@ function AdminPage() {
                     {visibleActivePanel === "indicators" && (
                       <AdminSection
                         title="Premium Indicators"
-                        description="Edit indicator names, tags, descriptions, stats, and TradingView links."
+                        description="Edit indicator names, tags, descriptions, thumbnails, and TradingView links."
                       >
                         {indicators.map((item) => (
                           <IndicatorEditor
@@ -2945,6 +2986,22 @@ function AdminPage() {
   );
 }
 
+function openEducationArticlePreview(article: EducationArticleRow) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(ADMIN_EDUCATION_PREVIEW_STORAGE_KEY, JSON.stringify(article));
+  } catch (error) {
+    console.error("Unable to prepare education article preview", error);
+  }
+
+  window.open(
+    adminEducationPreviewPath(article.slug),
+    "_blank",
+    "noopener,noreferrer",
+  );
+}
+
 function MentorshipPlanEditor({
   plan,
   saving,
@@ -3429,11 +3486,14 @@ function EducationArticlesList({
               </div>
 
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap lg:min-w-[520px] lg:justify-end">
-                <Button asChild variant="outline" className="border-border/60 bg-background/40">
-                  <a href={`/education/${item.slug}`} target="_blank" rel="noreferrer">
-                    <BookOpen className="h-4 w-4" />
-                    Preview
-                  </a>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-border/60 bg-background/40"
+                  onClick={() => openEducationArticlePreview(item)}
+                >
+                  <BookOpen className="h-4 w-4" />
+                  Preview
                 </Button>
                 <Button
                   asChild
@@ -3900,27 +3960,43 @@ function IndicatorEditor({
             value={item.description}
             onChange={(value) => onChange(item.slug, { description: value })}
           />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field
-              id={`${item.slug}-stats`}
-              label="Stats label"
-              value={item.stats_label}
-              onChange={(value) => onChange(item.slug, { stats_label: value })}
-            />
-            <Field
-              id={`${item.slug}-url`}
-              label="TradingView URL"
-              value={item.tradingview_url}
-              onChange={(value) => onChange(item.slug, { tradingview_url: value })}
-            />
-          </div>
           <Field
-            id={`${item.slug}-video-url`}
-            label="Video URL"
-            value={item.video_url ?? ""}
-            onChange={(value) => onChange(item.slug, { video_url: value.trim() || null })}
-            placeholder="https://.../indicator-video.mp4"
+            id={`${item.slug}-url`}
+            label="TradingView URL"
+            value={item.tradingview_url}
+            onChange={(value) => onChange(item.slug, { tradingview_url: value })}
           />
+          <div className="rounded-2xl border border-border/50 bg-background/35 p-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div className="h-24 w-full overflow-hidden rounded-xl border border-border/55 bg-card/45 sm:w-40">
+                {item.thumbnail_url ? (
+                  <img
+                    src={item.thumbnail_url}
+                    alt={`${item.name} thumbnail`}
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="grid h-full w-full place-items-center px-3 text-center text-xs font-semibold text-muted-foreground">
+                    No thumbnail
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <Label htmlFor={`${item.slug}-thumbnail-file`}>Indicator thumbnail</Label>
+                <Input
+                  id={`${item.slug}-thumbnail-file`}
+                  name="thumbnail_file"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="mt-2"
+                />
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  Upload PNG, JPG, or WEBP. Max 2 MB.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto]">
@@ -8345,11 +8421,11 @@ async function uploadLogoFile({
   if (!supabase || !(fileValue instanceof File) || fileValue.size === 0) return null;
 
   if (fileValue.size > maxBytes) {
-    throw new Error("Please upload a logo smaller than 2 MB.");
+    throw new Error("Please upload an image smaller than 2 MB.");
   }
 
   if (!isAcceptedPropFirmLogo(fileValue)) {
-    throw new Error("Please upload a PNG, JPG, or WEBP logo.");
+    throw new Error("Please upload a PNG, JPG, or WEBP image.");
   }
 
   const safeFileName = slugify(fileValue.name.replace(/\.[^.]+$/i, "")) || fallbackName;
@@ -8387,6 +8463,16 @@ async function uploadTradingToolLogo(fileValue: FormDataEntryValue | null, slug:
     bucket: TRADING_TOOL_LOGO_BUCKET,
     maxBytes: MAX_TRADING_TOOL_LOGO_BYTES,
     fallbackName: "trading-tool-logo",
+  });
+}
+
+async function uploadIndicatorThumbnail(fileValue: FormDataEntryValue | null, slug: string) {
+  return uploadLogoFile({
+    fileValue,
+    slug,
+    bucket: INDICATOR_THUMBNAIL_BUCKET,
+    maxBytes: MAX_INDICATOR_THUMBNAIL_BYTES,
+    fallbackName: "indicator-thumbnail",
   });
 }
 

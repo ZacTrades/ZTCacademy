@@ -27,6 +27,7 @@ import { Route as PaymentFailureRouteImport } from './routes/payment.failure'
 import { Route as PaymentCancelRouteImport } from './routes/payment.cancel'
 import { Route as EducationSlugRouteImport } from './routes/education_.$slug'
 import { Route as DiscordCallbackRouteImport } from './routes/discord.callback'
+import { Route as AdminEducationPreviewRouteImport } from './routes/admin_.education.preview'
 import { Route as AdminEducationNewRouteImport } from './routes/admin_.education.new'
 import { Route as AdminEducationEditSlugRouteImport } from './routes/admin_.education.edit.$slug'
 
@@ -120,6 +121,11 @@ const DiscordCallbackRoute = DiscordCallbackRouteImport.update({
   path: '/discord/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminEducationPreviewRoute = AdminEducationPreviewRouteImport.update({
+  id: '/admin_/education/preview',
+  path: '/admin/education/preview',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminEducationNewRoute = AdminEducationNewRouteImport.update({
   id: '/admin_/education/new',
   path: '/admin/education/new',
@@ -151,6 +157,7 @@ export interface FileRoutesByFullPath {
   '/payment/failure': typeof PaymentFailureRoute
   '/payment/success': typeof PaymentSuccessRoute
   '/admin/education/new': typeof AdminEducationNewRoute
+  '/admin/education/preview': typeof AdminEducationPreviewRoute
   '/admin/education/edit/$slug': typeof AdminEducationEditSlugRoute
 }
 export interface FileRoutesByTo {
@@ -173,6 +180,7 @@ export interface FileRoutesByTo {
   '/payment/failure': typeof PaymentFailureRoute
   '/payment/success': typeof PaymentSuccessRoute
   '/admin/education/new': typeof AdminEducationNewRoute
+  '/admin/education/preview': typeof AdminEducationPreviewRoute
   '/admin/education/edit/$slug': typeof AdminEducationEditSlugRoute
 }
 export interface FileRoutesById {
@@ -196,6 +204,7 @@ export interface FileRoutesById {
   '/payment/failure': typeof PaymentFailureRoute
   '/payment/success': typeof PaymentSuccessRoute
   '/admin_/education/new': typeof AdminEducationNewRoute
+  '/admin_/education/preview': typeof AdminEducationPreviewRoute
   '/admin_/education/edit/$slug': typeof AdminEducationEditSlugRoute
 }
 export interface FileRouteTypes {
@@ -220,6 +229,7 @@ export interface FileRouteTypes {
     | '/payment/failure'
     | '/payment/success'
     | '/admin/education/new'
+    | '/admin/education/preview'
     | '/admin/education/edit/$slug'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -242,6 +252,7 @@ export interface FileRouteTypes {
     | '/payment/failure'
     | '/payment/success'
     | '/admin/education/new'
+    | '/admin/education/preview'
     | '/admin/education/edit/$slug'
   id:
     | '__root__'
@@ -264,6 +275,7 @@ export interface FileRouteTypes {
     | '/payment/failure'
     | '/payment/success'
     | '/admin_/education/new'
+    | '/admin_/education/preview'
     | '/admin_/education/edit/$slug'
   fileRoutesById: FileRoutesById
 }
@@ -287,6 +299,7 @@ export interface RootRouteChildren {
   PaymentFailureRoute: typeof PaymentFailureRoute
   PaymentSuccessRoute: typeof PaymentSuccessRoute
   AdminEducationNewRoute: typeof AdminEducationNewRoute
+  AdminEducationPreviewRoute: typeof AdminEducationPreviewRoute
   AdminEducationEditSlugRoute: typeof AdminEducationEditSlugRoute
 }
 
@@ -418,6 +431,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DiscordCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin_/education/preview': {
+      id: '/admin_/education/preview'
+      path: '/admin/education/preview'
+      fullPath: '/admin/education/preview'
+      preLoaderRoute: typeof AdminEducationPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin_/education/new': {
       id: '/admin_/education/new'
       path: '/admin/education/new'
@@ -455,6 +475,7 @@ const rootRouteChildren: RootRouteChildren = {
   PaymentFailureRoute: PaymentFailureRoute,
   PaymentSuccessRoute: PaymentSuccessRoute,
   AdminEducationNewRoute: AdminEducationNewRoute,
+  AdminEducationPreviewRoute: AdminEducationPreviewRoute,
   AdminEducationEditSlugRoute: AdminEducationEditSlugRoute,
 }
 export const routeTree = rootRouteImport
