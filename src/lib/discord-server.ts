@@ -696,7 +696,20 @@ export async function provisionDiscordAccess(
     };
   }
 
+  const verifiedMemberRoleId = getDiscordVerifiedMemberRoleId();
   const roleIds = getDiscordRoleIds(options);
+
+  if (!verifiedMemberRoleId) {
+    const message =
+      "DISCORD_VERIFIED_MEMBER_ROLE_ID is not configured, so the ZTC member role cannot be assigned.";
+    await saveDiscordSyncFailure(adminClient, userId, message);
+
+    return {
+      ok: false,
+      status: "discord_verified_role_not_configured",
+      message,
+    };
+  }
 
   if (!roleIds.length) {
     return {
@@ -705,6 +718,8 @@ export async function provisionDiscordAccess(
       message: "Discord role IDs are not configured yet.",
     };
   }
+
+  const rolesToAssign = Array.from(new Set([verifiedMemberRoleId, ...roleIds]));
 
   const memberResponse = await fetch(
     `https://discord.com/api/guilds/${guildId}/members/${connection.discord_user_id}`,
@@ -716,7 +731,7 @@ export async function provisionDiscordAccess(
       },
       body: JSON.stringify({
         access_token: connection.access_token,
-        roles: roleIds,
+        roles: rolesToAssign,
       }),
     },
   );
@@ -732,29 +747,21 @@ export async function provisionDiscordAccess(
     };
   }
 
-  for (const roleId of roleIds) {
-    const roleResponse = await fetch(
-      `https://discord.com/api/guilds/${guildId}/members/${connection.discord_user_id}/roles/${roleId}`,
-      {
-        method: "PUT",
-        headers: {
-          authorization: `Bot ${botToken}`,
-        },
-      },
+  for (const roleId of rolesToAssign) {
+    const roleAssignment = await assignDiscordRole(
+      botToken,
+      guildId,
+      connection.discord_user_id,
+      roleId,
     );
 
-    if (!roleResponse.ok && roleResponse.status !== 204) {
-      const message = await roleResponse.text();
-      await saveDiscordSyncFailure(
-        adminClient,
-        userId,
-        message || "Unable to assign Discord role.",
-      );
+    if (!roleAssignment.ok) {
+      await saveDiscordSyncFailure(adminClient, userId, roleAssignment.message);
 
       return {
         ok: false,
         status: "discord_role_failed",
-        message: message || `Discord role assignment failed with ${roleResponse.status}.`,
+        message: roleAssignment.message,
       };
     }
   }
@@ -1068,7 +1075,7 @@ function validateDiscordCronRequest(request: Request, env: Record<string, string
 
 function getDiscordRoleIds(options: ProvisionDiscordOptions) {
   const roleIds = new Set<string>();
-  const verifiedMemberRoleId = readServerEnv("DISCORD_VERIFIED_MEMBER_ROLE_ID");
+  const verifiedMemberRoleId = getDiscordVerifiedMemberRoleId();
   const mentorshipRoleId = readServerEnv("DISCORD_MENTORSHIP_ROLE_ID");
   const oneToOneRoleId = readServerEnv("DISCORD_ONE_TO_ONE_ROLE_ID");
   const groupRoleId = readServerEnv("DISCORD_GROUP_ROLE_ID");
@@ -1092,6 +1099,42 @@ function getDiscordRoleIds(options: ProvisionDiscordOptions) {
   }
 
   return Array.from(roleIds);
+}
+
+function getDiscordVerifiedMemberRoleId() {
+  return (
+    readServerEnv("DISCORD_VERIFIED_MEMBER_ROLE_ID") ??
+    readServerEnv("DISCORD_VERIFIED_MEMBER") ??
+    readServerEnv("DISCORD_ZTC_MEMBER_ROLE_ID")
+  );
+}
+
+async function assignDiscordRole(
+  botToken: string,
+  guildId: string,
+  discordUserId: string,
+  roleId: string,
+) {
+  const roleResponse = await fetch(
+    `https://discord.com/api/guilds/${guildId}/members/${discordUserId}/roles/${roleId}`,
+    {
+      method: "PUT",
+      headers: {
+        authorization: `Bot ${botToken}`,
+      },
+    },
+  );
+
+  if (!roleResponse.ok && roleResponse.status !== 204) {
+    const message = await roleResponse.text();
+
+    return {
+      ok: false as const,
+      message: message || `Discord role assignment failed with ${roleResponse.status}.`,
+    };
+  }
+
+  return { ok: true as const };
 }
 
 async function removeDiscordUnverifiedRole(
