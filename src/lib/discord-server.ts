@@ -759,6 +759,22 @@ export async function provisionDiscordAccess(
     }
   }
 
+  const unverifiedRoleRemoval = await removeDiscordUnverifiedRole(
+    botToken,
+    guildId,
+    connection.discord_user_id,
+  );
+
+  if (!unverifiedRoleRemoval.ok) {
+    await saveDiscordSyncFailure(adminClient, userId, unverifiedRoleRemoval.message);
+
+    return {
+      ok: false,
+      status: "discord_unverified_role_remove_failed",
+      message: unverifiedRoleRemoval.message,
+    };
+  }
+
   const now = new Date().toISOString();
   await adminClient
     .from("profiles")
@@ -773,7 +789,7 @@ export async function provisionDiscordAccess(
   return {
     ok: true,
     status: "synced",
-    message: "Discord server access and role were assigned.",
+    message: "Discord server access and roles were assigned.",
   };
 }
 
@@ -1076,6 +1092,39 @@ function getDiscordRoleIds(options: ProvisionDiscordOptions) {
   }
 
   return Array.from(roleIds);
+}
+
+async function removeDiscordUnverifiedRole(
+  botToken: string,
+  guildId: string,
+  discordUserId: string,
+) {
+  const unverifiedRoleId = readServerEnv("DISCORD_UNVERIFIED_MEMBER_ROLE_ID");
+
+  if (!unverifiedRoleId) {
+    return { ok: true as const, message: "No unverified Discord role configured." };
+  }
+
+  const roleResponse = await fetch(
+    `https://discord.com/api/guilds/${guildId}/members/${discordUserId}/roles/${unverifiedRoleId}`,
+    {
+      method: "DELETE",
+      headers: {
+        authorization: `Bot ${botToken}`,
+      },
+    },
+  );
+
+  if (!roleResponse.ok && roleResponse.status !== 204 && roleResponse.status !== 404) {
+    const message = await roleResponse.text();
+
+    return {
+      ok: false as const,
+      message: message || `Discord unverified role removal failed with ${roleResponse.status}.`,
+    };
+  }
+
+  return { ok: true as const, message: "Discord unverified role was removed." };
 }
 
 function getDiscordRoleAuditTargets() {
