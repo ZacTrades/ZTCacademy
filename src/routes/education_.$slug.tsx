@@ -18,15 +18,21 @@ import { Navbar } from "@/components/site/Navbar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  ADMIN_EDUCATION_PREVIEW_STORAGE_KEY,
   defaultEducationArticleRows,
+  educationArticleFromRow,
   educationArticlesFromRows,
   fetchEducationArticleRows,
   type EducationArticle,
+  type EducationArticleRow,
 } from "@/lib/education-content";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/use-auth";
 
 export const Route = createFileRoute("/education_/$slug")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    preview: search.preview === "admin" ? ("admin" as const) : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Education Article | ZacTrades" },
@@ -49,12 +55,15 @@ const fadeUp = {
 
 function EducationArticlePage() {
   const { slug } = Route.useParams();
+  const { preview } = Route.useSearch();
+  const isAdminPreview = preview === "admin";
   const [articles, setArticles] = useState(() =>
     educationArticlesFromRows(defaultEducationArticleRows),
   );
   const [articlesLoading, setArticlesLoading] = useState(true);
-  const article = articles.find((item) => item.slug === slug);
-  const { user, loading: authLoading, isConfigured, isStaff } = useAuth();
+  const { user, loading: authLoading, isConfigured, isAdmin, isStaff } = useAuth();
+  const routeSlug = safeDecodeSlug(slug);
+  const article = articles.find((item) => item.slug === slug || item.slug === routeSlug);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"signin" | "join">("signin");
   const [hasPaidEducationAccess, setHasPaidEducationAccess] = useState(false);
@@ -69,7 +78,23 @@ function EducationArticlePage() {
   useEffect(() => {
     let mounted = true;
 
-    fetchEducationArticleRows()
+    if (isAdminPreview) {
+      const previewArticle = readAdminEducationPreviewArticle(slug);
+
+      if (previewArticle) {
+        setArticles([previewArticle]);
+        setArticlesLoading(false);
+        return () => {
+          mounted = false;
+        };
+      }
+    }
+
+    if (authLoading) return;
+
+    setArticlesLoading(true);
+
+    fetchEducationArticleRows({ includeUnpublished: isAdminPreview && isAdmin })
       .then((rows) => {
         if (mounted) {
           setArticles(educationArticlesFromRows(rows));
@@ -86,7 +111,7 @@ function EducationArticlePage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [authLoading, isAdmin, isAdminPreview, slug]);
 
   const openAuth = (mode: "signin" | "join") => {
     setAuthMode(mode);
@@ -291,7 +316,7 @@ function EducationArticlePage() {
   );
 }
 
-function getCategoryLabel(category: EducationArticle["category"]) {
+export function getCategoryLabel(category: EducationArticle["category"]) {
   const labels = {
     study: "Study",
     psychology: "Psychology",
@@ -304,6 +329,35 @@ function getCategoryLabel(category: EducationArticle["category"]) {
 
 function isPaidEducationArticle(article: Pick<EducationArticle, "access" | "category">) {
   return article.category === "premium" || article.access === "Members";
+}
+
+function readAdminEducationPreviewArticle(slug: string) {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const rawArticle = window.localStorage.getItem(ADMIN_EDUCATION_PREVIEW_STORAGE_KEY);
+    if (!rawArticle) return null;
+
+    const row = JSON.parse(rawArticle) as EducationArticleRow;
+    const routeSlug = safeDecodeSlug(slug);
+
+    if (row.slug !== slug && row.slug !== routeSlug) {
+      return null;
+    }
+
+    return educationArticleFromRow(row);
+  } catch (error) {
+    console.error("Unable to read education article preview", error);
+    return null;
+  }
+}
+
+function safeDecodeSlug(slug: string) {
+  try {
+    return decodeURIComponent(slug);
+  } catch {
+    return slug;
+  }
 }
 
 function SocialShareButtons({ article }: { article: EducationArticle }) {
@@ -372,7 +426,7 @@ function XIcon() {
   );
 }
 
-function ArticleContentBlock({ block, index }: { block: string; index: number }) {
+export function ArticleContentBlock({ block, index }: { block: string; index: number }) {
   const trimmed = block.trim();
 
   if (isRichHtmlContent(trimmed)) {

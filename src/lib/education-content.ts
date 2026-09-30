@@ -221,6 +221,12 @@ export function educationArticlePath(slug: string) {
   return `/education/${slug}`;
 }
 
+export const ADMIN_EDUCATION_PREVIEW_STORAGE_KEY = "zactrades-admin-education-preview";
+
+export function adminEducationPreviewPath(slug: string) {
+  return `/admin/education/preview?slug=${encodeURIComponent(slug)}`;
+}
+
 export function findEducationArticle(slug: string) {
   return educationArticles.find((article) => article.slug === slug);
 }

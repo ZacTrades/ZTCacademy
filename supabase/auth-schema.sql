@@ -842,6 +842,7 @@ create table if not exists public.premium_indicators (
   tag text not null,
   stats_label text not null,
   tradingview_url text not null,
+  thumbnail_url text,
   video_url text,
   is_active boolean not null default true,
   display_order integer not null default 0,
@@ -881,6 +882,9 @@ create trigger premium_indicators_set_updated_at
 before update on public.premium_indicators
 for each row
 execute function public.set_updated_at();
+
+alter table public.premium_indicators
+add column if not exists thumbnail_url text;
 
 insert into public.premium_indicators (
   slug,
@@ -1417,6 +1421,43 @@ create policy "Admins can delete trading tool logos"
 on storage.objects
 for delete
 using (bucket_id = 'trading-tool-logos' and public.is_admin());
+
+insert into storage.buckets (id, name, public)
+values ('indicator-thumbnails', 'indicator-thumbnails', true)
+on conflict (id) do update set public = excluded.public;
+
+drop policy if exists "Anyone can read indicator thumbnails" on storage.objects;
+create policy "Anyone can read indicator thumbnails"
+on storage.objects
+for select
+using (bucket_id = 'indicator-thumbnails');
+
+drop policy if exists "Admins can upload indicator thumbnails" on storage.objects;
+create policy "Admins can upload indicator thumbnails"
+on storage.objects
+for insert
+with check (
+  bucket_id = 'indicator-thumbnails'
+  and public.is_admin()
+  and lower(name) ~ '\.(png|jpg|jpeg|webp)$'
+);
+
+drop policy if exists "Admins can update indicator thumbnails" on storage.objects;
+create policy "Admins can update indicator thumbnails"
+on storage.objects
+for update
+using (bucket_id = 'indicator-thumbnails' and public.is_admin())
+with check (
+  bucket_id = 'indicator-thumbnails'
+  and public.is_admin()
+  and lower(name) ~ '\.(png|jpg|jpeg|webp)$'
+);
+
+drop policy if exists "Admins can delete indicator thumbnails" on storage.objects;
+create policy "Admins can delete indicator thumbnails"
+on storage.objects
+for delete
+using (bucket_id = 'indicator-thumbnails' and public.is_admin());
 
 create or replace function public.handle_new_user()
 returns trigger

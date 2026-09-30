@@ -228,7 +228,7 @@ function AdminEducationArticleEditPage() {
 
     setMessage(`${payload.title} was updated.`);
     window.setTimeout(() => {
-      window.location.href = "/admin";
+      window.location.href = "/admin?panel=education";
     }, 650);
   };
 
@@ -313,7 +313,7 @@ function AdminEducationArticleEditPage() {
 
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <Button asChild variant="outline" className="glass mb-8 border-border/60">
-            <a href="/admin">
+            <a href="/admin?panel=education">
               <ArrowLeft className="h-4 w-4" />
               Back to admin
             </a>

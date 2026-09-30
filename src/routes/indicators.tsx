@@ -151,6 +151,7 @@ function IndicatorsPage() {
               <div className="grid gap-5 lg:grid-cols-3">
                 {visibleIndicators.map((indicator, index) => {
                   const isComingSoon = comingSoonIndicatorSlugs.has(indicator.slug);
+                  const thumbnailUrl = indicator.thumbnail_url?.trim();
                   const useLiquidityPreview = index === 0;
                   const useBlurredPreview = index > 0;
 
@@ -205,7 +206,14 @@ function IndicatorsPage() {
                             useLiquidityPreview ? "aspect-[2910/1398]" : "h-36"
                           }`}
                         >
-                          {useLiquidityPreview ? (
+                          {thumbnailUrl ? (
+                            <img
+                              src={thumbnailUrl}
+                              alt={`${indicator.name} preview`}
+                              className="h-full w-full object-cover object-center"
+                              loading="lazy"
+                            />
+                          ) : useLiquidityPreview ? (
                             <img
                               src={liquidityLevelsPreview}
                               alt="ZTC Liquidity Levels chart preview"

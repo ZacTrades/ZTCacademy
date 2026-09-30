@@ -7,6 +7,7 @@ export type IndicatorRow = {
   tag: string;
   stats_label: string;
   tradingview_url: string;
+  thumbnail_url?: string | null;
   video_url?: string | null;
   is_active: boolean;
   display_order: number;
@@ -84,6 +85,7 @@ export const defaultIndicators: IndicatorRow[] = [
     stats_label: "",
     tradingview_url:
       "https://www.tradingview.com/chart/?symbol=OANDA%3AXAUUSD&interval=60&studies=STD%3BEMA%2CSTD%3BVWAP",
+    thumbnail_url: null,
     is_active: true,
     display_order: 1,
   },
@@ -95,6 +97,7 @@ export const defaultIndicators: IndicatorRow[] = [
     stats_label: "",
     tradingview_url:
       "https://www.tradingview.com/chart/?symbol=OANDA%3AXAUUSD&interval=60&studies=STD%3BVolume%2CSTD%3BVWAP",
+    thumbnail_url: null,
     is_active: true,
     display_order: 2,
   },
@@ -106,6 +109,7 @@ export const defaultIndicators: IndicatorRow[] = [
     stats_label: "",
     tradingview_url:
       "https://www.tradingview.com/chart/?symbol=OANDA%3AXAUUSD&interval=60&studies=STD%3BMACD%2CSTD%3BRSI",
+    thumbnail_url: null,
     is_active: true,
     display_order: 3,
   },
@@ -375,7 +379,7 @@ export async function fetchIndicators() {
   const { data, error } = await supabase
     .from("premium_indicators")
     .select(
-      "slug,name,description,tag,stats_label,tradingview_url,video_url,is_active,display_order",
+      "slug,name,description,tag,stats_label,tradingview_url,thumbnail_url,video_url,is_active,display_order",
     )
     .eq("is_active", true)
     .order("display_order", { ascending: true });
