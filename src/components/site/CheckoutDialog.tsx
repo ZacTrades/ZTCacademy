@@ -26,6 +26,7 @@ import { Label } from "@/components/ui/label";
 import { AuthDialog } from "@/components/site/AuthDialog";
 import { StaffCheckoutNotice } from "@/components/site/StaffCheckoutNotice";
 import { liveTradingPackages, type CheckoutPackage } from "@/components/site/liveTradingPackages";
+import payzoneSecureCheckoutImage from "@/assets/payzone-secure-checkout.svg";
 import {
   previewDiscountCode,
   startLiveTradingCheckout,
@@ -757,31 +758,23 @@ export function CheckoutDialog({
                       </Button>
                     </div>
 
-                    <div className="flex flex-wrap items-center justify-center gap-2 text-[11px] text-muted-foreground">
-                      <span className="flex items-center gap-2">
-                        <ShieldCheck className="h-3.5 w-3.5 text-bull" />
-                        {paymentMethod === "card"
-                          ? "Secured with 3D Secure"
-                          : "Secured crypto checkout by NOWPayments"}
-                      </span>
-
-                      {paymentMethod === "card" && (
-                        <span className="flex flex-wrap items-center justify-center gap-1.5">
-                          <span className="rounded-md bg-white px-1.5 py-0.5 text-[0.65rem] font-black tracking-tight text-[#143b8f] shadow-sm">
-                            VISA
-                          </span>
-                          <span className="flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 shadow-sm">
-                            <span className="relative flex h-3 w-5 items-center">
-                              <span className="absolute left-0 h-3 w-3 rounded-full bg-[#eb001b]" />
-                              <span className="absolute right-0 h-3 w-3 rounded-full bg-[#f79e1b] mix-blend-multiply" />
-                            </span>
-                            <span className="text-[0.48rem] font-bold lowercase text-slate-900">
-                              mastercard
-                            </span>
-                          </span>
+                    {paymentMethod === "card" ? (
+                      <div className="flex justify-center">
+                        <img
+                          src={payzoneSecureCheckoutImage}
+                          alt="Ce site web est securise 3D Secure avec Payzone, Visa et Mastercard"
+                          className="h-auto w-full max-w-[520px] rounded-xl border border-border/50 bg-white p-2 shadow-[0_18px_60px_-46px_hsl(var(--primary)/0.7)]"
+                          loading="lazy"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap items-center justify-center gap-2 text-[11px] text-muted-foreground">
+                        <span className="flex items-center gap-2">
+                          <ShieldCheck className="h-3.5 w-3.5 text-bull" />
+                          Secured crypto checkout by NOWPayments
                         </span>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </form>
                 )}
               </div>
