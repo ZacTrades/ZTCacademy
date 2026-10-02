@@ -329,8 +329,8 @@ begin
     now(),
     case
       when p_plan_slug = 'one_to_one' then now() + interval '1 year'
-      when p_plan_slug = 'group' then now() + interval '28 days'
-      else now() + interval '28 days'
+      when p_plan_slug = 'group' then now() + interval '4 months'
+      else now() + interval '4 months'
     end,
     'Temporary local checkout confirmation. Payment reference: ' || p_card_last4 || '. Replace with payment gateway webhook before production.'
   )

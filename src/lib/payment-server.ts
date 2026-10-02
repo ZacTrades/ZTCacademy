@@ -1890,13 +1890,19 @@ async function applyFailedTarget(
   target: PaymentTarget,
   failure: PaymentFailure,
 ) {
+  if (target.status === "paid") return;
+
   const patch = {
     status: failure.status,
     notes: `${failure.providerLabel} payment ended with status ${failure.rawStatus || "unknown"}.`,
   };
 
   if (target.kind === "live") {
-    await adminClient.from("user_live_trading_access").update(patch).eq("user_id", target.userId);
+    await adminClient
+      .from("user_live_trading_access")
+      .update(patch)
+      .eq("user_id", target.userId)
+      .neq("status", "paid");
     return;
   }
 
@@ -1905,11 +1911,16 @@ async function applyFailedTarget(
       .from("user_memberships")
       .update(patch)
       .eq("user_id", target.userId)
-      .eq("plan_slug", target.planSlug);
+      .eq("plan_slug", target.planSlug)
+      .neq("status", "paid");
     return;
   }
 
-  await adminClient.from("user_news_subscriptions").update(patch).eq("user_id", target.userId);
+  await adminClient
+    .from("user_news_subscriptions")
+    .update(patch)
+    .eq("user_id", target.userId)
+    .neq("status", "paid");
 }
 
 type PayzoneLaunchTarget = PaymentTarget & {
