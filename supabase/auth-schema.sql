@@ -1073,6 +1073,9 @@ add column if not exists logo_url text;
 
 alter table public.prop_firms enable row level security;
 
+grant select on public.prop_firms to anon, authenticated;
+grant insert, update, delete on public.prop_firms to authenticated;
+
 drop policy if exists "Anyone can read active prop firms" on public.prop_firms;
 create policy "Anyone can read active prop firms"
 on public.prop_firms
@@ -1083,12 +1086,14 @@ drop policy if exists "Admins can insert prop firms" on public.prop_firms;
 create policy "Admins can insert prop firms"
 on public.prop_firms
 for insert
+to authenticated
 with check (public.is_admin());
 
 drop policy if exists "Admins can update prop firms" on public.prop_firms;
 create policy "Admins can update prop firms"
 on public.prop_firms
 for update
+to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
@@ -1096,6 +1101,7 @@ drop policy if exists "Admins can delete prop firms" on public.prop_firms;
 create policy "Admins can delete prop firms"
 on public.prop_firms
 for delete
+to authenticated
 using (public.is_admin());
 
 drop trigger if exists prop_firms_set_updated_at on public.prop_firms;

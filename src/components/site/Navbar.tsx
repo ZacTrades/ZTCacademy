@@ -204,6 +204,10 @@ export function Navbar() {
   const isAdminRoute =
     pathname === "/admin" || pathname.startsWith("/admin/") || pathname.startsWith("/admin_");
 
+  if (pathname === "/reset-password") {
+    return null;
+  }
+
   if (isStaff) {
     return null;
   }

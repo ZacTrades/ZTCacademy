@@ -26,7 +26,7 @@ import { Label } from "@/components/ui/label";
 import { AuthDialog } from "@/components/site/AuthDialog";
 import { StaffCheckoutNotice } from "@/components/site/StaffCheckoutNotice";
 import { liveTradingPackages, type CheckoutPackage } from "@/components/site/liveTradingPackages";
-import payzoneSecureCheckoutImage from "@/assets/payzone-secure-checkout.svg";
+import payzoneSecureCheckoutImage from "@/assets/payzone-secure-footer.svg";
 import {
   previewDiscountCode,
   startLiveTradingCheckout,
@@ -770,7 +770,7 @@ export function CheckoutDialog({
                         <img
                           src={payzoneSecureCheckoutImage}
                           alt="Ce site web est securise 3D Secure avec Payzone, Visa et Mastercard"
-                          className="h-auto w-full max-w-[520px] rounded-xl border border-border/50 bg-white p-2 shadow-[0_18px_60px_-46px_hsl(var(--primary)/0.7)]"
+                          className="h-auto w-full max-w-[520px]"
                           loading="lazy"
                         />
                       </div>

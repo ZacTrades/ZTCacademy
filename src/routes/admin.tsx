@@ -8504,7 +8504,7 @@ function isAcceptedPropFirmLogo(file: File) {
 
   return (
     (!file.type || PROP_FIRM_LOGO_TYPES.has(file.type)) &&
-    ["png", "jpg", "webp"].includes(extension)
+    ["png", "jpg", "jpeg", "webp"].includes(extension)
   );
 }
 

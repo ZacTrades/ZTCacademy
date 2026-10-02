@@ -106,8 +106,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(missingConfigMessage);
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+    const { data: emailExists, error: emailCheckError } = await supabase.rpc(
+      "email_is_registered",
+      { p_email: normalizedEmail },
+    );
+
+    if (emailCheckError) {
+      throw emailCheckError;
+    }
+
+    if (emailExists) {
+      throw new Error(
+        "This email is already connected to a ZacTrades account. Please sign in or reset your password.",
+      );
+    }
+
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: normalizedEmail,
       password,
       options: {
         emailRedirectTo: authRedirectUrl("/"),
@@ -120,6 +136,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (error) {
       throw error;
+    }
+
+    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      throw new Error(
+        "This email is already connected to a ZacTrades account. Please sign in or reset your password.",
+      );
     }
 
     return { needsEmailConfirmation: !data.session };
@@ -176,14 +198,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const publicSession = passwordRecoveryMode ? null : session;
+  const publicRole = passwordRecoveryMode ? null : role;
+  const publicDiscordConnection = passwordRecoveryMode ? null : discordConnection;
+
   const value = useMemo<AuthContextValue>(
     () => ({
-      user: session?.user ?? null,
-      session,
-      role,
-      discordConnection,
-      isAdmin: role === "admin",
-      isStaff: role === "admin" || role === "moderator",
+      user: publicSession?.user ?? null,
+      session: publicSession,
+      role: publicRole,
+      discordConnection: publicDiscordConnection,
+      isAdmin: publicRole === "admin",
+      isStaff: publicRole === "admin" || publicRole === "moderator",
       loading,
       passwordRecoveryMode,
       isConfigured: isSupabaseConfigured,

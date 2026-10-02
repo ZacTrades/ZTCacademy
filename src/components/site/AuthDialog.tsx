@@ -81,7 +81,7 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
     setSuccessMessage("");
 
     const formData = new FormData(event.currentTarget);
-    const email = String(formData.get("email") ?? "").trim();
+    const email = String(formData.get("email") ?? "").trim().toLowerCase();
     const password = String(formData.get("password") ?? "");
     const fullName = String(formData.get("fullName") ?? "").trim();
     const localPhoneNumber = String(formData.get("phoneNumber") ?? "").trim();
