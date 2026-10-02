@@ -5334,10 +5334,16 @@ function StaffRoleCard({
 }) {
   const isCurrentUser = profile.id === currentUserId;
   const initials = getProfileInitials(profile);
+  const [selectedRole, setSelectedRole] = useState<ProfileRole>(profile.role);
+  const hasPendingRoleChange = selectedRole !== profile.role;
+
+  useEffect(() => {
+    setSelectedRole(profile.role);
+  }, [profile.role]);
 
   return (
     <form
-      onSubmit={(event) => onSubmit(event, profile)}
+      onSubmit={(event) => onSubmit(event, { ...profile, role: selectedRole })}
       className="rounded-2xl border border-border/45 bg-background/45 p-4 transition-colors hover:border-primary/25 hover:bg-background/60"
     >
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(220px,0.65fr)_auto] xl:items-center">
@@ -5351,6 +5357,11 @@ function StaffRoleCard({
                 <Badge variant="outline" className={profileRoleClassName(profile.role)}>
                   {profileRoleLabel(profile.role)}
                 </Badge>
+                {hasPendingRoleChange ? (
+                  <Badge variant="outline" className="border-gold/35 bg-gold/10 text-gold">
+                    Save to apply {profileRoleLabel(selectedRole)}
+                  </Badge>
+                ) : null}
                 {isCurrentUser && (
                   <span className="rounded-full border border-gold/30 bg-gold/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-gold">
                     You
@@ -5401,9 +5412,9 @@ function StaffRoleCard({
           </Label>
           <select
             id={`${profile.id}-staff-role`}
-            value={profile.role}
+            value={selectedRole}
             disabled={isCurrentUser}
-            onChange={(event) => onChange(profile.id, { role: event.target.value as ProfileRole })}
+            onChange={(event) => setSelectedRole(event.target.value as ProfileRole)}
             className="mt-1 h-11 w-full rounded-md border border-border/60 bg-card/45 px-3 text-sm text-foreground outline-none transition-colors focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
           >
             <option value="member">Member</option>
@@ -7575,10 +7586,16 @@ function UserProfileCard({
   const paidPlans = mentorshipMembershipPlans.filter(
     ({ slug }) => profile.memberships[slug].status === "paid",
   );
+  const [selectedRole, setSelectedRole] = useState<ProfileRole>(profile.role);
+  const hasPendingRoleChange = selectedRole !== profile.role;
+
+  useEffect(() => {
+    setSelectedRole(profile.role);
+  }, [profile.role]);
 
   return (
     <form
-      onSubmit={(event) => onSubmit(event, profile)}
+      onSubmit={(event) => onSubmit(event, { ...profile, role: selectedRole })}
       className="rounded-2xl border border-border/50 bg-card/25 p-4"
     >
       <div className="grid gap-5 xl:grid-cols-[1.1fr_1.6fr_auto] xl:items-start">
@@ -7597,6 +7614,11 @@ function UserProfileCard({
             <Badge variant="outline" className={profileRoleClassName(profile.role)}>
               {profileRoleLabel(profile.role)}
             </Badge>
+            {hasPendingRoleChange ? (
+              <Badge variant="outline" className="border-gold/35 bg-gold/10 text-gold">
+                Save to apply {profileRoleLabel(selectedRole)}
+              </Badge>
+            ) : null}
             {isCurrentUser && (
               <span className="text-[11px] font-semibold text-muted-foreground">Current admin</span>
             )}
@@ -7652,11 +7674,9 @@ function UserProfileCard({
               </Label>
               <select
                 id={`${profile.id}-role`}
-                value={profile.role}
+                value={selectedRole}
                 disabled={isCurrentUser}
-                onChange={(event) =>
-                  onChange(profile.id, { role: event.target.value as ProfileRole })
-                }
+                onChange={(event) => setSelectedRole(event.target.value as ProfileRole)}
                 className="mt-1 h-10 w-full rounded-md border border-border/60 bg-background/45 px-3 text-sm text-foreground outline-none transition-colors focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <option value="member">Member</option>

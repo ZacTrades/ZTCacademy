@@ -180,6 +180,7 @@ alter table public.user_memberships add column if not exists amount_label text;
 alter table public.user_memberships add column if not exists paid_at timestamptz;
 alter table public.user_memberships add column if not exists access_starts_at timestamptz;
 alter table public.user_memberships add column if not exists access_expires_at timestamptz;
+alter table public.user_memberships add column if not exists discord_role_synced_at timestamptz;
 alter table public.user_memberships add column if not exists notes text;
 
 with ranked_memberships as (
@@ -383,6 +384,7 @@ alter table public.user_live_trading_access add column if not exists amount_labe
 alter table public.user_live_trading_access add column if not exists paid_at timestamptz;
 alter table public.user_live_trading_access add column if not exists access_starts_at timestamptz;
 alter table public.user_live_trading_access add column if not exists access_expires_at timestamptz;
+alter table public.user_live_trading_access add column if not exists discord_role_synced_at timestamptz;
 alter table public.user_live_trading_access add column if not exists notes text;
 
 alter table public.user_live_trading_access drop constraint if exists user_live_trading_access_package_slug_check;
@@ -535,6 +537,7 @@ alter table public.user_news_subscriptions add column if not exists amount_label
 alter table public.user_news_subscriptions add column if not exists paid_at timestamptz;
 alter table public.user_news_subscriptions add column if not exists access_starts_at timestamptz;
 alter table public.user_news_subscriptions add column if not exists access_expires_at timestamptz;
+alter table public.user_news_subscriptions add column if not exists discord_role_synced_at timestamptz;
 alter table public.user_news_subscriptions add column if not exists notes text;
 
 do $$

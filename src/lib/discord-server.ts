@@ -69,6 +69,7 @@ type DiscordConnectionRoleAuditRow = {
 type DiscordRoleAuditedAccessRow = {
   paid_at?: string | null;
   access_starts_at?: string | null;
+  discord_role_synced_at?: string | null;
 };
 
 type DiscordRoleAuditTarget = {
@@ -115,6 +116,10 @@ function discordEligibleStatuses() {
 function discordManualRoleRemovalGraceMinutes() {
   const rawValue = Number(readServerEnv("DISCORD_MANUAL_ROLE_REMOVAL_GRACE_MINUTES") ?? "30");
   return Number.isFinite(rawValue) && rawValue >= 0 ? rawValue : 30;
+}
+
+function discordManualRoleRemovalAuditEnabled() {
+  return readServerEnv("DISCORD_MANUAL_ROLE_REMOVAL_AUDIT_ENABLED") === "true";
 }
 
 function getDiscordRedirectUri(origin: string) {
@@ -783,6 +788,8 @@ export async function provisionDiscordAccess(
   }
 
   const now = new Date().toISOString();
+  await markPaidAccessDiscordRoleSynced(adminClient, userId, options, now);
+
   await adminClient
     .from("profiles")
     .update({
@@ -798,6 +805,44 @@ export async function provisionDiscordAccess(
     status: "synced",
     message: "Discord server access and roles were assigned.",
   };
+}
+
+async function markPaidAccessDiscordRoleSynced(
+  adminClient: SupabaseClient,
+  userId: string,
+  options: ProvisionDiscordOptions,
+  syncedAt: string,
+) {
+  if (options.kind === "live") {
+    const { error } = await adminClient
+      .from("user_live_trading_access")
+      .update({ discord_role_synced_at: syncedAt })
+      .eq("user_id", userId)
+      .eq("status", "paid");
+
+    if (error) console.error(error);
+    return;
+  }
+
+  if (options.kind === "news") {
+    const { error } = await adminClient
+      .from("user_news_subscriptions")
+      .update({ discord_role_synced_at: syncedAt })
+      .eq("user_id", userId)
+      .eq("status", "paid");
+
+    if (error) console.error(error);
+    return;
+  }
+
+  const { error } = await adminClient
+    .from("user_memberships")
+    .update({ discord_role_synced_at: syncedAt })
+    .eq("user_id", userId)
+    .eq("plan_slug", options.planSlug)
+    .eq("status", "paid");
+
+  if (error) console.error(error);
 }
 
 export async function expireAndRevokeDiscordAccess(adminClient: SupabaseClient) {
@@ -1018,9 +1063,16 @@ export async function handleDiscordExpiryRequest(
   }
 
   const expiry = await expireAndRevokeDiscordAccess(adminClient);
-  const roleReconciliation = await reconcileDiscordRoleRemovals(adminClient);
 
-  return Response.json({ ok: true, ...expiry, roleReconciliation });
+  return Response.json({
+    ok: true,
+    ...expiry,
+    roleReconciliation: {
+      disabled: true,
+      message:
+        "Discord manual role removal audit is disabled. Paid access is expired only by its package expiry date.",
+    },
+  });
 }
 
 export async function handleDiscordRoleReconcileRequest(
@@ -1040,6 +1092,19 @@ export async function handleDiscordRoleReconcileRequest(
       },
       { status: 500 },
     );
+  }
+
+  if (!discordManualRoleRemovalAuditEnabled()) {
+    return Response.json({
+      ok: true,
+      disabled: true,
+      checkedCount: 0,
+      expiredCount: 0,
+      graceSkippedCount: 0,
+      failedMessages: [],
+      message:
+        "Discord manual role removal audit is disabled. Set DISCORD_MANUAL_ROLE_REMOVAL_AUDIT_ENABLED=true to enable it again.",
+    });
   }
 
   const result = await reconcileDiscordRoleRemovals(adminClient);
@@ -1252,6 +1317,10 @@ async function expireAccessForMissingDiscordRole(
     return { expiredCount: 0, graceSkippedCount: 0, error: null };
   }
 
+  if (!activeAccess.row.discord_role_synced_at) {
+    return { expiredCount: 0, graceSkippedCount: 1, error: null };
+  }
+
   if (isInsideDiscordManualRemovalGracePeriod(activeAccess.row)) {
     return { expiredCount: 0, graceSkippedCount: 1, error: null };
   }
@@ -1304,7 +1373,7 @@ async function getActiveAccessForDiscordRoleAudit(
   if (target.kind === "live") {
     const { data, error } = await adminClient
       .from("user_live_trading_access")
-      .select("paid_at,access_starts_at")
+      .select("paid_at,access_starts_at,discord_role_synced_at")
       .eq("user_id", userId)
       .eq("status", "paid")
       .maybeSingle();
@@ -1318,7 +1387,7 @@ async function getActiveAccessForDiscordRoleAudit(
   if (target.kind === "news") {
     const { data, error } = await adminClient
       .from("user_news_subscriptions")
-      .select("paid_at,access_starts_at")
+      .select("paid_at,access_starts_at,discord_role_synced_at")
       .eq("user_id", userId)
       .eq("status", "paid")
       .maybeSingle();
@@ -1331,7 +1400,7 @@ async function getActiveAccessForDiscordRoleAudit(
 
   const { data, error } = await adminClient
     .from("user_memberships")
-    .select("paid_at,access_starts_at")
+    .select("paid_at,access_starts_at,discord_role_synced_at")
     .eq("user_id", userId)
     .eq("plan_slug", target.kind)
     .eq("status", "paid")
