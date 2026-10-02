@@ -6265,7 +6265,7 @@ function PaidMembersTable({
                   <th className="px-4 py-3 font-semibold">Email</th>
                   <th className="px-4 py-3 font-semibold">Phone</th>
                   <th className="px-4 py-3 font-semibold">Discord user / ID</th>
-                  <th className="px-4 py-3 font-semibold">Mentorship</th>
+                  <th className="px-4 py-3 font-semibold">Paid access</th>
                   <th className="px-4 py-3 font-semibold">Joined</th>
                   <th className="px-4 py-3 font-semibold">Paid date</th>
                   <th className="px-4 py-3 text-right font-semibold">Invoice</th>
@@ -6617,9 +6617,7 @@ function InvoicePrintActions({
 }
 
 function PaidMembersTableRow({ profile }: { profile: UserProfileRow }) {
-  const paidMemberships = paidInvoiceItems(profile).filter(
-    (item) => item.accessType === "Mentorship access",
-  );
+  const paidMemberships = paidInvoiceItems(profile);
 
   return (
     <tr className="transition-colors hover:bg-card/35">
@@ -6634,7 +6632,7 @@ function PaidMembersTableRow({ profile }: { profile: UserProfileRow }) {
       <td className="px-4 py-4">
         <div className="flex flex-wrap gap-2">
           {paidMemberships.map(({ label }) => (
-            <Badge key={label} variant="outline" className="border-bull/40 bg-bull/10 text-bull">
+            <Badge key={label} variant="outline" className={paidAccessBadgeClassName(label)}>
               {label}
             </Badge>
           ))}
@@ -6653,6 +6651,20 @@ function PaidMembersTableRow({ profile }: { profile: UserProfileRow }) {
       </td>
     </tr>
   );
+}
+
+function paidAccessBadgeClassName(label: string) {
+  const normalizedLabel = label.toLowerCase();
+
+  if (normalizedLabel.includes("live trading")) {
+    return "border-primary/40 bg-primary/10 text-electric";
+  }
+
+  if (normalizedLabel.includes("premium")) {
+    return "border-gold/40 bg-gold/10 text-gold";
+  }
+
+  return "border-bull/40 bg-bull/10 text-bull";
 }
 
 function printPaidMemberInvoice(
