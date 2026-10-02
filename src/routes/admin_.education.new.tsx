@@ -283,7 +283,6 @@ function AdminEducationArticleCreatePage() {
                 label="Description"
                 name="description"
                 rows={3}
-                required
               />
 
               <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">

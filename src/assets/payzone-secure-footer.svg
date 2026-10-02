@@ -1,17 +1,16 @@
 <svg width="1164" height="119" viewBox="0 0 1164 119" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
-  <title id="title">Payzone secure checkout</title>
+  <title id="title">Payzone secure payment footer badge</title>
   <desc id="desc">Ce site web est securise 3D Secure with Payzone, Visa, and Mastercard.</desc>
-  <rect width="1164" height="119" rx="0" fill="#ffffff"/>
-  <g transform="translate(16 22)" fill="none" stroke="#344155" stroke-width="5.6" stroke-linecap="round" stroke-linejoin="round">
+  <g transform="translate(16 22)" fill="none" stroke="#e8eef8" stroke-width="5.6" stroke-linecap="round" stroke-linejoin="round">
     <path d="M60 24H25c-7 0-13 6-13 13v25c0 7 6 13 13 13h35c7 0 13-6 13-13V37c0-7-6-13-13-13Z"/>
-    <path d="M2 29 49 4h12l-7-3H38L5 18c-5 3-7 7-3 11Z" fill="#344155" stroke="none"/>
+    <path d="M2 29 49 4h12l-7-3H38L5 18c-5 3-7 7-3 11Z" fill="#e8eef8" stroke="none"/>
     <path d="M12 43h61"/>
     <path d="M26 59h19"/>
-    <circle cx="49" cy="59" r="4" fill="#344155" stroke="none"/>
-    <path d="M86 54v16c0 13-13 21-18 23-5-2-18-10-18-23V54c10 0 15-4 18-8 3 4 8 8 18 8Z" fill="#ffffff"/>
+    <circle cx="49" cy="59" r="4" fill="#e8eef8" stroke="none"/>
+    <path d="M86 54v16c0 13-13 21-18 23-5-2-18-10-18-23V54c10 0 15-4 18-8 3 4 8 8 18 8Z"/>
     <path d="m61 71 6 6 12-15"/>
   </g>
-  <text x="129" y="72" fill="#303a4a" font-family="Inter, Arial, Helvetica, sans-serif" font-size="30" font-weight="800" letter-spacing=".1">
+  <text x="129" y="72" fill="#f8fafc" font-family="Inter, Arial, Helvetica, sans-serif" font-size="30" font-weight="800" letter-spacing=".1">
     Ce site web est s&#233;curis&#233; 3D Secure
   </text>
   <g transform="translate(670 35)">
@@ -20,11 +19,11 @@
     <circle cx="187" cy="11" r="5.5" stroke="#ec007c" stroke-width="2"/>
     <text x="184" y="14" fill="#ec007c" font-family="Arial, Helvetica, sans-serif" font-size="8" font-weight="800">R</text>
   </g>
-  <text x="888" y="80" fill="#132c78" font-family="Arial, Helvetica, sans-serif" font-size="58" font-style="italic" font-weight="900" letter-spacing="-3">VISA</text>
+  <text x="888" y="80" fill="#f8fafc" font-family="Arial, Helvetica, sans-serif" font-size="58" font-style="italic" font-weight="900" letter-spacing="-3">VISA</text>
   <g transform="translate(1040 35)">
     <circle cx="28" cy="28" r="28" fill="#eb001b"/>
     <circle cx="58" cy="28" r="28" fill="#f79e1b"/>
     <path d="M43 8a28 28 0 0 1 0 40 28 28 0 0 1 0-40Z" fill="#ff5f00"/>
-    <text x="2" y="68" fill="#141414" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" letter-spacing="-1">mastercard</text>
+    <text x="2" y="68" fill="#f8fafc" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" letter-spacing="-1">mastercard</text>
   </g>
 </svg>

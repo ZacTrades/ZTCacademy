@@ -3,6 +3,7 @@ import { Instagram, X, Youtube } from "lucide-react";
 import type { SVGProps } from "react";
 
 import { BrandLogo } from "@/components/site/BrandLogo";
+import secureFooterBadge from "@/assets/payzone-secure-footer.svg";
 import { useLanguage, type TranslationKey } from "@/lib/language";
 import { fadeUp, staggerContainer } from "@/lib/motion";
 
@@ -68,6 +69,15 @@ export function Footer() {
               <BrandLogo className="h-14 sm:h-16" showWordmark wordmarkClassName="text-xl sm:text-2xl" />
             </div>
             <p className="mx-auto mt-4 max-w-sm text-sm leading-6 text-muted-foreground sm:mx-0 sm:max-w-xs">{t("footer.tagline")}</p>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Need help?{" "}
+              <a
+                href="mailto:support@zactrades.com"
+                className="font-semibold text-electric transition-colors hover:text-primary"
+              >
+                support@zactrades.com
+              </a>
+            </p>
             <div className="mt-5 flex flex-wrap items-center justify-center gap-3 sm:justify-start">
               {socials.map((social) => (
                 <motion.a
@@ -137,7 +147,16 @@ export function Footer() {
           </motion.div>
         </motion.div>
 
-        <motion.div className="mt-7 border-t border-border/40 pt-6 text-center sm:text-left md:mt-8" variants={fadeUp}>
+        <motion.div
+          className="mt-7 border-t border-border/40 pt-6 text-center sm:text-left md:mt-8"
+          variants={fadeUp}
+        >
+          <img
+            src={secureFooterBadge}
+            alt="Secured with 3D Secure, Payzone, Visa, and Mastercard"
+            className="mx-auto mb-5 h-auto w-full max-w-[620px] sm:mx-0 sm:max-w-[560px] md:max-w-[620px]"
+            loading="lazy"
+          />
           <p className="text-xs leading-6 text-muted-foreground">
             © {new Date().getFullYear()} ZacTrades. {t("footer.risk")}
           </p>

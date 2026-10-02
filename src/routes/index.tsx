@@ -24,13 +24,7 @@ import {
   Copy,
   ExternalLink,
   Heart,
-  Maximize,
   MessageCircle,
-  Mic,
-  Phone,
-  Plus,
-  Smile,
-  Volume2,
   Wrench,
   Send,
   Upload,
@@ -82,6 +76,7 @@ import bouma3zaReviewCertificate from "@/assets/member-review-bouma3za-myfundedf
 import mrHAlphaFuturesCertificate from "@/assets/member-review-mr-h-alpha-futures.jpg";
 import nizarReviewReward from "@/assets/member-review-nizar-fundednext-reward.jpg";
 import tradingViewPreview from "@/assets/zactrades-tradingview-preview.jpeg";
+import liveTradingPhonePreview from "@/assets/live-trading-phone-preview.png";
 import liquidityLevelsPreview from "@/assets/ztc-liquidity-levels-preview.png";
 import { useCurrency } from "@/lib/currency";
 import { supabase } from "@/lib/supabase";
@@ -519,220 +514,19 @@ function LiveRoom() {
             )}
           </motion.div>
 
-          <motion.div {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.15 }}>
-            <div className="glass-strong relative overflow-hidden rounded-2xl p-2 glow-emerald md:p-3">
-              <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary/15 blur-3xl" />
-              <div className="absolute -bottom-12 -left-12 h-36 w-36 rounded-full bg-bull/10 blur-3xl" />
-
-              <div className="relative overflow-hidden rounded-xl border border-border/60 bg-[#111016] shadow-2xl">
-                <div className="grid min-h-[620px] gap-0 lg:grid-cols-[minmax(0,1fr)_290px]">
-                  <div className="flex min-w-0 flex-col bg-black">
-                    <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className="h-3 w-3 rounded-full bg-bear shadow-[0_0_12px_hsl(var(--bear))]" />
-                        <div className="truncate font-display text-sm font-bold md:text-base">
-                          LIVE Day Trading NewYork Session
-                        </div>
-                        <span className="hidden items-center gap-1.5 text-muted-foreground sm:flex">
-                          <BarChart3 className="h-3.5 w-3.5" />
-                          <TrendingUp className="h-3.5 w-3.5" />
-                          <MessageSquareText className="h-3.5 w-3.5" />
-                        </span>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-3 text-[11px] text-muted-foreground">
-                        <span className="hidden items-center gap-1 sm:flex">
-                          <Mic className="h-3.5 w-3.5" />2 speaking
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Users className="h-3.5 w-3.5" />
-                          43 listening
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="p-2 sm:p-3">
-                      <div className="group relative overflow-hidden rounded-md bg-[#080808] ring-1 ring-white/10">
-                        <img
-                          src={tradingViewPreview}
-                          alt="ZacTrades live TradingView screen share"
-                          className="aspect-[16/8.6] w-full object-cover opacity-80 grayscale-[0.15] transition-transform duration-700 group-hover:scale-[1.015]"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/60" />
-                        <div className="absolute left-4 top-4 flex max-w-[80%] items-center gap-2 rounded-full bg-black/55 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur">
-                          <span className="h-2.5 w-2.5 rounded-full bg-bear shadow-[0_0_12px_hsl(var(--bear))]" />
-                          LIVE market screen share
-                        </div>
-                        <div className="absolute bottom-4 left-4 flex items-center gap-2 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur">
-                          <LineChart className="h-4 w-4 text-electric" />
-                          Zac Trades
-                        </div>
-                        <div className="absolute bottom-4 right-4 rounded-full bg-black/60 px-3 py-1.5 text-[11px] text-muted-foreground backdrop-blur">
-                          09:44:33 UTC-4 · ETH
-                        </div>
-                      </div>
-
-                      <div className="mt-3 border-t border-white/10 pt-3">
-                        <div className="mb-3 flex items-center justify-between text-xs font-semibold">
-                          <span className="flex items-center gap-2">
-                            <Mic className="h-4 w-4 text-muted-foreground" />
-                            Intervenants — 2
-                          </span>
-                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                        <div className="flex items-center gap-3">
-                          {[
-                            { name: "ZacTrades", color: "bg-primary/20 text-electric" },
-                            { name: "Suffy94", color: "bg-bull/20 text-bull" },
-                          ].map((speaker) => (
-                            <div key={speaker.name} className="flex items-center gap-2">
-                              <div
-                                className={`grid h-8 w-8 place-items-center rounded-full text-xs font-bold ring-2 ring-background ${speaker.color}`}
-                              >
-                                {speaker.name[0]}
-                              </div>
-                              <Badge className="border-bear/40 bg-bear/80 px-2 py-0.5 text-[10px] text-white">
-                                EN DIRECT
-                              </Badge>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="mt-3 border-t border-white/10 pt-3">
-                        <div className="mb-3 flex items-center justify-between text-xs font-semibold">
-                          <span className="flex items-center gap-2">
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                            Audience — 43
-                          </span>
-                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                        <div className="grid max-h-44 grid-cols-5 gap-3 overflow-hidden sm:grid-cols-7 lg:grid-cols-6 xl:grid-cols-7">
-                          {[
-                            "aziz",
-                            "Suffy94",
-                            "MaowZ13",
-                            "Dahaytam",
-                            "Issaac",
-                            "Fox",
-                            "Hatimsp",
-                            "RA-SM-AM",
-                            "Leouf32",
-                            "ayoub",
-                            "simo",
-                            "Badre",
-                            "Khalid",
-                            "mariam",
-                            "BRADA",
-                            "imad",
-                            "Youssef",
-                            "Spooox",
-                            "S",
-                            "Ilham",
-                            "MOD",
-                          ].map((avatar, index) => (
-                            <div key={`${avatar}-${index}`} className="text-center">
-                              <div
-                                className={`mx-auto grid h-10 w-10 place-items-center rounded-full text-xs font-bold text-white ring-1 ring-white/10 ${
-                                  index % 5 === 0
-                                    ? "bg-[#5865f2]"
-                                    : index % 4 === 0
-                                      ? "bg-[#ed4fa8]"
-                                      : index % 3 === 0
-                                        ? "bg-[#2f855a]"
-                                        : "bg-muted/40"
-                                }`}
-                              >
-                                {avatar[0].toUpperCase()}
-                              </div>
-                              <div className="mx-auto mt-1 w-12 truncate text-[10px] text-muted-foreground">
-                                {avatar}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mx-auto mb-4 mt-auto flex w-fit items-center gap-2 rounded-xl bg-card/95 px-3 py-2 shadow-xl ring-1 ring-border/60">
-                      <button className="grid h-9 w-9 place-items-center rounded-md bg-background/70 text-muted-foreground">
-                        <Mic className="h-4 w-4" />
-                      </button>
-                      <button className="grid h-9 w-9 place-items-center rounded-md bg-background/70 text-muted-foreground">
-                        <Volume2 className="h-4 w-4" />
-                      </button>
-                      <button className="grid h-10 w-12 place-items-center rounded-md bg-bear text-white">
-                        <Phone className="h-4 w-4" />
-                      </button>
-                      <button className="grid h-9 w-9 place-items-center rounded-md bg-background/70 text-muted-foreground">
-                        <Maximize className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <aside className="flex min-h-[360px] flex-col border-t border-white/10 bg-[#1d1b22] lg:border-l lg:border-t-0">
-                    <div className="border-b border-white/10 px-4 py-3">
-                      <div className="flex items-center gap-2 font-display text-sm font-bold">
-                        <span className="h-3 w-3 rounded-full bg-bear" />
-                        Premium LIVE
-                      </div>
-                      <div className="text-[11px] text-muted-foreground">Live room chat</div>
-                    </div>
-                    <div className="border-b border-white/10 p-4">
-                      <div className="mx-auto max-w-32 overflow-hidden rounded-md border border-white/10 bg-black/40">
-                        <img
-                          src={tradingViewPreview}
-                          alt=""
-                          className="h-24 w-full object-cover object-right opacity-80"
-                        />
-                      </div>
-                      <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="rounded-md bg-muted/30 px-2 py-1">3 reactions</span>
-                        <span className="rounded-md bg-muted/30 px-2 py-1">live chat</span>
-                      </div>
-                    </div>
-                    <div className="flex-1 space-y-3 overflow-hidden p-4 text-xs">
-                      {[
-                        { u: "Oussama Touati", m: "Khoya zac chno bank wch nkhliha tp" },
-                        { u: "imad", m: "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhh" },
-                        { u: "THE.OUTIS.LAMANI", m: "independent thinking !!", pro: true },
-                        { u: "Hatimsp", m: "tema cpi high o london high" },
-                        { u: "ZTC Radio", m: "Started playing I'm Your Poison", app: true },
-                        { u: "THE.OUTIS.LAMANI", m: "i still see lower prices before 4H sibi" },
-                      ].map((msg) => (
-                        <div key={`${msg.u}-${msg.m}`} className="flex items-start gap-2">
-                          <div
-                            className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[10px] font-bold ${
-                              msg.pro
-                                ? "bg-bull/20 text-bull"
-                                : msg.app
-                                  ? "bg-[#5865f2]/30 text-[#9fb0ff]"
-                                  : "bg-muted/40 text-muted-foreground"
-                            }`}
-                          >
-                            {msg.u[0]}
-                          </div>
-                          <div>
-                            <div
-                              className={`font-semibold ${msg.pro ? "text-gold" : "text-electric"}`}
-                            >
-                              {msg.u}
-                            </div>
-                            <div className="leading-5 text-foreground/80">{msg.m}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-2 border-t border-white/10 bg-background/45 p-3">
-                      <Plus className="h-4 w-4 text-muted-foreground" />
-                      <div className="flex-1 rounded-lg bg-background/50 px-3 py-2 text-xs text-muted-foreground">
-                        Message Premium LIVE
-                      </div>
-                      <Smile className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </aside>
-                </div>
-              </div>
-            </div>
+          <motion.div
+            {...fadeUp}
+            transition={{ ...fadeUp.transition, delay: 0.15 }}
+            className="relative flex min-w-0 justify-center lg:justify-end"
+          >
+            <div className="pointer-events-none absolute inset-x-8 bottom-6 top-12 -z-10 rounded-full bg-bull/20 blur-3xl" />
+            <div className="pointer-events-none absolute inset-x-16 top-1/4 -z-10 h-72 rounded-full bg-primary/15 blur-3xl" />
+            <img
+              src={liveTradingPhonePreview}
+              alt="ZacTrades live room shown on a phone"
+              className="h-auto max-h-[680px] w-full max-w-[430px] object-contain drop-shadow-[0_34px_80px_rgba(0,163,255,0.18)] sm:max-w-[500px] lg:max-h-[760px] lg:max-w-[560px]"
+              loading="lazy"
+            />
           </motion.div>
         </div>
       </div>
@@ -1363,6 +1157,7 @@ type TestimonialReview = {
   quote: string;
   reactions: Array<{ emoji: string; count: number }>;
   time: string;
+  sortDate?: string;
   tone: string;
   planLabel?: string;
   rating?: number;
@@ -1439,6 +1234,30 @@ function Testimonials() {
 
   const discordReviews: TestimonialReview[] = [
     {
+      name: "ben.amine23",
+      badges: [],
+      planLabel: "1-to-1 Coaching",
+      rating: 5,
+      quote:
+        "The best Mentor, ma3mrni ma fkrt nakhod chi mentorship 7itach aslan kaynin bzaf dial traders li huma brashom w ma3endhomch any clue 3la trading, without any glaze Zac's mentorship a7san investment drto f7yati yla rje3t fl we9t nwli ndir nefs choice 1000 mra.",
+      reactions: [{ emoji: "⭐", count: 5 }],
+      time: "8/3/2026",
+      sortDate: "2026-08-03T02:01:00",
+      tone: "text-gold",
+    },
+    {
+      name: "Modo",
+      badges: [],
+      planLabel: "1-to-1 Coaching",
+      rating: 5,
+      quote:
+        "السلام عليكم. انا اخذت دورة عند الاستاذ زاك. بصراحة مفيدة جداً ويعطيك خلاصة الخلاصة. وبالنسبة ل الايف اللي كل يوم، عبارة عن تطبيق عملي لكل اللي تعلمته. يعني يشرح لك ولما تحضر اللايف تعرف ايش دخل وايش طلع وعلى اي اساس يفكر. بصراحة اللي يبي يستفيد يتوكل على الله ولا راح يندم. الاخ زاك انشغل خلال هذا الشهر اللي ما سوا اللايف كثير من الناس يتردد ويشكك. لكن متاكد",
+      reactions: [{ emoji: "⭐", count: 5 }],
+      time: "19/3/2026",
+      sortDate: "2026-03-19T00:00:00",
+      tone: "text-gold",
+    },
+    {
       name: "Abdellatif",
       badges: [],
       planLabel: "Group Coaching",
@@ -1448,6 +1267,7 @@ function Testimonials() {
       imageUrls: [abdellatifReviewCertificate],
       reactions: [{ emoji: "⭐", count: 5 }],
       time: "12/09/2026",
+      sortDate: "2026-09-12T00:00:00",
       tone: "text-gold",
     },
     {
@@ -1460,6 +1280,7 @@ function Testimonials() {
       imageUrls: [bouma3zaReviewCertificate],
       reactions: [{ emoji: "⭐", count: 5 }],
       time: "10/29/2025",
+      sortDate: "2025-10-29T00:00:00",
       tone: "text-bull",
     },
     {
@@ -1472,6 +1293,7 @@ function Testimonials() {
       imageUrls: [mrHAlphaFuturesCertificate],
       reactions: [{ emoji: "⭐", count: 5 }],
       time: "17/12/2025",
+      sortDate: "2025-12-17T00:00:00",
       tone: "text-bull",
     },
     {
@@ -1484,6 +1306,7 @@ function Testimonials() {
       imageUrls: [bhcReviewCertificate],
       reactions: [{ emoji: "⭐", count: 5 }],
       time: "11/12/2025",
+      sortDate: "2025-12-11T00:00:00",
       tone: "text-gold",
     },
     {
@@ -1495,6 +1318,7 @@ function Testimonials() {
         "Slm alikom 2 mois de formation m3a Zac Kent kangol 3andi des bases bach nkon profitable Trader ( presque 1 an et demi dial 9raya bou7di ) + had la formation li O9sim bilah hta had siyed awal 7aja wold nas w mrabi w baghi l khir l ayi wa7d baghi it3alm fahmo had kelma dial T3ALM 7aydo alikom l3gaz w ba3do 3la les groupes signaux b tajriba ba3do 3la s7ab affiliate b khosos ( li kigol likom dakhlo w 3andkom bonus ) had siyed macheft m3ah ghir khir O9sim bilah staghlo forsa staaaghlo KNOWLEDGE dial had siyd f bzaf 7wayj machi ghir domaine Mn 9alb kantmana lik a khouya Zakaria dakchi li kat tmana f 7yatk w dommage 3raftk m3atl walakin had forsa jat 7amdolilah W kanchrok hta Team rakom 3zaz A7san mentor Khouya Zac",
       reactions: [{ emoji: "⭐", count: 5 }],
       time: "23/09/2026",
+      sortDate: "2026-09-23T00:00:00",
       tone: "text-gold",
     },
     {
@@ -1505,7 +1329,8 @@ function Testimonials() {
       quote:
         "Bonjour tt le monde,\nJe viens de terminer une séance( la troisieme ) dial 1to1 mentorship avec Zac , et je voulais faire un témoignage( n9lebha 3arbiya daba 😅):\nKane 3tani wa7ed tamarin ndirhoum men 9bel et rje3lihoum galiya adnane hadchi lli 3atini rah ma houach , ha chnou bghitek te3tini ou bel mital ou l khater , dik sa3at ka tel9a l wa7ed dayer leak niya baghik t3elem machi wa7ed baghi i zreb 3lik wi tnez 3lik .\nGaliya rje3 lah i khelik et 3awed l exercice .\nAutre chose 3awtani ,\nZac professionnel et me39oul, ki programmi m3ak la séance , ki ltazem ou ila gaa3 khrej lih blane men jenb, ki sifet lik message dik sa3at bachi i 3elmek machi i 7ensrek ( kane siftli un message m3a 3h du matin ).\nBghit ndir had chhada lillah et merci beaucoup pour ta disponibilité et ton humilité 🙏🙏",
       reactions: [{ emoji: "⭐", count: 5 }],
-      time: "2/12/2025, 08:05",
+      time: "2/12/2025",
+      sortDate: "2025-12-02T08:05:00",
       tone: "text-bull",
     },
     {
@@ -1516,7 +1341,8 @@ function Testimonials() {
       quote:
         "Je tiens à remercier Zakaria pour la qualité de sa formation et de son accompagnement en trading. Sa pédagogie, sa rigueur et sa capacité à simplifier des notions complexes m’ont permis de faire de réels progrès. Grâce à son coaching personnalisé, j’ai acquis une méthode claire, une meilleure gestion des émotions et une vision plus structurée des marchés. Je recommande vivement sa formation à toute personne souhaitant progresser sérieusement dans le trading.",
       reactions: [{ emoji: "⭐", count: 5 }],
-      time: "12/10/2025, 20:25",
+      time: "12/10/2025",
+      sortDate: "2025-10-12T20:25:00",
       tone: "text-bull",
     },
     {
@@ -1528,14 +1354,17 @@ function Testimonials() {
         "فاش كتفيق صباح اوكتلقا بحال هاد الميساج كتفرح اوتقول الحمدالله تعلمت شيحجا نخرج منها الفلوس … اوكنبقا كنفكر تنقول شحال او انا كنت تنرون من قروب لقروب قلب على سينيال … حتى حمدلله لقيت راسي هنا معاكوم او حمد الله حيت علمني زكرياء مشي عطاني سينيال او من هنا كنقول ليه شكرا بزاف  بغيت نقوليكوم لدراري والله الى كولشي ساهل تعلمو ديرو ستراتيجيات ديالكوم اربي ايسخرليكوم  شكرا زيكو  شكرا لدراري كاملين",
       imageUrls: [nizarReviewReward],
       reactions: [{ emoji: "⭐", count: 5 }],
-      time: "20/11/2025, 12:56",
+      time: "20/11/2025",
+      sortDate: "2025-11-20T12:56:00",
       tone: "text-bull",
     },
   ];
 
   const initialReviewCount = 4;
   const [visibleReviewCount, setVisibleReviewCount] = useState(initialReviewCount);
-  const allReviews = [...approvedReviews, ...discordReviews];
+  const allReviews = [...approvedReviews, ...discordReviews].sort(
+    (firstReview, secondReview) => reviewSortTimestamp(secondReview) - reviewSortTimestamp(firstReview),
+  );
   const visibleReviews = allReviews.slice(0, visibleReviewCount);
   const hasMoreReviews = visibleReviewCount < allReviews.length;
 
@@ -1569,6 +1398,7 @@ function Testimonials() {
             imageUrls: Array.isArray(review.image_urls) ? review.image_urls.filter(Boolean) : [],
             reactions: [{ emoji: "⭐", count: review.rating }],
             time: formatReviewDate(review.created_at),
+            sortDate: review.created_at,
             tone: review.rating >= 5 ? "text-gold" : "text-primary",
           })),
         );
@@ -2103,6 +1933,11 @@ function formatReviewDate(value: string) {
     day: "numeric",
     year: "numeric",
   }).format(date);
+}
+
+function reviewSortTimestamp(review: TestimonialReview) {
+  const date = new Date(review.sortDate ?? review.time);
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
 }
 
 async function uploadReviewImages(files: File[], userId: string) {

@@ -32,6 +32,7 @@ function ResetPasswordPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const isRecoveryLink = canResetPassword || passwordRecoveryMode || urlHasRecoveryType();
 
   useEffect(() => {
     if (passwordRecoveryMode || urlHasRecoveryType()) {
@@ -41,9 +42,9 @@ function ResetPasswordPage() {
 
     if (loading) return;
 
-    const redirectDelay = urlHasAuthCode() ? 1200 : 0;
+    const redirectDelay = urlHasAuthCode() ? 500 : 0;
     const timeoutId = window.setTimeout(() => {
-      if (!urlHasRecoveryType()) {
+      if (!urlHasRecoveryType() && !passwordRecoveryMode) {
         window.location.replace("/");
       }
     }, redirectDelay);
@@ -78,6 +79,33 @@ function ResetPasswordPage() {
     }
   };
 
+  if (!isRecoveryLink && !successMessage) {
+    return (
+      <div className="min-h-screen overflow-x-clip bg-background text-foreground">
+        <Navbar />
+        <main className="relative overflow-hidden pt-32 pb-20 md:pt-40">
+          <div className="absolute inset-0 -z-10" style={{ background: "var(--gradient-hero)" }} />
+          <div className="grid-bg absolute inset-0 -z-10" />
+          <section className="mx-auto grid min-h-[52vh] max-w-xl place-items-center px-4 md:px-6">
+            <div className="glass-strong w-full rounded-3xl border border-border/60 p-6 text-center sm:p-8">
+              <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-primary/15 text-electric ring-1 ring-primary/30">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+              <p className="mt-6 text-xs font-semibold uppercase tracking-[0.28em] text-electric">
+                ZacTrades account
+              </p>
+              <h1 className="mt-3 font-display text-3xl font-bold sm:text-4xl">Checking account link</h1>
+              <p className="mx-auto mt-4 max-w-md text-sm leading-6 text-muted-foreground">
+                Taking you back to ZacTrades...
+              </p>
+            </div>
+          </section>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen overflow-x-clip bg-background text-foreground">
       <Navbar />
@@ -99,12 +127,7 @@ function ResetPasswordPage() {
               Choose a new password for your account.
             </p>
 
-            {!canResetPassword && !successMessage ? (
-              <div className="mt-7 text-center">
-                <Loader2 className="mx-auto h-6 w-6 animate-spin text-primary" />
-                <p className="mt-3 text-sm text-muted-foreground">Checking account link...</p>
-              </div>
-            ) : successMessage ? (
+            {successMessage ? (
               <div className="mt-7 text-center">
                 <p className="rounded-xl border border-bull/35 bg-bull/10 p-4 text-sm text-bull">
                   {successMessage}

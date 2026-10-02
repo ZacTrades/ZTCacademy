@@ -481,7 +481,12 @@ export function CheckoutDialog({
                               </span>
                             )}
                           </div>
-                          <div className="mt-2 flex items-baseline gap-2">
+                          <div className="mt-2">
+                            {option.originalPrice && (
+                              <span className="mb-0.5 block font-mono text-[11px] font-semibold text-bull">
+                                You save {formatCheckoutPrice(option.originalPrice)}
+                              </span>
+                            )}
                             <span className="font-mono text-lg font-bold">
                               {formatCheckoutPrice(option.price)}
                             </span>
