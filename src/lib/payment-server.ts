@@ -2232,12 +2232,12 @@ function payzoneLaunchHtml(paywallUrl: string, payload: string, signature: strin
   <body>
     <main class="card">
       <div class="spinner" aria-hidden="true"></div>
-      <h1>Opening secure Payzone checkout</h1>
+      <h1>Opening secure checkout</h1>
       <p>If the payment page does not open automatically, press the button below.</p>
       <form id="payzone-launch" action="${escapeHtml(paywallUrl)}" method="post">
         <input type="hidden" name="payload" value="${escapeHtml(payload)}" />
         <input type="hidden" name="signature" value="${escapeHtml(signature)}" />
-        <button type="submit">Continue to Payzone</button>
+        <button type="submit">Continue to checkout</button>
       </form>
     </main>
     <script>

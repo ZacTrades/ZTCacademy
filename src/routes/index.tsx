@@ -483,8 +483,8 @@ function LiveRoom() {
                         <div className="mt-4 flex items-center justify-between">
                           <span>
                             {option.originalPrice && (
-                              <span className="mb-1 block font-mono text-xs text-muted-foreground line-through">
-                                Before {formatPrice(option.originalPrice)}
+                              <span className="mb-1 block font-mono text-xs font-semibold text-bull">
+                                You save {formatPrice(option.originalPrice)}
                               </span>
                             )}
                             <span className="block font-mono text-2xl font-bold text-gradient-gold">
@@ -912,6 +912,7 @@ function Mentorship() {
 /* ============================ INDICATORS ============================ */
 function Indicators() {
   const [items, setItems] = useState<IndicatorRow[]>(defaultIndicators);
+  const previewItems = items.slice(0, 3);
 
   useEffect(() => {
     let mounted = true;
@@ -945,7 +946,7 @@ function Indicators() {
         </motion.div>
 
         <div className="mt-7 grid gap-5 md:mt-9 lg:grid-cols-3">
-          {items.map((indicator, index) => {
+          {previewItems.map((indicator, index) => {
             const isComingSoon = comingSoonIndicatorSlugs.has(indicator.slug);
             const useLiquidityPreview = index === 0;
             const useBlurredPreview = index > 0;
@@ -1488,7 +1489,7 @@ function Testimonials() {
     {
       name: "Moad",
       badges: [],
-      planLabel: "Live Trading",
+      planLabel: "1-to-1 Coaching",
       rating: 5,
       quote:
         "Slm alikom 2 mois de formation m3a Zac Kent kangol 3andi des bases bach nkon profitable Trader ( presque 1 an et demi dial 9raya bou7di ) + had la formation li O9sim bilah hta had siyed awal 7aja wold nas w mrabi w baghi l khir l ayi wa7d baghi it3alm fahmo had kelma dial T3ALM 7aydo alikom l3gaz w ba3do 3la les groupes signaux b tajriba ba3do 3la s7ab affiliate b khosos ( li kigol likom dakhlo w 3andkom bonus ) had siyed macheft m3ah ghir khir O9sim bilah staghlo forsa staaaghlo KNOWLEDGE dial had siyd f bzaf 7wayj machi ghir domaine Mn 9alb kantmana lik a khouya Zakaria dakchi li kat tmana f 7yatk w dommage 3raftk m3atl walakin had forsa jat 7amdolilah W kanchrok hta Team rakom 3zaz A7san mentor Khouya Zac",

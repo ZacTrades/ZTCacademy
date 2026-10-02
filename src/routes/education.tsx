@@ -29,6 +29,7 @@ import {
   educationArticlePath,
   educationArticlesFromRows,
   fetchEducationArticleRows,
+  sortEducationArticleRowsNewestFirst,
 } from "@/lib/education-content";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/use-auth";
@@ -84,6 +85,7 @@ type Lesson = {
   isLogoThumbnail?: boolean;
   slug?: string;
   articleDate?: string;
+  isNew?: boolean;
 };
 
 const lessons: Lesson[] = [
@@ -391,9 +393,11 @@ function EducationPage() {
 
   const canAccessPaidEducation = Boolean(user && (hasPaidEducationAccess || isStaff));
 
-  const articleLessons = useMemo<Lesson[]>(
-    () =>
-      educationArticlesFromRows(educationArticleRows).map((article) => {
+  const articleLessons = useMemo<Lesson[]>(() => {
+    const sortedArticleRows = sortEducationArticleRowsNewestFirst(educationArticleRows);
+    const newestArticleSlug = sortedArticleRows[0]?.slug;
+
+    return educationArticlesFromRows(sortedArticleRows).map((article) => {
         const articleThumbnailUrl = article.coverImageUrl?.trim();
 
         return {
@@ -408,10 +412,10 @@ function EducationPage() {
           articleDate: article.date,
           thumbnailUrl: articleThumbnailUrl || websiteLogoUrl,
           isLogoThumbnail: !articleThumbnailUrl,
+          isNew: article.slug === newestArticleSlug,
         };
-      }),
-    [educationArticleRows],
-  );
+      });
+  }, [educationArticleRows]);
 
   const allLessons = useMemo(() => [...lessons, ...articleLessons], [articleLessons]);
 
@@ -792,6 +796,11 @@ function LessonCard({
               </div>
             </div>
           )}
+          {lesson.isNew ? (
+            <div className="absolute right-4 top-4 rounded-full border border-bull/35 bg-bull/90 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-background shadow-[0_0_28px_-8px_hsl(var(--bull)/0.9)] backdrop-blur-md">
+              New
+            </div>
+          ) : null}
           {lesson.slug ? (
             <h3 className="absolute bottom-3 left-4 right-4 line-clamp-2 font-display text-base font-black leading-tight text-foreground drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] sm:text-lg">
               {lesson.title}
@@ -876,6 +885,11 @@ function LessonCard({
           >
             {lesson.access}
           </Badge>
+          {lesson.isNew ? (
+            <Badge className="border-bull/35 bg-bull/90 text-background shadow-[0_0_24px_-12px_hsl(var(--bull)/0.9)]">
+              New
+            </Badge>
+          ) : null}
         </div>
         <h3 className="mt-4 font-display text-2xl font-bold leading-tight text-foreground">
           {lesson.title}

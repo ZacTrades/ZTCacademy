@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AlertCircle, ArrowRight, Check, Eye, EyeOff, Loader2, Lock } from "lucide-react";
 
@@ -24,13 +24,32 @@ export const Route = createFileRoute("/reset-password")({
 });
 
 function ResetPasswordPage() {
-  const { signOut, updatePassword } = useAuth();
+  const { loading, passwordRecoveryMode, signOut, updatePassword } = useAuth();
   const { t } = useLanguage();
+  const [canResetPassword, setCanResetPassword] = useState(() => urlHasRecoveryType());
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  useEffect(() => {
+    if (passwordRecoveryMode || urlHasRecoveryType()) {
+      setCanResetPassword(true);
+      return;
+    }
+
+    if (loading) return;
+
+    const redirectDelay = urlHasAuthCode() ? 1200 : 0;
+    const timeoutId = window.setTimeout(() => {
+      if (!urlHasRecoveryType()) {
+        window.location.replace("/");
+      }
+    }, redirectDelay);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [loading, passwordRecoveryMode]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -80,7 +99,12 @@ function ResetPasswordPage() {
               Choose a new password for your account.
             </p>
 
-            {successMessage ? (
+            {!canResetPassword && !successMessage ? (
+              <div className="mt-7 text-center">
+                <Loader2 className="mx-auto h-6 w-6 animate-spin text-primary" />
+                <p className="mt-3 text-sm text-muted-foreground">Checking account link...</p>
+              </div>
+            ) : successMessage ? (
               <div className="mt-7 text-center">
                 <p className="rounded-xl border border-bull/35 bg-bull/10 p-4 text-sm text-bull">
                   {successMessage}
@@ -141,6 +165,21 @@ function ResetPasswordPage() {
       <Footer />
     </div>
   );
+}
+
+function urlHasRecoveryType() {
+  if (typeof window === "undefined") return false;
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+
+  return searchParams.get("type") === "recovery" || hashParams.get("type") === "recovery";
+}
+
+function urlHasAuthCode() {
+  if (typeof window === "undefined") return false;
+
+  return new URLSearchParams(window.location.search).has("code");
 }
 
 function PasswordInput({

@@ -306,8 +306,8 @@ function LiveTradingPage() {
                     </div>
                     <div className="mt-6">
                       {option.originalPrice && (
-                        <p className="mb-1 font-mono text-sm text-muted-foreground line-through">
-                          Before {formatPrice(option.originalPrice)}
+                        <p className="mb-1 font-mono text-sm font-semibold text-bull">
+                          You save {formatPrice(option.originalPrice)}
                         </p>
                       )}
                       <p className="font-mono text-4xl font-bold text-gradient-gold">

@@ -342,6 +342,30 @@ const educationCategoryOptions: Array<{ value: EducationArticleCategory; label: 
 
 const staffVisiblePanelKeys: AdminPanelKey[] = ["communityMembers", "registeredAccounts"];
 
+function sortEducationArticlesByRecentActivity(articles: EditableEducationArticle[]) {
+  return [...articles].sort((articleA, articleB) => {
+    const articleBTime = getEducationArticleActivityTime(articleB);
+    const articleATime = getEducationArticleActivityTime(articleA);
+
+    if (articleBTime !== articleATime) {
+      return articleBTime - articleATime;
+    }
+
+    return (articleB.display_order ?? 0) - (articleA.display_order ?? 0);
+  });
+}
+
+function getEducationArticleActivityTime(article: EditableEducationArticle) {
+  const updatedTime = article.updated_at ? Date.parse(article.updated_at) : Number.NaN;
+  if (Number.isFinite(updatedTime)) return updatedTime;
+
+  const createdTime = article.created_at ? Date.parse(article.created_at) : Number.NaN;
+  if (Number.isFinite(createdTime)) return createdTime;
+
+  const publishedTime = article.published_date ? Date.parse(article.published_date) : Number.NaN;
+  return Number.isFinite(publishedTime) ? publishedTime : 0;
+}
+
 function AdminPage() {
   const { panel } = Route.useSearch();
   const { user, loading, isConfigured, isAdmin, isStaff, role, signOut } = useAuth();
@@ -353,7 +377,7 @@ function AdminPage() {
   const [tools, setTools] = useState<EditableTool[]>([]);
   const [propFirms, setPropFirms] = useState<EditablePropFirm[]>([]);
   const [educationArticles, setEducationArticles] = useState<EditableEducationArticle[]>(
-    defaultEducationArticleRows,
+    sortEducationArticlesByRecentActivity(defaultEducationArticleRows),
   );
   const [offerHeadlines, setOfferHeadlines] =
     useState<EditableOfferHeadline[]>(defaultOfferHeadlines);
@@ -444,7 +468,9 @@ function AdminPage() {
           supabase
             .from("education_articles")
             .select("*")
-            .order("display_order", { ascending: true }),
+            .order("updated_at", { ascending: false })
+            .order("created_at", { ascending: false })
+            .order("display_order", { ascending: false }),
           supabase
             .from("prop_firms")
             .select(
@@ -558,7 +584,11 @@ function AdminPage() {
             : defaultTradingTools.map(toEditableTool),
         );
         setEducationArticles(
-          educationResult.data ? (educationResult.data as EducationArticleRow[]) : defaultEducationArticleRows,
+          sortEducationArticlesByRecentActivity(
+            educationResult.data
+              ? (educationResult.data as EducationArticleRow[])
+              : defaultEducationArticleRows,
+          ),
         );
         setPropFirms(
           firmsResult.data?.length
@@ -601,7 +631,7 @@ function AdminPage() {
           setLivePackages(defaultLiveTradingPackageRows);
           setIndicators(defaultIndicators);
           setTools(defaultTradingTools.map(toEditableTool));
-          setEducationArticles(defaultEducationArticleRows);
+          setEducationArticles(sortEducationArticlesByRecentActivity(defaultEducationArticleRows));
           setPropFirms(defaultPropFirms.map(toEditablePropFirm));
           setCommunitySocials(defaultCommunitySocials);
           setDiscountCodes([]);
@@ -643,6 +673,32 @@ function AdminPage() {
     setIndicators((current) =>
       current.map((item) => (item.slug === slug ? { ...item, ...patch } : item)),
     );
+    setMessage("");
+    setErrorMessage("");
+  };
+
+  const addIndicator = () => {
+    const nextOrder =
+      indicators.reduce((highestOrder, indicator) => {
+        return Math.max(highestOrder, Number(indicator.display_order) || 0);
+      }, 0) + 1;
+    const draftSlug = `indicator-draft-${Date.now()}`;
+
+    setIndicators((current) => [
+      {
+        slug: draftSlug,
+        name: "New Indicator",
+        description: "",
+        tag: "Pro",
+        stats_label: "",
+        tradingview_url: "",
+        thumbnail_url: null,
+        video_url: null,
+        is_active: true,
+        display_order: nextOrder,
+      },
+      ...current,
+    ]);
     setMessage("");
     setErrorMessage("");
   };
@@ -1095,16 +1151,33 @@ function AdminPage() {
     if (!supabase) return;
 
     const formData = new FormData(event.currentTarget);
+    const isDraftIndicator = item.slug.startsWith("indicator-draft-");
+    const nextSlug = isDraftIndicator
+      ? uniqueSlug(
+          slugify(item.name || item.slug),
+          new Set(
+            indicators
+              .filter((indicator) => indicator.slug !== item.slug)
+              .map((indicator) => indicator.slug),
+          ),
+        )
+      : item.slug;
 
     setSavingKey(`indicator:${item.slug}`);
     setMessage("");
     setErrorMessage("");
 
+    if (!item.name.trim()) {
+      setErrorMessage("Indicator name is required.");
+      setSavingKey(null);
+      return;
+    }
+
     let thumbnailUrl = item.thumbnail_url?.trim() || null;
 
     try {
       thumbnailUrl =
-        (await uploadIndicatorThumbnail(formData.get("thumbnail_file"), item.slug)) ?? thumbnailUrl;
+        (await uploadIndicatorThumbnail(formData.get("thumbnail_file"), nextSlug)) ?? thumbnailUrl;
     } catch (error) {
       console.error(error);
       setErrorMessage(error instanceof Error ? error.message : "Could not upload this thumbnail.");
@@ -1114,6 +1187,7 @@ function AdminPage() {
 
     const payload: IndicatorRow = {
       ...item,
+      slug: nextSlug,
       name: item.name.trim(),
       description: item.description.trim(),
       tag: item.tag.trim(),
@@ -1136,11 +1210,13 @@ function AdminPage() {
       setErrorMessage(error.message);
     } else if (data) {
       setIndicators((current) =>
-        current.map((currentItem) =>
-          currentItem.slug === item.slug ? (data as IndicatorRow) : currentItem,
-        ),
+        current.map((currentItem) => {
+          if (currentItem.slug !== item.slug) return currentItem;
+
+          return data as IndicatorRow;
+        }),
       );
-      setMessage(`${payload.name} indicator updated.`);
+      setMessage(`${payload.name} indicator ${isDraftIndicator ? "added" : "updated"}.`);
     }
 
     setSavingKey(null);
@@ -1152,6 +1228,14 @@ function AdminPage() {
     setSavingKey(`indicator:delete:${item.slug}`);
     setMessage("");
     setErrorMessage("");
+
+    if (item.slug.startsWith("indicator-draft-")) {
+      setIndicators((current) => current.filter((currentItem) => currentItem.slug !== item.slug));
+      setIndicatorDeleteTarget(null);
+      setMessage("Draft indicator removed.");
+      setSavingKey(null);
+      return;
+    }
 
     const { error } = await supabase.from("premium_indicators").delete().eq("slug", item.slug);
 
@@ -1362,8 +1446,10 @@ function AdminPage() {
       setErrorMessage(error.message);
     } else if (data) {
       setEducationArticles((current) =>
-        current.map((currentItem) =>
-          currentItem.slug === item.slug ? (data as EducationArticleRow) : currentItem,
+        sortEducationArticlesByRecentActivity(
+          current.map((currentItem) =>
+            currentItem.slug === item.slug ? (data as EducationArticleRow) : currentItem,
+          ),
         ),
       );
       setMessage(
@@ -1517,8 +1603,10 @@ function AdminPage() {
       setErrorMessage(error.message);
     } else if (data) {
       setEducationArticles((current) =>
-        current.map((currentItem) =>
-          currentItem.slug === previousSlug ? (data as EducationArticleRow) : currentItem,
+        sortEducationArticlesByRecentActivity(
+          current.map((currentItem) =>
+            currentItem.slug === previousSlug ? (data as EducationArticleRow) : currentItem,
+          ),
         ),
       );
       setMessage(`${payload.title} education article updated.`);
@@ -2441,6 +2529,17 @@ function AdminPage() {
                       <AdminSection
                         title="Premium Indicators"
                         description="Edit indicator names, tags, descriptions, thumbnails, and TradingView links."
+                        action={
+                          <Button
+                            type="button"
+                            onClick={addIndicator}
+                            className="text-primary-foreground glow-primary hover:opacity-90"
+                            style={{ background: "var(--gradient-primary)" }}
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add Indicator
+                          </Button>
+                        }
                       >
                         {indicators.map((item) => (
                           <IndicatorEditor
@@ -3735,10 +3834,10 @@ function LivePackageEditor({
           />
           <Field
             id={`${item.slug}-original-price`}
-            label="Before price"
+            label="Amount saved"
             value={item.original_price ?? ""}
             onChange={(value) => onChange(item.slug, { original_price: value })}
-            placeholder="Optional"
+            placeholder="Example: $20"
           />
           <Field
             id={`${item.slug}-badge`}
@@ -8370,6 +8469,20 @@ function slugify(value: string) {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "") || `item-${Date.now()}`
   );
+}
+
+function uniqueSlug(baseSlug: string, existingSlugs: Set<string>) {
+  if (!existingSlugs.has(baseSlug)) return baseSlug;
+
+  let suffix = 2;
+  let nextSlug = `${baseSlug}-${suffix}`;
+
+  while (existingSlugs.has(nextSlug)) {
+    suffix += 1;
+    nextSlug = `${baseSlug}-${suffix}`;
+  }
+
+  return nextSlug;
 }
 
 function getLogoFileExtension(file: File) {

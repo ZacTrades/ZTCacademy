@@ -93,6 +93,11 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
         await withAuthTimeout(requestPasswordReset(email));
         setSuccessMessage(t("auth.resetSent"));
       } else if (isJoin) {
+        if (!fullName || !localPhoneNumber) {
+          setErrorMessage("Full name and phone number are required.");
+          return;
+        }
+
         const result = await withAuthTimeout(signUp({ email, password, fullName, phoneNumber }));
         setSuccessMessage(
           result.needsEmailConfirmation ? t("auth.signupConfirm") : t("auth.signupReady"),
@@ -159,7 +164,7 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
             </h3>
             <p className="mt-2 text-sm text-muted-foreground">{successMessage}</p>
             <Button
-              className="mt-6 w-full font-semibold text-primary-foreground glow-primary hover:opacity-90"
+              className="mt-6 w-full cursor-pointer font-semibold text-primary-foreground glow-primary hover:opacity-90"
               style={{ background: "var(--gradient-primary)" }}
               onClick={() => {
                 resetState();
@@ -206,7 +211,7 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
                     >
                       <SelectTrigger
                         aria-label="Choose country area code"
-                        className="h-9 w-[6.75rem] shrink-0 rounded-none border-0 border-r border-border/60 bg-background/30 shadow-none focus:ring-0"
+                        className="h-9 w-[6.75rem] shrink-0 cursor-pointer rounded-none border-0 border-r border-border/60 bg-background/30 shadow-none focus:ring-0"
                       >
                         <span>
                           {selectedCountry.flag} {selectedCountry.code}
@@ -264,7 +269,7 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
                   {!isJoin && (
                     <button
                       type="button"
-                      className="text-xs font-semibold text-electric transition-colors hover:text-primary"
+                      className="cursor-pointer text-xs font-semibold text-electric transition-colors hover:text-primary disabled:cursor-not-allowed"
                       onClick={() => {
                         setErrorMessage("");
                         setSuccessMessage("");
@@ -293,7 +298,7 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
                     aria-label={showPassword ? "Hide password" : "Show password"}
                     aria-pressed={showPassword}
                     onClick={() => setShowPassword((current) => !current)}
-                    className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 cursor-pointer place-items-center rounded-md text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed"
                     disabled={submitting}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -330,7 +335,7 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
             <Button
               type="submit"
               size="lg"
-              className="w-full font-semibold text-primary-foreground glow-primary hover:opacity-90"
+              className="w-full cursor-pointer font-semibold text-primary-foreground glow-primary hover:opacity-90 disabled:cursor-not-allowed"
               style={{ background: "var(--gradient-primary)" }}
               disabled={submitting}
             >
@@ -344,7 +349,7 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
 
             <button
               type="button"
-              className="w-full text-center text-xs text-muted-foreground transition-colors hover:text-foreground"
+              className="w-full cursor-pointer text-center text-xs text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed"
               onClick={() => {
                 resetState();
                 if (isForgotPassword) {

@@ -23,6 +23,7 @@ export type AuthContextValue = {
   isAdmin: boolean;
   isStaff: boolean;
   loading: boolean;
+  passwordRecoveryMode: boolean;
   isConfigured: boolean;
   refreshProfile: () => Promise<void>;
   signUp: (params: SignUpParams) => Promise<{ needsEmailConfirmation: boolean }>;
