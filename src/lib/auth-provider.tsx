@@ -12,10 +12,15 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 const missingConfigMessage =
   "Supabase is not configured yet. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local.";
 
+function authRedirectUrl(path: string) {
+  return typeof window !== "undefined" ? `${window.location.origin}${path}` : undefined;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<"admin" | "moderator" | "member" | null>(null);
   const [discordConnection, setDiscordConnection] = useState<DiscordConnection | null>(null);
+  const [passwordRecoveryMode, setPasswordRecoveryMode] = useState(false);
   const [loading, setLoading] = useState(isSupabaseConfigured);
 
   const loadProfile = useCallback(async (nextSession: Session | null) => {
@@ -78,7 +83,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setPasswordRecoveryMode(true);
+      } else if (event === "SIGNED_OUT") {
+        setPasswordRecoveryMode(false);
+      }
+
       setSession(nextSession);
       void loadProfile(nextSession);
       setLoading(false);
@@ -99,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email,
       password,
       options: {
+        emailRedirectTo: authRedirectUrl("/"),
         data: {
           full_name: fullName,
           phone_number: phoneNumber,
@@ -133,11 +145,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(missingConfigMessage);
     }
 
-    const redirectTo =
-      typeof window !== "undefined" ? `${window.location.origin}/reset-password` : undefined;
-
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo,
+      redirectTo: authRedirectUrl("/reset-password"),
     });
 
     if (error) {
@@ -176,6 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin: role === "admin",
       isStaff: role === "admin" || role === "moderator",
       loading,
+      passwordRecoveryMode,
       isConfigured: isSupabaseConfigured,
       refreshProfile,
       signUp,
@@ -187,6 +197,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [
       discordConnection,
       loading,
+      passwordRecoveryMode,
       refreshProfile,
       requestPasswordReset,
       role,

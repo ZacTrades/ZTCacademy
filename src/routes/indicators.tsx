@@ -148,7 +148,7 @@ function IndicatorsPage() {
             {authLoading ? (
               <AccessStatus title="Checking access" description="Verifying your member account." />
             ) : canAccess ? (
-              <div className="grid gap-5 lg:grid-cols-3">
+              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                 {visibleIndicators.map((indicator, index) => {
                   const isComingSoon = comingSoonIndicatorSlugs.has(indicator.slug);
                   const thumbnailUrl = indicator.thumbnail_url?.trim();

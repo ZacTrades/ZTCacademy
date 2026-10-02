@@ -420,7 +420,7 @@ export function CheckoutDialog({
               <DialogHeader className="shrink-0 border-b border-border/60 p-5 pb-4 sm:px-6 sm:py-4">
                 <DialogTitle className="font-display text-xl">Secure Checkout</DialogTitle>
                 <DialogDescription className="text-xs text-muted-foreground">
-                  Encrypted payment · Cancel anytime
+                  Encrypted Payment • Instant Premium Access
                 </DialogDescription>
               </DialogHeader>
 
@@ -443,13 +443,15 @@ export function CheckoutDialog({
                             {activePackage.badge}
                           </div>
                         )}
-                        {(activePackage.originalPrice || appliedDiscount) && (
+                        {appliedDiscount ? (
                           <div className="font-mono text-sm text-muted-foreground line-through">
-                            {formatCheckoutPrice(
-                              appliedDiscount?.originalAmountLabel ?? activePackage.originalPrice,
-                            )}
+                            {formatCheckoutPrice(appliedDiscount.originalAmountLabel)}
                           </div>
-                        )}
+                        ) : activePackage.originalPrice ? (
+                          <div className="font-mono text-xs font-semibold text-bull">
+                            You save {formatCheckoutPrice(activePackage.originalPrice)}
+                          </div>
+                        ) : null}
                         <div className="font-mono text-2xl font-bold text-gradient-gold">
                           {formatCheckoutPrice(payablePriceLabel)}
                         </div>

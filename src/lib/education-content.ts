@@ -32,6 +32,8 @@ export type EducationArticleRow = {
   content: string;
   is_published: boolean;
   display_order: number;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 export const educationArticles: EducationArticle[] = [
@@ -247,6 +249,8 @@ export const defaultEducationArticleRows: EducationArticleRow[] = educationArtic
     content: article.content.join("\n\n"),
     is_published: true,
     display_order: index + 1,
+    created_at: null,
+    updated_at: null,
   }),
 );
 
@@ -276,13 +280,26 @@ export function educationArticlesFromRows(rows: EducationArticleRow[]) {
   return rows.map(educationArticleFromRow);
 }
 
+export function sortEducationArticleRowsNewestFirst(rows: EducationArticleRow[]) {
+  return [...rows].sort((articleA, articleB) => {
+    const articleBTime = getEducationArticleSortTime(articleB);
+    const articleATime = getEducationArticleSortTime(articleA);
+
+    if (articleBTime !== articleATime) {
+      return articleBTime - articleATime;
+    }
+
+    return (articleB.display_order ?? 0) - (articleA.display_order ?? 0);
+  });
+}
+
 export async function fetchEducationArticleRows({
   includeUnpublished = false,
 }: {
   includeUnpublished?: boolean;
 } = {}) {
   if (!supabase) {
-    return defaultEducationArticleRows;
+    return sortEducationArticleRowsNewestFirst(defaultEducationArticleRows);
   }
 
   let query = supabase
@@ -290,7 +307,8 @@ export async function fetchEducationArticleRows({
     .select(
       "*",
     )
-    .order("display_order", { ascending: true });
+    .order("created_at", { ascending: false })
+    .order("display_order", { ascending: false });
 
   if (!includeUnpublished) {
     query = query.eq("is_published", true);
@@ -300,10 +318,18 @@ export async function fetchEducationArticleRows({
 
   if (error) {
     console.error(error);
-    return defaultEducationArticleRows;
+    return sortEducationArticleRowsNewestFirst(defaultEducationArticleRows);
   }
 
-  return (data ?? []) as EducationArticleRow[];
+  return sortEducationArticleRowsNewestFirst((data ?? []) as EducationArticleRow[]);
+}
+
+function getEducationArticleSortTime(row: EducationArticleRow) {
+  const createdTime = row.created_at ? Date.parse(row.created_at) : Number.NaN;
+  if (Number.isFinite(createdTime)) return createdTime;
+
+  const publishedTime = row.published_date ? Date.parse(row.published_date) : Number.NaN;
+  return Number.isFinite(publishedTime) ? publishedTime : 0;
 }
 
 function getFirstArticleImageUrl(content: string) {
