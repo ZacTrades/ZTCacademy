@@ -332,7 +332,9 @@ function EducationPage() {
   const [authMode, setAuthMode] = useState<"signin" | "join">("signin");
   const [activeCategory, setActiveCategory] = useState<CategoryId>("bootcamp");
   const [searchTerm, setSearchTerm] = useState("");
-  const [educationArticleRows, setEducationArticleRows] = useState(defaultEducationArticleRows);
+  const [educationArticleRows, setEducationArticleRows] = useState(() =>
+    sortEducationArticleRowsNewestFirst(defaultEducationArticleRows),
+  );
   const [hasPaidEducationAccess, setHasPaidEducationAccess] = useState(false);
   const [paidAccessLoading, setPaidAccessLoading] = useState(false);
 

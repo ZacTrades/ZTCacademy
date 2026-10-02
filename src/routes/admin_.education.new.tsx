@@ -118,11 +118,27 @@ function AdminEducationArticleCreatePage() {
     const formData = new FormData(event.currentTarget);
     const formTitle = title.trim();
     const nextSlug = slugify(formTitle);
-    const nextOrder = defaultEducationArticleRows.length + 1;
 
     setSaving(true);
     setMessage("");
     setErrorMessage("");
+
+    const createdAt = new Date().toISOString();
+    const { data: latestOrderRow, error: latestOrderError } = await supabase
+      .from("education_articles")
+      .select("display_order")
+      .order("display_order", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (latestOrderError) {
+      console.error(latestOrderError);
+    }
+
+    const latestDisplayOrder = Number(latestOrderRow?.display_order);
+    const nextOrder = Number.isFinite(latestDisplayOrder)
+      ? latestDisplayOrder + 1
+      : defaultEducationArticleRows.length + 1;
 
     const payload: EducationArticleRow = {
       slug: nextSlug,
@@ -139,6 +155,8 @@ function AdminEducationArticleCreatePage() {
       content: content.trim(),
       is_published: isPublished,
       display_order: nextOrder,
+      created_at: createdAt,
+      updated_at: createdAt,
     };
 
     const { error } = await supabase.from("education_articles").insert(payload);

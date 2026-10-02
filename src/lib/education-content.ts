@@ -289,7 +289,10 @@ export function sortEducationArticleRowsNewestFirst(rows: EducationArticleRow[])
       return articleBTime - articleATime;
     }
 
-    return (articleB.display_order ?? 0) - (articleA.display_order ?? 0);
+    const orderDifference = (articleB.display_order ?? 0) - (articleA.display_order ?? 0);
+    if (orderDifference !== 0) return orderDifference;
+
+    return articleB.slug.localeCompare(articleA.slug);
   });
 }
 
@@ -308,7 +311,9 @@ export async function fetchEducationArticleRows({
       "*",
     )
     .order("created_at", { ascending: false })
-    .order("display_order", { ascending: false });
+    .order("published_date", { ascending: false })
+    .order("display_order", { ascending: false })
+    .order("slug", { ascending: false });
 
   if (!includeUnpublished) {
     query = query.eq("is_published", true);

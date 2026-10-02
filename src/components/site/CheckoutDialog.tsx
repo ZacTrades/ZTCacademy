@@ -10,7 +10,6 @@ import {
   Wallet,
   BadgePercent,
   Loader2,
-  MessageCircle,
 } from "lucide-react";
 import {
   Dialog,
@@ -57,6 +56,14 @@ type AppliedDiscountPreview = {
   discountedAmountLabel: string;
   message: string;
 };
+
+function DiscordIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
+      <path d="M19.54 5.23a16.9 16.9 0 0 0-4.24-1.31.06.06 0 0 0-.06.03c-.18.32-.38.74-.52 1.07a15.68 15.68 0 0 0-4.72 0c-.14-.33-.35-.75-.53-1.07a.07.07 0 0 0-.06-.03 16.84 16.84 0 0 0-4.24 1.31.06.06 0 0 0-.03.02C2.45 9.27 1.7 13.2 2.06 17.08c0 .02.01.04.03.05a17 17 0 0 0 5.2 2.63.07.07 0 0 0 .08-.02c.4-.55.76-1.13 1.06-1.74a.07.07 0 0 0-.04-.09 11.2 11.2 0 0 1-1.63-.78.07.07 0 0 1-.01-.11l.32-.25a.06.06 0 0 1 .07 0c3.13 1.43 6.52 1.43 9.61 0a.06.06 0 0 1 .07 0l.33.25a.07.07 0 0 1-.01.11c-.52.31-1.06.57-1.63.78a.07.07 0 0 0-.04.09c.31.61.66 1.19 1.06 1.74a.07.07 0 0 0 .08.02 16.95 16.95 0 0 0 5.21-2.63.07.07 0 0 0 .03-.05c.43-4.49-.72-8.39-3.26-11.83a.05.05 0 0 0-.03-.02ZM8.68 14.71c-.94 0-1.72-.86-1.72-1.92s.76-1.92 1.72-1.92c.97 0 1.74.87 1.72 1.92 0 1.06-.76 1.92-1.72 1.92Zm6.64 0c-.94 0-1.72-.86-1.72-1.92s.76-1.92 1.72-1.92c.97 0 1.74.87 1.72 1.92 0 1.06-.75 1.92-1.72 1.92Z" />
+    </svg>
+  );
+}
 
 const cryptoPaymentOptions = [
   { asset: "USDT", network: "TRC20", label: "USDT TRC20" },
@@ -509,8 +516,8 @@ export function CheckoutDialog({
                   {needsDiscordConnection ? (
                     <div className="mt-3 rounded-xl border border-[#5865f2]/40 bg-[#5865f2]/10 p-4 shadow-[0_0_34px_rgba(88,101,242,0.12)]">
                       <div className="flex items-start gap-3">
-                        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#5865f2]/20 text-[#c8ceff]">
-                          <MessageCircle className="h-5 w-5" />
+                        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#5865f2] text-white shadow-[0_0_22px_rgba(88,101,242,0.35)]">
+                          <DiscordIcon className="h-5 w-5" />
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="font-display text-sm font-semibold text-foreground">
@@ -531,7 +538,7 @@ export function CheckoutDialog({
                             {discordLoading ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              <MessageCircle className="h-4 w-4" />
+                              <DiscordIcon className="h-4 w-4" />
                             )}
                             Connect Discord
                           </Button>

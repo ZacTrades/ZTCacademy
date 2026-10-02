@@ -71,6 +71,11 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
 
   const isJoin = mode === "join";
   const isForgotPassword = !isJoin && forgotPasswordMode;
+  const authDescription = isForgotPassword
+    ? t("auth.forgotDescription")
+    : isJoin
+      ? t("auth.joinDescription")
+      : "";
   const selectedCountry =
     countryCodes.find((country) => country.id === selectedCountryId) ?? countryCodes[0];
 
@@ -145,13 +150,11 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
                 ? t("auth.joinTitle")
                 : t("auth.signInTitle")}
           </DialogTitle>
-          <DialogDescription className="text-sm text-muted-foreground">
-            {isForgotPassword
-              ? t("auth.forgotDescription")
-              : isJoin
-                ? t("auth.joinDescription")
-                : t("auth.signInDescription")}
-          </DialogDescription>
+          {authDescription ? (
+            <DialogDescription className="text-sm text-muted-foreground">
+              {authDescription}
+            </DialogDescription>
+          ) : null}
         </DialogHeader>
 
         {successMessage ? (
