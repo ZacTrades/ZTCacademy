@@ -1,5 +1,16 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { AlertCircle, Check, Eye, EyeOff, Loader2, Lock, Mail, Phone, User } from "lucide-react";
+import {
+  AlertCircle,
+  Check,
+  Eye,
+  EyeOff,
+  Loader2,
+  Lock,
+  Mail,
+  MailCheck,
+  Phone,
+  User,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -29,12 +40,27 @@ const countryCodes = [
   { id: "ca", flag: "🇨🇦", code: "+1", country: "Canada" },
   { id: "gb", flag: "🇬🇧", code: "+44", country: "United Kingdom" },
   { id: "ma", flag: "🇲🇦", code: "+212", country: "Morocco" },
+  { id: "dz", flag: "🇩🇿", code: "+213", country: "Algeria" },
+  { id: "tn", flag: "🇹🇳", code: "+216", country: "Tunisia" },
+  { id: "eg", flag: "🇪🇬", code: "+20", country: "Egypt" },
+  { id: "ly", flag: "🇱🇾", code: "+218", country: "Libya" },
+  { id: "sd", flag: "🇸🇩", code: "+249", country: "Sudan" },
+  { id: "mr", flag: "🇲🇷", code: "+222", country: "Mauritania" },
   { id: "fr", flag: "🇫🇷", code: "+33", country: "France" },
   { id: "es", flag: "🇪🇸", code: "+34", country: "Spain" },
   { id: "de", flag: "🇩🇪", code: "+49", country: "Germany" },
   { id: "it", flag: "🇮🇹", code: "+39", country: "Italy" },
   { id: "ae", flag: "🇦🇪", code: "+971", country: "United Arab Emirates" },
   { id: "sa", flag: "🇸🇦", code: "+966", country: "Saudi Arabia" },
+  { id: "qa", flag: "🇶🇦", code: "+974", country: "Qatar" },
+  { id: "kw", flag: "🇰🇼", code: "+965", country: "Kuwait" },
+  { id: "bh", flag: "🇧🇭", code: "+973", country: "Bahrain" },
+  { id: "om", flag: "🇴🇲", code: "+968", country: "Oman" },
+  { id: "jo", flag: "🇯🇴", code: "+962", country: "Jordan" },
+  { id: "lb", flag: "🇱🇧", code: "+961", country: "Lebanon" },
+  { id: "iq", flag: "🇮🇶", code: "+964", country: "Iraq" },
+  { id: "ye", flag: "🇾🇪", code: "+967", country: "Yemen" },
+  { id: "ps", flag: "🇵🇸", code: "+970", country: "Palestine" },
 ];
 
 const AUTH_SUBMIT_TIMEOUT_MS = 20000;
@@ -68,9 +94,11 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
   const [selectedCountryId, setSelectedCountryId] = useState("us");
   const [showPassword, setShowPassword] = useState(false);
   const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
+  const [signupConfirmationEmail, setSignupConfirmationEmail] = useState("");
 
   const isJoin = mode === "join";
   const isForgotPassword = !isJoin && forgotPasswordMode;
+  const isSignupConfirmation = Boolean(signupConfirmationEmail);
   const authDescription = isForgotPassword
     ? t("auth.forgotDescription")
     : isJoin
@@ -104,6 +132,7 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
         }
 
         const result = await withAuthTimeout(signUp({ email, password, fullName, phoneNumber }));
+        setSignupConfirmationEmail(result.needsEmailConfirmation ? email : "");
         setSuccessMessage(
           result.needsEmailConfirmation ? t("auth.signupConfirm") : t("auth.signupReady"),
         );
@@ -124,6 +153,7 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
     setSubmitting(false);
     setShowPassword(false);
     setForgotPasswordMode(false);
+    setSignupConfirmationEmail("");
   };
 
   useEffect(() => {
@@ -160,21 +190,41 @@ export function AuthDialog({ open, mode, onOpenChange, onModeChange }: AuthDialo
         {successMessage ? (
           <div className="min-h-0 overflow-y-auto overscroll-contain p-5 text-center sm:p-6">
             <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-bull/15 text-bull">
-              <Check className="h-7 w-7" strokeWidth={3} />
+              {isSignupConfirmation ? (
+                <MailCheck className="h-7 w-7" strokeWidth={2.5} />
+              ) : (
+                <Check className="h-7 w-7" strokeWidth={3} />
+              )}
             </div>
             <h3 className="mt-4 font-display text-xl font-bold">
-              {isJoin ? t("auth.accountCreated") : t("auth.welcomeBack")}
+              {isSignupConfirmation
+                ? t("auth.checkEmailTitle")
+                : isJoin
+                  ? t("auth.accountCreated")
+                  : t("auth.welcomeBack")}
             </h3>
             <p className="mt-2 text-sm text-muted-foreground">{successMessage}</p>
+            {isSignupConfirmation ? (
+              <div className="mt-4 rounded-xl border border-primary/25 bg-primary/10 px-4 py-3 text-sm text-foreground">
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                  {t("auth.confirmationSentTo")}
+                </div>
+                <div className="mt-1 break-all font-semibold">{signupConfirmationEmail}</div>
+              </div>
+            ) : null}
             <Button
               className="mt-6 w-full cursor-pointer font-semibold text-primary-foreground glow-primary hover:opacity-90"
               style={{ background: "var(--gradient-primary)" }}
               onClick={() => {
                 resetState();
-                onOpenChange(false);
+                if (isSignupConfirmation) {
+                  onModeChange("signin");
+                } else {
+                  onOpenChange(false);
+                }
               }}
             >
-              {t("auth.continue")}
+              {isSignupConfirmation ? t("auth.backToSignIn") : t("auth.continue")}
             </Button>
           </div>
         ) : (

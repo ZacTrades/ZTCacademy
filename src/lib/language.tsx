@@ -48,9 +48,11 @@ const en = {
   "auth.forgotTitle": "Reset your password",
   "auth.forgotDescription": "Enter your account email and we will send you a secure reset link.",
   "auth.accountCreated": "Account created",
+  "auth.checkEmailTitle": "Check your email",
+  "auth.confirmationSentTo": "Confirmation sent to",
   "auth.welcomeBack": "Welcome back",
   "auth.signupConfirm":
-    "Account created. Check your email to confirm your address before signing in.",
+    "Account created. Please open your email inbox and click the confirmation link before signing in.",
   "auth.signupReady": "Your account is ready. You can continue to your member area.",
   "auth.signInSuccess": "Welcome back. You are signed in and ready to continue.",
   "auth.failed": "Authentication failed.",
@@ -131,9 +133,11 @@ const fr: Record<TranslationKey, string> = {
   "auth.forgotDescription":
     "Entrez l'email de votre compte et nous vous enverrons un lien securise.",
   "auth.accountCreated": "Compte cree",
+  "auth.checkEmailTitle": "Verifiez votre email",
+  "auth.confirmationSentTo": "Confirmation envoyee a",
   "auth.welcomeBack": "Bon retour",
   "auth.signupConfirm":
-    "Compte cree. Verifiez votre email pour confirmer votre adresse avant de vous connecter.",
+    "Compte cree. Ouvrez votre boite email et cliquez sur le lien de confirmation avant de vous connecter.",
   "auth.signupReady": "Votre compte est pret. Vous pouvez continuer vers votre espace membre.",
   "auth.signInSuccess": "Bon retour. Vous etes connecte et pret a continuer.",
   "auth.failed": "Echec de l'authentification.",
