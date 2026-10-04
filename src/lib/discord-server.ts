@@ -61,22 +61,6 @@ type ExpiredAccessRow = {
   user_id: string;
 };
 
-type DiscordConnectionRoleAuditRow = {
-  user_id: string;
-  discord_user_id: string | null;
-};
-
-type DiscordRoleAuditedAccessRow = {
-  paid_at?: string | null;
-  access_starts_at?: string | null;
-  discord_role_synced_at?: string | null;
-};
-
-type DiscordRoleAuditTarget = {
-  kind: "one_to_one" | "group" | "live" | "news";
-  roleIds: string[];
-};
-
 function readServerEnv(name: string) {
   const runtimeValue = (
     globalThis as typeof globalThis & {
@@ -111,15 +95,6 @@ function discordAllowPendingAccess() {
 
 function discordEligibleStatuses() {
   return discordAllowPendingAccess() ? ["paid", "pending"] : ["paid"];
-}
-
-function discordManualRoleRemovalGraceMinutes() {
-  const rawValue = Number(readServerEnv("DISCORD_MANUAL_ROLE_REMOVAL_GRACE_MINUTES") ?? "30");
-  return Number.isFinite(rawValue) && rawValue >= 0 ? rawValue : 30;
-}
-
-function discordManualRoleRemovalAuditEnabled() {
-  return readServerEnv("DISCORD_MANUAL_ROLE_REMOVAL_AUDIT_ENABLED") === "true";
 }
 
 function getDiscordRedirectUri(origin: string) {
@@ -946,101 +921,17 @@ export async function expireAndRevokeDiscordAccess(adminClient: SupabaseClient) 
 }
 
 export async function reconcileDiscordRoleRemovals(adminClient: SupabaseClient) {
-  const botToken = readServerEnv("DISCORD_BOT_TOKEN");
-  const guildId = readServerEnv("DISCORD_GUILD_ID");
+  void adminClient;
 
-  if (!botToken || !guildId) {
-    return {
-      checkedCount: 0,
-      expiredCount: 0,
-      graceSkippedCount: 0,
-      failedMessages: ["Discord bot is not configured yet."],
-    };
-  }
-
-  const targets = getDiscordRoleAuditTargets();
-
-  if (!targets.length) {
-    return {
-      checkedCount: 0,
-      expiredCount: 0,
-      graceSkippedCount: 0,
-      failedMessages: ["Discord paid role IDs are not configured yet."],
-    };
-  }
-
-  const { data: connections, error } = await adminClient
-    .from("discord_connections")
-    .select("user_id,discord_user_id")
-    .not("discord_user_id", "is", null);
-
-  if (error) {
-    return {
-      checkedCount: 0,
-      expiredCount: 0,
-      graceSkippedCount: 0,
-      failedMessages: [error.message],
-    };
-  }
-
-  let checkedCount = 0;
-  let expiredCount = 0;
-  let graceSkippedCount = 0;
-  const failedMessages: string[] = [];
-
-  for (const connection of (connections ?? []) as DiscordConnectionRoleAuditRow[]) {
-    if (!connection.discord_user_id) continue;
-    checkedCount += 1;
-
-    const roleLookup = await fetchDiscordMemberRoleSet(
-      botToken,
-      guildId,
-      connection.discord_user_id,
-    );
-
-    if (!roleLookup.ok) {
-      failedMessages.push(roleLookup.message);
-      continue;
-    }
-
-    let userExpiredCount = 0;
-    let userGraceSkippedCount = 0;
-
-    for (const target of targets) {
-      if (target.roleIds.every((roleId) => roleLookup.roleIds.has(roleId))) continue;
-
-      const result = await expireAccessForMissingDiscordRole(
-        adminClient,
-        connection.user_id,
-        target,
-      );
-
-      if (result.error) {
-        failedMessages.push(result.error);
-      } else {
-        userExpiredCount += result.expiredCount;
-        userGraceSkippedCount += result.graceSkippedCount;
-      }
-    }
-
-    if (userExpiredCount > 0) {
-      expiredCount += userExpiredCount;
-      await adminClient
-        .from("profiles")
-        .update({
-          discord_last_role_sync_at: new Date().toISOString(),
-          discord_role_sync_status: "manual_role_removed",
-          discord_role_sync_error: null,
-        })
-        .eq("id", connection.user_id);
-    }
-
-    if (userGraceSkippedCount > 0) {
-      graceSkippedCount += userGraceSkippedCount;
-    }
-  }
-
-  return { checkedCount, expiredCount, graceSkippedCount, failedMessages };
+  return {
+    disabled: true,
+    checkedCount: 0,
+    expiredCount: 0,
+    graceSkippedCount: 0,
+    failedMessages: [],
+    message:
+      "Discord role reconciliation is non-destructive. Paid access expires only at access_expires_at.",
+  };
 }
 
 export async function handleDiscordExpiryRequest(
@@ -1092,19 +983,6 @@ export async function handleDiscordRoleReconcileRequest(
       },
       { status: 500 },
     );
-  }
-
-  if (!discordManualRoleRemovalAuditEnabled()) {
-    return Response.json({
-      ok: true,
-      disabled: true,
-      checkedCount: 0,
-      expiredCount: 0,
-      graceSkippedCount: 0,
-      failedMessages: [],
-      message:
-        "Discord manual role removal audit is disabled. Set DISCORD_MANUAL_ROLE_REMOVAL_AUDIT_ENABLED=true to enable it again.",
-    });
   }
 
   const result = await reconcileDiscordRoleRemovals(adminClient);
@@ -1235,195 +1113,6 @@ async function removeDiscordUnverifiedRole(
   return { ok: true as const, message: "Discord unverified role was removed." };
 }
 
-function getDiscordRoleAuditTargets() {
-  const targets: DiscordRoleAuditTarget[] = [];
-  const mentorshipRoleId = readServerEnv("DISCORD_MENTORSHIP_ROLE_ID");
-  const oneToOneRoleId = readServerEnv("DISCORD_ONE_TO_ONE_ROLE_ID");
-  const groupRoleId = readServerEnv("DISCORD_GROUP_ROLE_ID");
-  const liveTradingRoleId = readServerEnv("DISCORD_LIVE_TRADING_ROLE_ID");
-  const newsRoleId = readServerEnv("DISCORD_NEWS_ROLE_ID");
-
-  if (oneToOneRoleId || mentorshipRoleId) {
-    targets.push({
-      kind: "one_to_one",
-      roleIds: [oneToOneRoleId ?? mentorshipRoleId].filter((roleId): roleId is string =>
-        Boolean(roleId),
-      ),
-    });
-  }
-
-  if (groupRoleId || mentorshipRoleId) {
-    targets.push({
-      kind: "group",
-      roleIds: [groupRoleId ?? mentorshipRoleId].filter((roleId): roleId is string =>
-        Boolean(roleId),
-      ),
-    });
-  }
-
-  if (liveTradingRoleId) {
-    targets.push({ kind: "live", roleIds: [liveTradingRoleId] });
-  }
-
-  if (newsRoleId) {
-    targets.push({ kind: "news", roleIds: [newsRoleId] });
-  }
-
-  return targets.filter((target) => target.roleIds.length > 0);
-}
-
-async function fetchDiscordMemberRoleSet(botToken: string, guildId: string, discordUserId: string) {
-  const response = await fetch(
-    `https://discord.com/api/guilds/${guildId}/members/${discordUserId}`,
-    {
-      headers: {
-        authorization: `Bot ${botToken}`,
-      },
-    },
-  );
-
-  if (response.status === 404) {
-    return { ok: true as const, roleIds: new Set<string>() };
-  }
-
-  if (!response.ok) {
-    const message = await response.text();
-    return {
-      ok: false as const,
-      message: message || `Discord member role lookup failed with ${response.status}.`,
-    };
-  }
-
-  const member = (await response.json()) as { roles?: unknown };
-  const roles = Array.isArray(member.roles)
-    ? member.roles.filter((roleId): roleId is string => typeof roleId === "string")
-    : [];
-
-  return { ok: true as const, roleIds: new Set(roles) };
-}
-
-async function expireAccessForMissingDiscordRole(
-  adminClient: SupabaseClient,
-  userId: string,
-  target: DiscordRoleAuditTarget,
-) {
-  const activeAccess = await getActiveAccessForDiscordRoleAudit(adminClient, userId, target);
-
-  if (activeAccess.error) {
-    return { expiredCount: 0, graceSkippedCount: 0, error: activeAccess.error };
-  }
-
-  if (!activeAccess.row) {
-    return { expiredCount: 0, graceSkippedCount: 0, error: null };
-  }
-
-  if (!activeAccess.row.discord_role_synced_at) {
-    return { expiredCount: 0, graceSkippedCount: 1, error: null };
-  }
-
-  if (isInsideDiscordManualRemovalGracePeriod(activeAccess.row)) {
-    return { expiredCount: 0, graceSkippedCount: 1, error: null };
-  }
-
-  const now = new Date().toISOString();
-  const patch = {
-    status: "expired",
-    access_expires_at: now,
-    notes: `Access expired because the matching Discord role was removed manually (${target.kind}).`,
-  };
-
-  if (target.kind === "live") {
-    const { data, error } = await adminClient
-      .from("user_live_trading_access")
-      .update(patch)
-      .eq("user_id", userId)
-      .eq("status", "paid")
-      .select("user_id");
-
-    return { expiredCount: data?.length ?? 0, graceSkippedCount: 0, error: error?.message ?? null };
-  }
-
-  if (target.kind === "news") {
-    const { data, error } = await adminClient
-      .from("user_news_subscriptions")
-      .update(patch)
-      .eq("user_id", userId)
-      .eq("status", "paid")
-      .select("user_id");
-
-    return { expiredCount: data?.length ?? 0, graceSkippedCount: 0, error: error?.message ?? null };
-  }
-
-  const { data, error } = await adminClient
-    .from("user_memberships")
-    .update(patch)
-    .eq("user_id", userId)
-    .eq("plan_slug", target.kind)
-    .eq("status", "paid")
-    .select("user_id");
-
-  return { expiredCount: data?.length ?? 0, graceSkippedCount: 0, error: error?.message ?? null };
-}
-
-async function getActiveAccessForDiscordRoleAudit(
-  adminClient: SupabaseClient,
-  userId: string,
-  target: DiscordRoleAuditTarget,
-) {
-  if (target.kind === "live") {
-    const { data, error } = await adminClient
-      .from("user_live_trading_access")
-      .select("paid_at,access_starts_at,discord_role_synced_at")
-      .eq("user_id", userId)
-      .eq("status", "paid")
-      .maybeSingle();
-
-    return {
-      row: data ? (data as DiscordRoleAuditedAccessRow) : null,
-      error: error?.message ?? null,
-    };
-  }
-
-  if (target.kind === "news") {
-    const { data, error } = await adminClient
-      .from("user_news_subscriptions")
-      .select("paid_at,access_starts_at,discord_role_synced_at")
-      .eq("user_id", userId)
-      .eq("status", "paid")
-      .maybeSingle();
-
-    return {
-      row: data ? (data as DiscordRoleAuditedAccessRow) : null,
-      error: error?.message ?? null,
-    };
-  }
-
-  const { data, error } = await adminClient
-    .from("user_memberships")
-    .select("paid_at,access_starts_at,discord_role_synced_at")
-    .eq("user_id", userId)
-    .eq("plan_slug", target.kind)
-    .eq("status", "paid")
-    .maybeSingle();
-
-  return {
-    row: data ? (data as DiscordRoleAuditedAccessRow) : null,
-    error: error?.message ?? null,
-  };
-}
-
-function isInsideDiscordManualRemovalGracePeriod(access: DiscordRoleAuditedAccessRow) {
-  const graceMs = discordManualRoleRemovalGraceMinutes() * 60 * 1000;
-  if (graceMs <= 0) return false;
-
-  const referenceDate = access.access_starts_at ?? access.paid_at;
-  if (!referenceDate) return false;
-
-  const referenceTime = new Date(referenceDate).getTime();
-  if (Number.isNaN(referenceTime)) return false;
-
-  return Date.now() - referenceTime < graceMs;
-}
 
 async function revokeExpiredDiscordRoles(
   adminClient: SupabaseClient,
