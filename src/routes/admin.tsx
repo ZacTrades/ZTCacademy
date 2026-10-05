@@ -209,7 +209,8 @@ type DiscountCodeRow = {
 
 type EditableDiscountCode = DiscountCodeRow & {
   maxRedemptionsText: string;
-  validForHoursText: string;
+  startsAtText: string;
+  expiresAtText: string;
 };
 
 type ProfileRole = "member" | "moderator" | "admin";
@@ -774,7 +775,8 @@ function AdminPage() {
       starts_at: null,
       expires_at: null,
       maxRedemptionsText: "",
-      validForHoursText: "24",
+      startsAtText: "",
+      expiresAtText: "",
     };
 
     setDiscountCodes((current) => [nextDiscount, ...current]);
@@ -1774,9 +1776,8 @@ function AdminPage() {
     const maxRedemptions = item.maxRedemptionsText.trim()
       ? Number(item.maxRedemptionsText.trim())
       : null;
-    const validForHours = item.validForHoursText.trim()
-      ? Number(item.validForHoursText.trim())
-      : null;
+    const startsAt = dateTimeInputToIso(item.startsAtText);
+    const expiresAt = dateTimeInputToIso(item.expiresAtText);
 
     if (!code) {
       setErrorMessage("Please enter a discount code.");
@@ -1798,12 +1799,20 @@ function AdminPage() {
       return;
     }
 
-    if (validForHours !== null && (!Number.isFinite(validForHours) || validForHours <= 0)) {
-      setErrorMessage("Coupon validity must be empty or greater than 0 hours.");
+    if (item.startsAtText.trim() && !startsAt) {
+      setErrorMessage("Please enter a valid coupon start date and time.");
       return;
     }
 
-    const schedule = couponScheduleForSave(item, validForHours);
+    if (item.expiresAtText.trim() && !expiresAt) {
+      setErrorMessage("Please enter a valid coupon expiration date and time.");
+      return;
+    }
+
+    if (startsAt && expiresAt && new Date(expiresAt).getTime() <= new Date(startsAt).getTime()) {
+      setErrorMessage("Coupon expiration must be after its start date and time.");
+      return;
+    }
 
     setSavingKey(`discount:${item.id}`);
     setMessage("");
@@ -1817,8 +1826,8 @@ function AdminPage() {
       applies_to: item.applies_to,
       is_active: item.is_active,
       max_redemptions: maxRedemptions,
-      starts_at: schedule.startsAt,
-      expires_at: schedule.expiresAt,
+      starts_at: startsAt,
+      expires_at: expiresAt,
     };
 
     const query = item.id.startsWith("new-")
@@ -4638,32 +4647,19 @@ function DiscountCodeEditor({
             </div>
           </div>
 
-          <div className="rounded-xl border border-border/60 bg-background/25 p-4">
-            <Label htmlFor={`${item.id}-discount-valid-hours`} className="text-xs">
-              Valid for (hours)
-            </Label>
-            <Input
-              id={`${item.id}-discount-valid-hours`}
-              type="number"
-              min="0.25"
-              step="0.25"
-              value={item.validForHoursText}
-              onChange={(event) =>
-                onChange(item.id, { validForHoursText: event.target.value })
-              }
-              placeholder="24"
-              className="mt-1 max-w-xs bg-background/45"
+          <div className="grid gap-4 sm:grid-cols-2">
+            <DateTimeField
+              id={item.id + "-discount-start"}
+              label="Starts at (date and time)"
+              value={item.startsAtText}
+              onChange={(value) => onChange(item.id, { startsAtText: value })}
             />
-            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-              New, expired, or duration-changed coupons start when saved and remain valid for the
-              exact number of hours in every timezone. Active unchanged coupons keep their current
-              expiration. Leave empty for no automatic expiration.
-            </p>
-            {item.expires_at && !item.id.startsWith("new-") ? (
-              <p className="mt-2 text-xs font-medium text-gold">
-                Current expiration: {formatCouponScheduleDate(item.expires_at)}
-              </p>
-            ) : null}
+            <DateTimeField
+              id={item.id + "-discount-expires"}
+              label="Expires at (date and time)"
+              value={item.expiresAtText}
+              onChange={(value) => onChange(item.id, { expiresAtText: value })}
+            />
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -8248,6 +8244,34 @@ function DateField({
   );
 }
 
+function DateTimeField({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div>
+      <Label htmlFor={id} className="text-xs">
+        {label}
+      </Label>
+      <Input
+        id={id}
+        type="datetime-local"
+        step="60"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-1 bg-background/45 text-foreground [color-scheme:dark]"
+      />
+    </div>
+  );
+}
+
 function TextareaField({
   id,
   label,
@@ -8511,44 +8535,27 @@ function dateInputValue(value: string | null) {
   return year + "-" + month + "-" + day;
 }
 
-function couponValidityHours(startsAt: string | null, expiresAt: string | null) {
-  if (!startsAt || !expiresAt) return null;
+function dateTimeInputValue(value: string | null) {
+  if (!value) return "";
 
-  const durationMs = new Date(expiresAt).getTime() - new Date(startsAt).getTime();
-  if (!Number.isFinite(durationMs) || durationMs <= 0) return null;
-
-  return Math.round((durationMs / 3_600_000) * 100) / 100;
-}
-
-function couponScheduleForSave(item: EditableDiscountCode, validForHours: number | null) {
-  if (validForHours === null) return { startsAt: null, expiresAt: null };
-
-  const previousHours = couponValidityHours(item.starts_at, item.expires_at);
-  const previousExpiration = item.expires_at ? new Date(item.expires_at).getTime() : Number.NaN;
-  const canKeepCurrentSchedule =
-    !item.id.startsWith("new-") &&
-    previousHours !== null &&
-    Math.abs(previousHours - validForHours) < 0.001 &&
-    previousExpiration > Date.now();
-
-  if (canKeepCurrentSchedule) {
-    return { startsAt: item.starts_at, expiresAt: item.expires_at };
-  }
-
-  const startsAt = new Date();
-  const expiresAt = new Date(startsAt.getTime() + validForHours * 3_600_000);
-
-  return { startsAt: startsAt.toISOString(), expiresAt: expiresAt.toISOString() };
-}
-
-function formatCouponScheduleDate(value: string) {
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
+  if (Number.isNaN(parsed.getTime())) return "";
 
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(parsed);
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  const hours = String(parsed.getHours()).padStart(2, "0");
+  const minutes = String(parsed.getMinutes()).padStart(2, "0");
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function dateTimeInputToIso(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const parsed = new Date(trimmed);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
 function toEditableDiscountCode(row: DiscountCodeRow): EditableDiscountCode {
@@ -8556,7 +8563,8 @@ function toEditableDiscountCode(row: DiscountCodeRow): EditableDiscountCode {
     ...row,
     description: row.description ?? "",
     maxRedemptionsText: row.max_redemptions ? String(row.max_redemptions) : "",
-    validForHoursText: String(couponValidityHours(row.starts_at, row.expires_at) ?? ""),
+    startsAtText: dateTimeInputValue(row.starts_at),
+    expiresAtText: dateTimeInputValue(row.expires_at),
   };
 }
 
