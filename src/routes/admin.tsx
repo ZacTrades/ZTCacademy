@@ -179,7 +179,16 @@ type MemberReviewRow = {
 };
 
 type DiscountType = "percent" | "fixed";
-type DiscountApplyTarget = "all" | "live" | "mentorship_one_to_one" | "mentorship_group" | "news";
+type DiscountApplyTarget =
+  | "all"
+  | "live"
+  | "live_one_month"
+  | "live_three_months"
+  | "live_six_months"
+  | "live_twelve_months"
+  | "mentorship_one_to_one"
+  | "mentorship_group"
+  | "news";
 type DiscountAppliesTo = string;
 
 type DiscountCodeRow = {
@@ -200,8 +209,7 @@ type DiscountCodeRow = {
 
 type EditableDiscountCode = DiscountCodeRow & {
   maxRedemptionsText: string;
-  startsAtText: string;
-  expiresAtText: string;
+  validForHoursText: string;
 };
 
 type ProfileRole = "member" | "moderator" | "admin";
@@ -766,8 +774,7 @@ function AdminPage() {
       starts_at: null,
       expires_at: null,
       maxRedemptionsText: "",
-      startsAtText: "",
-      expiresAtText: "",
+      validForHoursText: "24",
     };
 
     setDiscountCodes((current) => [nextDiscount, ...current]);
@@ -1767,6 +1774,9 @@ function AdminPage() {
     const maxRedemptions = item.maxRedemptionsText.trim()
       ? Number(item.maxRedemptionsText.trim())
       : null;
+    const validForHours = item.validForHoursText.trim()
+      ? Number(item.validForHoursText.trim())
+      : null;
 
     if (!code) {
       setErrorMessage("Please enter a discount code.");
@@ -1788,6 +1798,13 @@ function AdminPage() {
       return;
     }
 
+    if (validForHours !== null && (!Number.isFinite(validForHours) || validForHours <= 0)) {
+      setErrorMessage("Coupon validity must be empty or greater than 0 hours.");
+      return;
+    }
+
+    const schedule = couponScheduleForSave(item, validForHours);
+
     setSavingKey(`discount:${item.id}`);
     setMessage("");
     setErrorMessage("");
@@ -1800,8 +1817,8 @@ function AdminPage() {
       applies_to: item.applies_to,
       is_active: item.is_active,
       max_redemptions: maxRedemptions,
-      starts_at: item.startsAtText.trim() || null,
-      expires_at: item.expiresAtText.trim() || null,
+      starts_at: schedule.startsAt,
+      expires_at: schedule.expiresAt,
     };
 
     const query = item.id.startsWith("new-")
@@ -4566,7 +4583,8 @@ function DiscountCodeEditor({
                   Coupon scope
                 </Label>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Choose one or more products where this code can be used.
+                  Choose one or more products. For Live Trading, select all plans or exact
+                  durations.
                 </p>
               </div>
               <Badge variant="outline" className="w-fit border-gold/35 bg-gold/10 text-gold">
@@ -4620,19 +4638,32 @@ function DiscountCodeEditor({
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <DateField
-              id={item.id + "-discount-start"}
-              label="Starts at"
-              value={item.startsAtText}
-              onChange={(value) => onChange(item.id, { startsAtText: value })}
+          <div className="rounded-xl border border-border/60 bg-background/25 p-4">
+            <Label htmlFor={`${item.id}-discount-valid-hours`} className="text-xs">
+              Valid for (hours)
+            </Label>
+            <Input
+              id={`${item.id}-discount-valid-hours`}
+              type="number"
+              min="0.25"
+              step="0.25"
+              value={item.validForHoursText}
+              onChange={(event) =>
+                onChange(item.id, { validForHoursText: event.target.value })
+              }
+              placeholder="24"
+              className="mt-1 max-w-xs bg-background/45"
             />
-            <DateField
-              id={item.id + "-discount-expires"}
-              label="Expires at"
-              value={item.expiresAtText}
-              onChange={(value) => onChange(item.id, { expiresAtText: value })}
-            />
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              New, expired, or duration-changed coupons start when saved and remain valid for the
+              exact number of hours in every timezone. Active unchanged coupons keep their current
+              expiration. Leave empty for no automatic expiration.
+            </p>
+            {item.expires_at && !item.id.startsWith("new-") ? (
+              <p className="mt-2 text-xs font-medium text-gold">
+                Current expiration: {formatCouponScheduleDate(item.expires_at)}
+              </p>
+            ) : null}
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -8383,7 +8414,23 @@ const discountApplyTargetOptions: {
   shortLabel: string;
 }[] = [
   { value: "all", label: "All checkout", shortLabel: "All" },
-  { value: "live", label: "Live Trading", shortLabel: "Live" },
+  { value: "live", label: "All Live Trading", shortLabel: "All Live" },
+  { value: "live_one_month", label: "Live Trading - 1 month", shortLabel: "Live 1 month" },
+  {
+    value: "live_three_months",
+    label: "Live Trading - 3 months",
+    shortLabel: "Live 3 months",
+  },
+  {
+    value: "live_six_months",
+    label: "Live Trading - 6 months",
+    shortLabel: "Live 6 months",
+  },
+  {
+    value: "live_twelve_months",
+    label: "Live Trading - 12 months",
+    shortLabel: "Live 12 months",
+  },
   { value: "mentorship_one_to_one", label: "1-to-1 Coaching", shortLabel: "1-to-1" },
   { value: "mentorship_group", label: "Training Group Coaching", shortLabel: "Group" },
   { value: "news", label: "News Subscription", shortLabel: "News" },
@@ -8417,14 +8464,19 @@ function encodeDiscountApplyTargets(targets: DiscountApplyTarget[]) {
 function toggleDiscountApplyTarget(currentValue: string, target: DiscountApplyTarget) {
   if (target === "all") return "all";
 
-  const currentTargets = getDiscountApplyTargets(currentValue).filter(
-    (current) => current !== "all",
-  );
+  let currentTargets = getDiscountApplyTargets(currentValue).filter((current) => current !== "all");
+
+  if (target === "live") {
+    currentTargets = currentTargets.filter((current) => !current.startsWith("live_"));
+  } else if (target.startsWith("live_")) {
+    currentTargets = currentTargets.filter((current) => current !== "live");
+  }
+
   const nextTargets = currentTargets.includes(target)
     ? currentTargets.filter((current) => current !== target)
     : [...currentTargets, target];
 
-  return encodeDiscountApplyTargets(nextTargets);
+  return nextTargets.length ? encodeDiscountApplyTargets(nextTargets) : currentValue;
 }
 
 function formatDiscountApplyTargets(value: string | null | undefined) {
@@ -8459,13 +8511,52 @@ function dateInputValue(value: string | null) {
   return year + "-" + month + "-" + day;
 }
 
+function couponValidityHours(startsAt: string | null, expiresAt: string | null) {
+  if (!startsAt || !expiresAt) return null;
+
+  const durationMs = new Date(expiresAt).getTime() - new Date(startsAt).getTime();
+  if (!Number.isFinite(durationMs) || durationMs <= 0) return null;
+
+  return Math.round((durationMs / 3_600_000) * 100) / 100;
+}
+
+function couponScheduleForSave(item: EditableDiscountCode, validForHours: number | null) {
+  if (validForHours === null) return { startsAt: null, expiresAt: null };
+
+  const previousHours = couponValidityHours(item.starts_at, item.expires_at);
+  const previousExpiration = item.expires_at ? new Date(item.expires_at).getTime() : Number.NaN;
+  const canKeepCurrentSchedule =
+    !item.id.startsWith("new-") &&
+    previousHours !== null &&
+    Math.abs(previousHours - validForHours) < 0.001 &&
+    previousExpiration > Date.now();
+
+  if (canKeepCurrentSchedule) {
+    return { startsAt: item.starts_at, expiresAt: item.expires_at };
+  }
+
+  const startsAt = new Date();
+  const expiresAt = new Date(startsAt.getTime() + validForHours * 3_600_000);
+
+  return { startsAt: startsAt.toISOString(), expiresAt: expiresAt.toISOString() };
+}
+
+function formatCouponScheduleDate(value: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(parsed);
+}
+
 function toEditableDiscountCode(row: DiscountCodeRow): EditableDiscountCode {
   return {
     ...row,
     description: row.description ?? "",
     maxRedemptionsText: row.max_redemptions ? String(row.max_redemptions) : "",
-    startsAtText: dateInputValue(row.starts_at),
-    expiresAtText: dateInputValue(row.expires_at),
+    validForHoursText: String(couponValidityHours(row.starts_at, row.expires_at) ?? ""),
   };
 }
 

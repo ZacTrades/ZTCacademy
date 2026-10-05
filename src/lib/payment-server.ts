@@ -128,6 +128,10 @@ type PaymentProduct = {
 type DiscountApplyTarget =
   | "all"
   | "live"
+  | "live_one_month"
+  | "live_three_months"
+  | "live_six_months"
+  | "live_twelve_months"
   | "mentorship"
   | "mentorship_one_to_one"
   | "mentorship_group"
@@ -298,6 +302,10 @@ function parseDiscountApplyTargets(value: string | null | undefined): DiscountAp
   const allowedTargets: DiscountApplyTarget[] = [
     "all",
     "live",
+    "live_one_month",
+    "live_three_months",
+    "live_six_months",
+    "live_twelve_months",
     "mentorship",
     "mentorship_one_to_one",
     "mentorship_group",
@@ -318,7 +326,17 @@ function parseDiscountApplyTargets(value: string | null | undefined): DiscountAp
 }
 
 function discountTargetsForProduct(product: PaymentProduct): DiscountApplyTarget[] {
-  if (product.kind === "live") return ["live"];
+  if (product.kind === "live") {
+    const packageTargetBySlug: Partial<Record<string, DiscountApplyTarget>> = {
+      one_month: "live_one_month",
+      three_months: "live_three_months",
+      six_months: "live_six_months",
+      twelve_months: "live_twelve_months",
+    };
+    const packageTarget = product.slug ? packageTargetBySlug[product.slug] : undefined;
+
+    return packageTarget ? ["live", packageTarget] : ["live"];
+  }
   if (product.kind === "news") return ["news"];
 
   if (product.slug === "one_to_one") return ["mentorship", "mentorship_one_to_one"];
