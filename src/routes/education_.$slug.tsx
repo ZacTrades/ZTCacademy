@@ -663,17 +663,62 @@ function sanitizeArticleStyle(style: string) {
       safeDeclarations.push(`color: ${value}`);
     }
 
-    if (
-      property === "font-family" &&
-      /^(Inter|Space Grotesk|Georgia|JetBrains Mono)(,\s*(sans-serif|serif|monospace))?$/i.test(
-        value,
-      )
-    ) {
-      safeDeclarations.push(`font-family: ${value}`);
+    if (property === "font-size" && isSafeArticleFontSize(value)) {
+      safeDeclarations.push(`font-size: ${value.toLowerCase()}`);
+    }
+
+    if (property === "font-weight" && /^(normal|bold|[1-9]00|850)$/i.test(value)) {
+      safeDeclarations.push(`font-weight: ${value.toLowerCase()}`);
+    }
+
+    if (property === "line-height" && isSafeArticleLineHeight(value)) {
+      safeDeclarations.push(`line-height: ${value.toLowerCase()}`);
+    }
+
+    if (property === "font-family") {
+      const safeFontFamily = sanitizeArticleFontFamily(value);
+      if (safeFontFamily) safeDeclarations.push(`font-family: ${safeFontFamily}`);
     }
   }
 
   return safeDeclarations.join("; ");
+}
+
+function isSafeArticleFontSize(value: string) {
+  const match = value.trim().match(/^(\d+(?:\.\d+)?)(rem|em|px|%)$/i);
+  if (!match) return false;
+
+  const amount = Number(match[1]);
+  const unit = match[2].toLowerCase();
+  const maximumByUnit = { rem: 6, em: 6, px: 96, "%": 600 }[unit];
+
+  return amount >= 0.5 && amount <= maximumByUnit;
+}
+
+function isSafeArticleLineHeight(value: string) {
+  const amount = Number(value.trim());
+  return Number.isFinite(amount) && amount >= 0.8 && amount <= 3;
+}
+
+function sanitizeArticleFontFamily(value: string) {
+  const normalized = value
+    .replace(/&quot;|&#0*34;|["']/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const [family, fallback] = normalized.split(",").map((part) => part.trim());
+  const safeFamilies: Record<string, string> = {
+    inter: "Inter",
+    "space grotesk": '"Space Grotesk"',
+    georgia: "Georgia",
+    "jetbrains mono": '"JetBrains Mono"',
+  };
+  const safeFamily = safeFamilies[family.toLowerCase()];
+
+  if (!safeFamily) return null;
+  if (!fallback) return safeFamily;
+  if (!/^(sans-serif|serif|monospace)$/i.test(fallback)) return null;
+
+  return `${safeFamily}, ${fallback.toLowerCase()}`;
 }
 
 function isSafeArticleLink(url: string) {
